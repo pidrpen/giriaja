@@ -265,7 +265,7 @@ this.companion=new Companion(this.player, this);
 
         this.player.draw(this.ctx);
 			if (this.companion && this.companion.alive) {
-			this.companion.drow(this.ctx);
+			this.companion.draw(this.ctx);
 		}
 
         // Рисуем пули
