@@ -1,41 +1,38 @@
-// ===== CosmoShuter Enhanced - Companion.js =====
-// Простой мини-помощник (дрон) для игрока
-
+// ===== CosmoShuter Enhanced - Companion.js (ИСПРАВЛЕННЫЙ) =====
 export class Companion {
     constructor(player, game) {
         this.player = player;
         this.game = game;
         
-        this.x = player.x + 40;
-        this.y = player.y - 30;
+        this.x = player.x;
+        this.y = player.y;
         this.radius = 14;
-        this.angle = 0;           // для орбитального движения
+        this.angle = 0;
         this.orbitRadius = 55;
-        this.orbitSpeed = 0.04;
+        this.orbitSpeed = 0.045;
         
         this.health = 25;
         this.maxHealth = 25;
         this.alive = true;
         
         this.shootCooldown = 0;
-        this.shootInterval = 380; // стреляет каждые ~380ms
-        this.bulletSpeed = 7;
+        this.shootInterval = 320; // стреляет чаще
+        this.bulletSpeed = 8;
         this.damage = 1;
     }
 
     update(enemies) {
         if (!this.alive) return;
 
-        // === Орбитальное движение вокруг игрока ===
+        // Летает вокруг игрока
         this.angle += this.orbitSpeed;
         this.x = this.player.x + Math.cos(this.angle) * this.orbitRadius;
-        this.y = this.player.y + Math.sin(this.angle) * this.orbitRadius * 0.7;
+        this.y = this.player.y + Math.sin(this.angle) * this.orbitRadius * 0.65;
 
-        // === Авто-стрельба по ближайшему врагу ===
-        this.shootCooldown -= 16; // примерно 60fps
+        // Стрельба
+        this.shootCooldown -= 16;
 
         if (this.shootCooldown <= 0 && enemies.length > 0) {
-            // Находим ближайшего врага
             let closest = null;
             let minDist = Infinity;
 
@@ -44,13 +41,13 @@ export class Companion {
                 const dx = enemy.x - this.x;
                 const dy = enemy.y - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < minDist) {
+                if (dist < minDist && dist < 700) {
                     minDist = dist;
                     closest = enemy;
                 }
             }
 
-            if (closest && minDist < 650) {
+            if (closest) {
                 this.shoot(closest);
                 this.shootCooldown = this.shootInterval;
             }
@@ -64,65 +61,62 @@ export class Companion {
         const dy = target.y - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
+        // Пуля с методами (теперь работает)
         const bullet = {
             x: this.x,
             y: this.y,
             vx: (dx / dist) * this.bulletSpeed,
             vy: (dy / dist) * this.bulletSpeed,
             damage: this.damage,
-            radius: 4,
+            radius: 5,
             alive: true,
-            fromCompanion: true
+            fromCompanion: true,
+
+            move() {
+                this.x += this.vx;
+                this.y += this.vy;
+            },
+
+            draw(ctx) {
+                ctx.save();
+                ctx.fillStyle = '#00ffcc';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            },
+
+            isOffScreen(w, h) {
+                return this.x < -10 || this.x > w + 10 || this.y < -10 || this.y > h + 10;
+            }
         };
 
-        this.game.bullets.push(bullet); // добавляем в массив пуль игры
+        this.game.bullets.push(bullet);
     }
 
     takeDamage(amount) {
         this.health -= amount;
-        if (this.health <= 0) {
-            this.alive = false;
-            // Можно добавить эффект взрыва дрона
-        }
+        if (this.health <= 0) this.alive = false;
     }
 
     draw(ctx) {
         if (!this.alive) return;
 
         ctx.save();
-        
-        // Тело дрона (простой круг + детальки)
         ctx.fillStyle = '#00ffcc';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Обводка
         ctx.strokeStyle = '#00aa88';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // "Глаз" / пушка
+        // "Глаз"
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(this.x + 4, this.y, 5, 0, Math.PI * 2);
+        ctx.arc(this.x + 3, this.y, 4, 0, Math.PI * 2);
         ctx.fill();
-
-        // Небольшой "хвост"
-        ctx.strokeStyle = '#00ffcc';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.x - this.radius, this.y);
-        ctx.lineTo(this.x - this.radius - 12, this.y + Math.sin(this.angle * 3) * 6);
-        ctx.stroke();
-
         ctx.restore();
-    }
-
-    // Можно добавить метод респавна дрона
-    respawn() {
-        this.health = this.maxHealth;
-        this.alive = true;
-        this.angle = 0;
     }
 }
