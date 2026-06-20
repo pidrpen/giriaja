@@ -1,0 +1,1945 @@
+﻿// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\index.html =====
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game test</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+    <body>
+        <div id="game-container">
+            <div id="top-bar">
+                <div>Волна: <span id="wave-display">1</span></div>
+                <div>Прогресс: <span id="wave-progress-display">0/10</span></div>
+                <div>Счет: <span id="score-display">0</span></div>
+                <div>Убито: <span id="kills-display">0</span></div>
+                <div>Множитель: <span id="multiplier-display">x1.00</span></div>
+            </div>
+            <canvas id="gameCanvas" width="1000" height="900"></canvas>
+
+            <div id="notification-multiplier" class="game-notification hidden">
+                Множитель x<span id="notif-mult-value">2.00</span>!
+            </div>
+            
+            <div id="notification-wave" class="game-notification hidden">
+                🌊 Волна: <span id="notif-wave-name">Разведка</span>!
+            </div>
+            
+            <div id="notification-bonus" class="game-notification hidden">
+                ✨ Получено: <span id="notif-bonus-name">Здоровье</span>!
+            </div>
+
+            <div id="main-menu" class="ui-panel">
+                <h1>Космический шутер</h1>
+                <button id="start-game-btn">Новая игра</button>
+            </div>
+            <div id="game-over" class="ui-panel hidden">
+                <h1>Увы, вы проиграли😢</h1>
+                <button id="restart-btn">Играть снова</button>
+            </div>
+            <div id="game-pause" class="ui-panel hidden">
+                <h1>Игра на паузе</h1>
+                <button id="resume-btn">Продолжить</button>
+            </div>
+
+        </div>
+        <script type="module" src="js/main.js"></script>
+    </body>
+</html>
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\AssetLoader.js =====
+import { gameConfig } from "./config.js";
+
+export class AssetLoader {
+    constructor() {
+        this.playerSprites = {};   // Загруженные спрайты игрока
+        this.spriteSheets = {};    // Загруженные спрайт-листы врагов
+    }
+    
+    loadAll(callback) {
+        let totalAssets = 0;
+        let loadedAssets = 0;
+        
+        const checkComplete = () => {
+            loadedAssets++;
+            if (loadedAssets === totalAssets) {
+                console.log('Все ресурсы загружены!');
+                callback();
+            }
+        };
+        
+        // 1. Загружаем спрайты игрока
+        for (const [direction, src] of Object.entries(gameConfig.playerSprites)) {
+            totalAssets++;
+            const img = new Image();
+            img.src = src;
+            img.onload = checkComplete;
+            this.playerSprites[direction] = img;
+        }
+        
+        // 2. Загружаем спрайт-листы врагов
+        const loadedPaths = new Map(); // ← Изменили Set на Map
+        
+        // Сначала собираем все уникальные пути
+        for (const type of gameConfig.enemyTypes) {
+            if (!loadedPaths.has(type.spriteSheet)) {
+                totalAssets++;
+                const img = new Image();
+                img.src = type.spriteSheet;
+                img.onload = checkComplete;
+                loadedPaths.set(type.spriteSheet, img); // ← Сохраняем в Map
+            }
+        }
+        
+        // Теперь присваиваем каждый спрайт-лист всем типам, которые его используют
+        for (const type of gameConfig.enemyTypes) {
+            this.spriteSheets[type.name] = loadedPaths.get(type.spriteSheet);
+        }
+        
+        // Защита от ситуации, когда ресурсов нет
+        if (totalAssets === 0) {
+            callback();
+        }
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\config.js =====
+
+export const gameConfig = {
+    canvas: {
+        width: 1000,
+        height: 900
+    },
+    
+    enemySpawn: {
+        interval: 5000  // мс
+    },
+    
+    score: {
+        initialMultiplier: 1,
+        killsForNextMultiplier: 10,
+        multiplierGrowth: 1.5
+    },
+
+    durationInvulnerability: 1000,
+    
+    enemyTypes: [
+        {
+            name: 'smalShip',
+            spriteSheet: 'images/SpritesEnemy2.png',
+            sprites: [
+                { sx: 51, sy: 0, swidth: 32, sheight: 58 },
+                { sx: 200, sy: 0, swidth: 42, sheight: 48 },
+                { sx: 242, sy: 0, swidth: 28, sheight: 56 }
+            ],
+            speed: 1.8,
+            dy: 1,
+            points: 5,
+            health: 1,
+            damage: 1,
+            armor: 0
+        },
+        {
+            name: 'mediumShip',
+            spriteSheet: 'images/SpritesEnemy2.png',
+            sprites: [
+                { sx: 0, sy: 0, swidth: 50, sheight: 59 },
+                { sx: 82, sy: 0, swidth: 58, sheight: 60 },
+                { sx: 140, sy: 0, swidth: 60, sheight: 56 }
+            ],
+            speed: 1.4,
+            dy: 1,
+            points: 10,
+            health: 2,
+            damage: 1,
+            armor: 0
+        },
+        {
+            name: 'largeShip',
+            spriteSheet: 'images/SpritesEnemy2.png',
+            sprites: [
+                { sx: 270, sy: 0, swidth: 56, sheight: 60 },
+                { sx: 326, sy: 0, swidth: 52, sheight: 60 } 
+            ],
+            speed: 1,
+            dy: 1,
+            points: 20,
+            health: 4,
+            damage: 2,
+            armor: 1
+        },
+        {
+            name: 'Boss',
+            spriteSheet: 'images/Boss.png',
+            sprites: [
+                { sx: 0, sy: 0, swidth: 197, sheight: 185 }
+            ],
+            speed: 0.8,
+            dy: 1,
+            points: 40,
+            health: 10,
+            damage: 3,
+            armor: 2
+        },
+        {
+            name: 'strongBoss',
+            spriteSheet: 'images/strongBoss.png',
+            sprites: [
+                { sx: 0, sy: 0, swidth: 635, sheight: 167 }
+            ],
+            speed: 0.4,
+            dy: 1,
+            points: 100,
+            health: 50,
+            damage: 3,
+            armor: 3
+        }
+    ],
+    
+    playerSprites: {
+        down: 'images/player_down.png',
+        left: 'images/player_left.png',
+        right: 'images/player_right.png',
+        up: 'images/player_up.png',
+        left_down: 'images/player_left_down.png',
+        left_up: 'images/player_left_up.png',
+        right_down: 'images/player_right_down.png',
+        right_up: 'images/player_right_up.png',
+        idle: 'images/player.png'
+    },
+
+    waves: [
+        {
+            name: 'Разведка',
+            killsNeeded: 10,
+            spawnInterval: 2000,
+            maxEnemies: 5,
+            enemyTypes: [
+                { name: 'smalShip', weight: 100 },  // 100% шанс
+            ]
+        },
+        {
+            name: 'Первый контакт',
+            killsNeeded: 20,
+            spawnInterval: 1500,
+            maxEnemies: 10,
+            enemyTypes: [
+                { name: 'smalShip', weight: 70 },
+                { name: 'mediumShip', weight: 30 },
+            ]
+        },
+        {
+            name: 'Усиление',
+            killsNeeded: 40,
+            spawnInterval: 1200,
+            maxEnemies: 15,
+            enemyTypes: [
+                { name: 'smalShip', weight: 50 },
+                { name: 'mediumShip', weight: 35 },
+                { name: 'largeShip', weight: 15 }
+            ]
+        },
+        {
+            name: 'Босс приближается',
+            killsNeeded: 70,
+            spawnInterval: 1000,
+            maxEnemies: 30,
+            enemyTypes: [
+                { name: 'smalShip', weight: 40 },
+                { name: 'mediumShip', weight: 30 },
+                { name: 'largeShip', weight: 20 },
+                { name: 'Boss', weight: 10 }  // 10% шанс босса
+            ]
+        },
+        {
+            name: 'Боссы атакуют',
+            killsNeeded: 120,
+            spawnInterval: 800,
+            maxEnemies: 40,
+            enemyTypes: [
+                { name: 'smalShip', weight: 28 },
+                { name: 'mediumShip', weight: 30 },
+                { name: 'largeShip', weight: 25 },
+                { name: 'Boss', weight: 15 },
+                { name: 'strongBoss', weight: 2 }
+            ]
+        },
+        {
+            name: 'Хаос',
+            killsNeeded: 300,
+            spawnInterval: 600,
+            maxEnemies: 60,
+            enemyTypes: [
+                { name: 'smalShip', weight: 10 },
+                { name: 'mediumShip', weight: 25 },
+                { name: 'largeShip', weight: 30 },
+                { name: 'Boss', weight: 25 },
+                { name: 'strongBoss', weight: 10 }
+            ]
+        },
+        {
+            name: 'Безумие',
+            killsNeeded: 500,
+            spawnInterval: 500,
+            maxEnemies: 100,
+            enemyTypes: [
+                { name: 'smalShip', weight: 0 },
+                { name: 'mediumShip', weight: 10 },
+                { name: 'largeShip', weight: 35 },
+                { name: 'Boss', weight: 35 },
+                { name: 'strongBoss', weight: 20 }
+            ]
+        }
+    ],
+
+    bonusRates: {
+        smalShip: 0.15,    // 15% шанс
+        mediumShip: 0.25,  // 25% шанс
+        largeShip: 0.40,   // 40% шанс
+        Boss: 0.50,         // 40% шанс
+        strongBoss: 0.90         //90% шанс
+    },
+    
+    bonusTypes: [
+        { type: 'health', weight: 22 },        // 30%
+        { type: 'shield', weight: 22 },        // 15%
+        { type: 'speed', weight: 20 },     // 5%
+        { type: 'fireRate', weight: 15 },      // 20%
+        { type: 'multiShot', weight: 10 },     // 20%
+        { type: 'fullHealth', weight: 6 },    // 10%
+        { type: 'strongShield', weight: 5 },  // 5%
+    ]
+};
+
+    // // Координаты каждого врага на спрайт-листе
+    // this.enemySprites = [
+    //     { sx: 0, sy: 0, swidth: 50, sheight: 59 },    // Враг 1
+    //     { sx: 51, sy: 0, swidth: 32, sheight: 58 },   // Враг 2
+    //     { sx: 82, sy: 0, swidth: 58, sheight: 60 },  // Враг 3
+    //     { sx: 140, sy: 0, swidth: 60, sheight: 56 },  // Враг 4
+    //     { sx: 200, sy: 0, swidth: 42, sheight: 48 },    // Враг 5
+    //     { sx: 242, sy: 0, swidth: 28, sheight: 56 },   // Враг 6
+    //     { sx: 270, sy: 0, swidth: 56, sheight: 60 },  // Враг 7
+    //     { sx: 326, sy: 0, swidth: 52, sheight: 60 }   // Враг 8
+    // ];
+
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\InputHandler.js =====
+export class InputHandler {
+    constructor() {
+        this.keys = new Map();
+        this.pauseKey = false;
+        this.init();
+    }
+    
+    init() {
+        document.addEventListener('keydown', e => {
+            if(e.key == 'Escape'){
+                this.pauseKey = !this.pauseKey;
+            }
+            else if (!this.keys.get(e.key)) {
+                this.keys.set(e.key, e.key);
+            }
+            
+        });
+        
+        document.addEventListener('keyup', e => {
+            if (this.keys.get(e.key)) {
+                this.keys.delete(e.key);
+            }
+        });
+    }
+    
+    isPressed(key) {
+        return this.keys.has(key);
+    }
+    
+    getDirection() {
+        const hasUp = this.isPressed('ArrowUp');
+        const hasDown = this.isPressed('ArrowDown');
+        const hasLeft = this.isPressed('ArrowLeft');
+        const hasRight = this.isPressed('ArrowRight');
+        
+        if (hasUp && hasLeft) return 'left_up';
+        if (hasUp && hasRight) return 'right_up';
+        if (hasDown && hasLeft) return 'left_down';
+        if (hasDown && hasRight) return 'right_down';
+        if (hasUp) return 'up';
+        if (hasDown) return 'down';
+        if (hasLeft) return 'left';
+        if (hasRight) return 'right';
+        return 'idle';
+    }
+    
+    isAnyDirectionPressed() {
+        return this.isPressed('ArrowUp') || 
+               this.isPressed('ArrowDown') || 
+               this.isPressed('ArrowLeft') || 
+               this.isPressed('ArrowRight');
+    }
+    
+    isShootPressed() {
+        return this.isPressed(' ');
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\main.js =====
+import { InputHandler } from "./InputHandler.js";
+import { AssetLoader } from "./AssetLoader.js";
+import { EnemyFactory } from "./Factorys/EnemyFactory.js";
+import { ScoreManager } from "./Managers/ScoreManager.js";
+import { UIManager } from "./Managers/UIManager.js";
+import { Player } from "./GameObjects/Creatures.js";
+import { WaveManager } from "./Managers/WaveManager.js";
+import { BonusManager } from "./Managers/BonusManager.js";
+import { gameConfig } from "./config.js";
+
+import { Bonus } from "./GameObjects/Bonus.js";
+
+class Game{
+    constructor(){
+        //Холст игры
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        // Менеджеры
+        this.input = new InputHandler();
+        this.scoreManager = new ScoreManager();
+        this.ui = new UIManager();
+        this.waveManager = new WaveManager();
+        this.bonusManager = new BonusManager();
+        
+        // Игровые сущности
+        this.player = null;
+        this.enemies = [];
+        this.bullets = [];
+        
+        // Состояние
+        this.isGameOver = false;
+        this.gamePause = false;
+        this.enemySpawnInterval = null;
+        this.lastFrameTime = Date.now();
+
+
+        // Загрузка ресурсов
+        this.assetLoader = new AssetLoader();
+        this.assetLoader.loadAll(() => {
+            this.enemyFactory = new EnemyFactory(this.assetLoader.spriteSheets);
+            this.initUI();
+        });
+
+    }
+
+    initUI() {
+        const startBtn = document.getElementById('start-game-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const resumeBtn = document.getElementById('resume-btn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () =>
+                {
+                    this.startGame();
+                    this.ui.hideMainMenu();
+                });
+                    
+        }
+        if (restartBtn) {
+            restartBtn.addEventListener('click', () =>
+                {
+                    this.startGame();
+                    this.ui.hideGameOver();
+                });
+        }
+
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', () =>
+                {
+                    this.input.pauseKey = !this.input.pauseKey;
+                });
+        }
+        
+    }
+
+    startGame() {
+        this.isGameOver = false;
+        this.enemies = [];
+        this.bullets = [];
+        this.waveManager.reset();
+        this.bonusManager.reset();
+        this.lastFrameTime = Date.now();
+
+        this.scoreManager.reset();
+        this.ui.hideMainMenu();
+        this.ui.hideGameOver();
+        this.ui.updateAll(this.scoreManager);
+
+
+        this.player = new Player(
+            this.canvas.width, 
+            this.canvas.height, 
+            45, 45, 
+            this.assetLoader.playerSprites
+        );
+
+        // this.spawnEnemy();
+
+        // this.enemySpawnInterval = setInterval(() =>
+        //     {
+        //         this.spawnEnemy();
+        //         // Обновляем интервал динамически
+        //         clearInterval(this.enemySpawnInterval);
+        //         this.enemySpawnInterval = setInterval(() => {
+        //             this.spawnEnemy();
+        //         }, this.getSpawnInterval());
+        //     },
+        //         this.getSpawnInterval()
+        //     );
+
+        this.gameLoop();
+    }    
+    
+    gameLoop() {
+        if (this.isGameOver) return; // Выходим из цикла
+
+        if(!this.gamePause){
+            this.update();
+            this.draw();
+        }
+        else{
+            this.updatePause();
+        }
+
+
+        requestAnimationFrame(() => this.gameLoop());
+    }
+    
+    gameOver() {
+        if (this.enemySpawnInterval) {
+            clearInterval(this.enemySpawnInterval);
+        }
+        this.isGameOver = true;
+           
+        const gameOverScreen = document.getElementById('game-over');
+        if (gameOverScreen) {
+            gameOverScreen.classList.remove('hidden');
+        }
+    }
+
+    shouldSpawnEnemy() {
+        // Проверяем, пора ли спавнить врага
+        if (!this.waveManager.shouldSpawn(this.enemies.length)) {
+            return false;
+        }
+        
+        // Проверяем интервал спавна
+        const now = Date.now();
+        if (!this.lastSpawnTime) this.lastSpawnTime = 0;
+        
+        if (now - this.lastSpawnTime >= this.waveManager.getSpawnInterval()) {
+            this.lastSpawnTime = now;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    spawnEnemy() {
+        const enemyTypeName = this.waveManager.getRandomEnemyType();
+        const enemy = this.enemyFactory.createByType(
+            enemyTypeName
+        );
+        
+        if (enemy) {
+            this.enemies.push(enemy);
+        }
+    }
+
+    update() {
+        
+        const currentTime = Date.now();
+        const deltaTime = currentTime - this.lastFrameTime;
+        this.lastFrameTime = currentTime;
+
+        // Обновляем менеджер волн
+        this.waveManager.update(deltaTime);
+        this.bonusManager.update();
+
+        const collectedBonus = this.bonusManager.checkCollision(this.player);
+        if (collectedBonus) {
+            this.ui.showBonusNotification(collectedBonus);
+        }
+
+        // Спавним врагов по таймеру волны
+        if (this.shouldSpawnEnemy()) {
+            this.spawnEnemy();
+        }
+
+        this.updatePause();
+
+        this.updatePlayer();
+        this.updateEnemies();
+        this.updateBullets();
+        this.cleanup();
+        this.checkCollisions();
+    }
+
+    updatePause(){
+        this.gamePause = this.input.pauseKey;
+        this.ui.showAndHidePause(this.gamePause);
+        this.lastFrameTime = Date.now();
+    }
+
+    updatePlayer() {
+        this.player.currentDirection = this.input.getDirection();
+        
+        // Движение
+        if (this.input.isPressed('ArrowRight')) this.player.moveRight(this.canvas.width);
+        if (this.input.isPressed('ArrowLeft')) this.player.moveLeft();
+        if (this.input.isPressed('ArrowUp')) this.player.moveUp();
+        if (this.input.isPressed('ArrowDown')) this.player.moveDown(this.canvas.height);
+        
+        if (this.input.isShootPressed() && this.player.canShoot()) {
+            for (let i = 0; i < this.player.weaponBulletCount; i++) {
+                this.bullets.push(this.player.createBullet(i));
+            }
+        }
+    }
+
+    updateEnemies() {
+        for (const enemy of this.enemies) enemy.move();
+    }
+    
+    updateBullets() {
+        for (const bullet of this.bullets) bullet.move();
+    }
+    
+    cleanup() {
+        this.bullets = this.bullets.filter(b => !b.isOffScreen(this.canvas.width, this.canvas.height));
+        this.enemies = this.enemies.filter(e => !e.isOffScreen(this.canvas.width, this.canvas.height));
+    }
+
+    getSpawnInterval() {
+        // Базовый интервал 1000 мс
+        const baseInterval = 1000;
+        
+        // Каждые 30 секунд уменьшаем интервал на 10%
+        // Минимальный интервал 200 мс
+        const difficultyFactor = Math.floor(this.gameTime / 30);
+        const multiplier = Math.max(0.2, 1 - (difficultyFactor * 0.1));
+        
+        return baseInterval * multiplier;
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        for (const enemy of this.enemies) {
+            if (enemy.isLoaded){
+                enemy.draw(this.ctx);
+            }
+        }
+
+        this.player.draw(this.ctx);
+
+        // Рисуем пули
+        for (const bullet of this.bullets) {
+            bullet.draw(this.ctx);
+        }
+        this.bonusManager.draw(this.ctx);
+        this.ui.updateWaveInfo(this.waveManager.getWaveInfo());
+    }
+
+    checkCollisions() {
+        const player = this.player;
+
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const enemy = this.enemies[j];
+                    
+            // Столкновение пуль с врагами
+            for (let i = this.bullets.length - 1; i >= 0; i--) {
+                const bullet = this.bullets[i];
+
+                if (this.isColliding(bullet, enemy)) {
+                    this.bullets.splice(i, 1);
+
+                    // Уменьшаем здоровье врага
+                    const isDead = enemy.takeDamage();
+                    
+                    if (isDead) {
+
+                        // Пытаемся оставить бонус
+                        this.bonusManager.tryDropBonuse(
+                            enemy.x + enemy.sizeX / 2,
+                            enemy.y + enemy.sizeY / 2,
+                            enemy.typeName
+                        );
+
+                        this.enemies.splice(j, 1);
+                        this.onEnemyKilled(enemy);
+                    }
+                    break;
+                }
+            }
+
+            if (!this.enemies[j]) continue;
+
+            if (this.isColliding(player, enemy)) {
+                let enemyDies = false;
+
+                // Проверяем щит
+                if (player.hasShield()) {   
+                    enemyDies = player.handleShieldCollision(enemy);
+                } else {
+                    // Обычный урон с учетом типа врага
+                    const isDead = player.takeDamage(enemy.damage || 1);
+                    if (isDead) this.gameOver();
+                    
+                    // При столкновении враг тоже обычно уничтожается (таран)
+                    enemyDies = true; 
+                }
+
+                if (enemyDies) {
+                    this.enemies.splice(j, 1);
+                }
+                break;
+            }
+        }
+    }
+
+    isColliding(rect1, rect2) {
+        return !(
+            rect1.x + rect1.sizeX < rect2.x ||
+            rect1.x > rect2.x + rect2.sizeX ||
+            rect1.y + rect1.sizeY < rect2.y ||
+            rect1.y > rect2.y + rect2.sizeY
+        );
+    }
+     
+    // Метод обработки убийства
+    onEnemyKilled(enemy) {
+        const points = this.scoreManager.onEnemyKilled(enemy.costPoint);
+        this.ui.updateAll(this.scoreManager);
+        
+        const isNextWave = this.waveManager.onEnemyKilled();
+        if(isNextWave){
+            this.ui.showWaveNotification(this.waveManager.getCurrentWave().name);
+        }
+
+        this.ui.updateWaveInfo(this.waveManager.getWaveInfo());
+    }
+}
+
+let game = null;
+
+document.addEventListener('DOMContentLoaded', () =>{
+    game = new Game();
+
+    // 2. Делаем игру доступной в консоли
+    window.game = game;
+    
+    // 3. Добавляем функцию отладки, которая работает с ЭТИМ экземпляром
+    window.debugSpawnBonus = (type = 'strongShield') => {
+        if (!game || !game.bonusManager) {
+            console.error('Игра или менеджер бонусов еще не инициализированы!');
+            return;
+        }
+        
+        // Создаем бонус в центре экрана
+        const bonus = new Bonus(500, 400, type);
+        // ВАЖНО: Добавляем его в активные бонусы игры!
+        game.bonusManager.activeBonuses.push(bonus);
+    };
+
+        // 3. Добавляем функцию отладки, которая работает с ЭТИМ экземпляром
+    window.debugSpawnEnemy = (type = 'Boss') => {
+        if (!game || !game.enemyFactory) {
+            console.error('Игра или менеджер бонусов еще не инициализированы!');
+            return;
+        }
+        const enemy = game.enemyFactory.createByType(type);
+
+        if (enemy) {
+            game.enemies.push(enemy);
+        }
+    };
+});
+    
+
+
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\Managers\BonusManager.js =====
+import { Bonus } from "../GameObjects/Bonus.js";
+import { gameConfig } from "../config.js";
+
+export class BonusManager {
+    constructor() {
+        this.activeBonuses = [];
+    }
+    
+    reset() {
+        this.activeBonuses = [];
+    }
+    
+    tryDropBonuse(x, y, enemyTypeName) {
+        const dropRate = gameConfig.bonusRates[enemyTypeName] || 0;
+        const randomNum = Math.random();
+        
+        console.log(`🎲 Выпало ${randomNum} из ${dropRate}`);
+
+        // Проверяем, выпадет ли бонус
+        if (randomNum < dropRate) {
+            const bonuseType = this.getRandomBonuseType();
+            const bonuse = new Bonus(x, y, bonuseType);
+            this.activeBonuses.push(bonuse);
+        }
+    }
+    
+    getRandomBonuseType() {
+        const types = gameConfig.bonusTypes;
+        const totalWeight = types.reduce((sum, type) => sum + type.weight, 0);
+        
+        let random = Math.random() * totalWeight;
+        
+        for (const type of types) {
+            random -= type.weight;
+            if (random <= 0) {
+                return type.type;
+            }
+        }
+        
+        return types[0].type;
+    }
+    
+    update() {
+        // Двигаем бонусы
+        for (const bonuse of this.activeBonuses) {
+            bonuse.move();
+        }
+        
+        // Удаляем улетевшие и истёкшие
+        this.activeBonuses = this.activeBonuses.filter(p => 
+            !p.isOffScreen(gameConfig.canvas.height,gameConfig.canvas.width) && !p.isExpired()
+        );
+    }
+    
+    draw(ctx) {
+        for (const bonuse of this.activeBonuses) {
+            bonuse.draw(ctx);
+        }
+    }
+    
+    checkCollision(player) {
+        for (let i = this.activeBonuses.length - 1; i >= 0; i--) {
+            const bonuse = this.activeBonuses[i];
+            
+            if (this.isColliding(player, bonuse)) {
+                const applied = this.applyBonuse(player, bonuse.type);
+                
+                if (applied) {
+                    this.activeBonuses.splice(i, 1);
+                    return bonuse.name; // Возвращаем название для уведомления
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    isColliding(rect1, rect2) {
+        return !(
+            rect1.x + rect1.sizeX < rect2.x ||
+            rect1.x > rect2.x + rect2.sizeX ||
+            rect1.y + rect1.sizeY < rect2.y ||
+            rect1.y > rect2.y + rect2.sizeY
+        );
+    }
+    
+    applyBonuse(player, type) {
+        switch(type) {
+            case 'health':
+                if (player.playerHealth < 3) {
+                    player.playerHealth++;
+                    return true;
+                }
+                return false; // Здоровье полное
+                break;
+                
+            case 'fullHealth':
+                player.playerHealth = 3;
+                return true;
+                break;
+                
+            case 'fireRate':
+                if (player.weaponSpeedLevel < 8) {
+                    player.upgradeSpeedWeapon();
+                    return true;
+                }
+                return false; // Максимальный уровень
+                break;
+                
+            case 'multiShot':
+                if (player.weaponBulletCount < 4) {
+                    player.upgradeBulletCount();
+                    return true;
+                }
+                return false;
+                break;
+                
+            case 'shield':
+                player.activateShield(15000, false); // 15 секунд, обычный щит
+                return true;
+                break;
+                
+            case 'strongShield':
+                player.activateShield(15000, true); // 15 секунд, крепкий щит
+                return true;
+                break;   
+
+            case 'speed':
+                if(player.speed < 2.4){
+                    player.upgradeSpeed(); // 15 секунд, крепкий щит
+                    return true;
+                }
+                return false;
+                break;
+                                
+            // case 'strongShield':
+            //     player.activateShield(15000, true); // 15 секунд, крепкий щит
+            //     return true;
+            //     break;
+        }
+        
+        return false;
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\Managers\ScoreManager.js =====
+import { gameConfig } from "../config.js";
+
+export class ScoreManager {
+    constructor() {
+        this.reset();
+    }
+    
+    reset() {
+        this.score = 0;
+        this.kills = 0;
+        this.killsStrike = 0;
+        this.multiplier = gameConfig.score.initialMultiplier;
+        this.killsForNextMultiplier = gameConfig.score.killsForNextMultiplier;
+    }
+    
+    onEnemyKilled(basePoints) {
+        this.kills++;
+        this.killsStrike++;
+        
+        const points = Math.floor(basePoints * this.multiplier);
+        this.score += points;
+        
+        if (this.killsStrike >= this.killsForNextMultiplier) {
+            this.increaseMultiplier();
+        }
+        
+        return points;
+    }
+    
+    increaseMultiplier() {
+        this.multiplier *= gameConfig.score.multiplierGrowth;
+        this.killsForNextMultiplier += 10 * (this.killsForNextMultiplier / 5);
+    }
+    
+    clearMultiplier() {
+        this.multiplier = 1;
+        this.killsForNextMultiplier = 10;
+        this.killsStrike = 0;
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\Managers\UIManager.js =====
+
+export class UIManager {
+    constructor() {
+        this.scoreDisplay = document.getElementById('score-display');
+        this.killsDisplay = document.getElementById('kills-display');
+        this.multiplierDisplay = document.getElementById('multiplier-display');
+        this.killsForNextDisplay = document.getElementById('killsForNext-display');
+
+        // Панели меню
+        this.mainMenu = document.getElementById('main-menu');
+        this.gameOverScreen = document.getElementById('game-over');
+        this.pauseScreen = document.getElementById('game-pause');
+
+        // Элементы уведомлений
+        this.notifMultiplier = document.getElementById('notification-multiplier');
+        this.notifWave = document.getElementById('notification-wave');
+        this.notifBonus = document.getElementById('notification-bonus');
+        // Внутренние span для текста
+        this.notifMultValue = document.getElementById('notif-mult-value');
+        this.notifWaveName = document.getElementById('notif-wave-name');
+        this.notifBonusName = document.getElementById('notif-bonus-name');
+
+        this.waveDisplay = document.getElementById('wave-display');
+        this.waveProgressDisplay = document.getElementById('wave-progress-display');
+
+        // Таймеры для автоматического скрытия
+        this.hideTimers = {};
+    }
+    
+    showNotification(element, duration = 2000) {
+        // Если уже показывается — сбрасываем таймер
+        if (this.hideTimers[element.id]) {
+            clearTimeout(this.hideTimers[element.id]);
+        }
+        
+        // Перезапускаем анимацию
+        element.classList.remove('show', 'hidden');
+        // Форсируем reflow для перезапуска CSS-анимации
+        void element.offsetWidth;
+        element.classList.add('show');
+        
+        // Автоматически скрываем через duration
+        this.hideTimers[element.id] = setTimeout(() => {
+            element.classList.remove('show');
+            element.classList.add('hidden');
+            delete this.hideTimers[element.id];
+        }, duration);
+    }
+
+    showMultiplierNotification(multiplier) {
+        if (this.notifMultValue) {
+            this.notifMultValue.textContent = multiplier.toFixed(2);
+        }
+        this.showNotification(this.notifMultiplier, 2000);
+    }
+    
+    showWaveNotification(waveName) {
+        if (this.notifWaveName) {
+            this.notifWaveName.textContent = waveName;
+        }
+        this.showNotification(this.notifWave, 2500);
+    }
+    
+    showBonusNotification(bonusName) {
+        if (this.notifBonusName) {
+            this.notifBonusName.textContent = bonusName;
+        }
+        this.showNotification(this.notifBonus, 1500);
+    }
+
+    updateScore(score) {
+        if (this.scoreDisplay) this.scoreDisplay.textContent = score;
+    }
+    
+    updateKills(kills) {
+        if (this.killsDisplay) this.killsDisplay.textContent = kills;
+    }
+    
+    updateMultiplier(multiplier, killsForNext) {
+        if (this.multiplierDisplay) {
+            this.multiplierDisplay.textContent = `x${multiplier.toFixed(2)}`;
+        }
+        if (this.killsForNextDisplay) {
+            this.killsForNextDisplay.textContent = `x${killsForNext.toFixed(0)}`;
+        }
+    }
+
+    updateWaveInfo(waveInfo) {
+        if (this.waveDisplay) {
+            this.waveDisplay.textContent = `Волна ${waveInfo.number}: ${waveInfo.name}`;
+        }
+        
+        if (this.waveProgressDisplay) {
+            this.waveProgressDisplay.textContent = `${waveInfo.killsInWave}/${waveInfo.killsNeeded}`;
+        }
+    }
+    
+    updateAll(scoreManager) {
+        this.updateScore(scoreManager.score);
+        this.updateKills(scoreManager.kills);
+        this.updateMultiplier(scoreManager.multiplier, scoreManager.killsForNextMultiplier);
+    }
+    
+    showMainMenu() {
+        this.mainMenu.classList.remove('hidden');
+    }
+    
+    hideMainMenu() {
+        this.mainMenu.classList.add('hidden');
+    }
+    
+    showGameOver() {
+        this.gameOverScreen.classList.remove('hidden');
+    }
+    
+    hideGameOver() {
+        this.gameOverScreen.classList.add('hidden');
+    }
+
+    showAndHidePause(hide) {
+        hide == true? this.pauseScreen.classList.remove('hidden') : this.pauseScreen.classList.add('hidden');
+    }
+
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\Managers\WaveManager.js =====
+import { gameConfig } from "../config.js";
+
+export class WaveManager {
+    constructor() {
+        this.currentWaveIndex = 0;
+        this.killsInWave = 0;
+        this.idleTime = 0; // Время без убийств (в секундах)
+        this.idleThreshold = 20; // Принудительный переход через 60 секунд
+
+    }
+    
+    reset() {
+        this.currentWaveIndex = 0;
+        this.killsInWave = 0;
+        this.idleTime = 0;
+    }
+    
+    update(deltaTime) {
+
+        this.idleTime += deltaTime / 1000;
+        
+        // Проверяем принудительный переход
+        if (this.idleTime >= this.idleThreshold) {
+            this.forceNextWave();
+        }
+    }
+    
+    onEnemyKilled() {
+        this.killsInWave++;
+        this.idleTime = 0; // Сбрасываем таймер бездействия
+        
+        const currentWave = this.getCurrentWave();
+        
+        // Проверяем, достигли ли цели волны
+        if (this.killsInWave >= currentWave.killsNeeded) {
+            this.nextWave();
+            return true;
+        }
+        return false;
+    }
+    
+    nextWave() {
+        if (this.currentWaveIndex < gameConfig.waves.length - 1) {
+            this.currentWaveIndex++;
+            this.killsInWave = 0;
+            this.idleTime = 0;
+            console.log(`🌊 Волна ${this.currentWaveIndex + 1}: ${this.getCurrentWave().name}`);
+            return true; // Волна сменилась
+        }
+        return false; // Последняя волна
+    }
+    
+    forceNextWave() {
+        console.log(`⏰ Принудительный переход: игрок бездействовал ${this.idleTime.toFixed(0)}с`);
+        this.nextWave();
+        
+        // Спавним группу врагов сразу
+        return this.getCurrentWave().maxEnemies; // Количество врагов для спавна
+    }
+    
+    getCurrentWave() {
+        return gameConfig.waves[this.currentWaveIndex];
+    }
+    
+    shouldSpawn(currentEnemyCount) {
+        const currentWave = this.getCurrentWave();
+        
+        // Проверяем лимит врагов на экране
+        if (currentEnemyCount >= currentWave.maxEnemies) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    getRandomEnemyType() {
+        const currentWave = this.getCurrentWave();
+        const types = currentWave.enemyTypes;
+
+        // Собираем только типы с весом > 0
+        const availableTypes = types.filter(t => t.weight > 0);
+        
+        if (availableTypes.length === 0) {
+            return 'smalShip'; // Запасной вариант
+        }
+
+        // Считаем общий вес
+        const totalWeight = availableTypes.reduce((sum, type) => sum + type.weight, 0);
+
+        // Генерируем случайное число от 0 до totalWeight
+        let random = Math.random() * totalWeight;
+        // Выбираем тип на основе веса
+        for (const type of availableTypes) {
+            random -= type.weight;
+            if (random <= 0) {
+                return type.name;
+            }
+        }
+        
+        return availableTypes[0].name; // На всякий случай
+    }
+    
+    getSpawnInterval() {
+        return this.getCurrentWave().spawnInterval;
+    }
+    
+    getWaveInfo() {
+        const currentWave = this.getCurrentWave();
+        return {
+            name: currentWave.name,
+            number: this.currentWaveIndex + 1,
+            killsInWave: this.killsInWave,
+            killsNeeded: currentWave.killsNeeded,
+            idleTime: this.idleTime,
+            idleThreshold: this.idleThreshold
+        };
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\GameObjects\Bonus.js =====
+import { GameObject } from "./GameObject.js";
+
+export class Bonus extends GameObject {
+    constructor(x, y, type) {
+        super(x, y, 20, 20); // Размер бонуса 30x30
+        
+        this.type = type; // 'health', 'fullHealth', 'fireRate', 'multiShot', 'shield', 'strongShield'
+        this.speed = 2; // Скорость падения
+        this.lifetime = 10000; // Бонус исчезает через 10 секунд
+        this.createdAt = Date.now();
+        
+        // Настройка внешнего вида в зависимости от типа
+        this.setupAppearance();
+    }
+    
+    setupAppearance() {
+        switch(this.type) {
+            case 'health':
+                this.color = '#00ff00';
+                this.symbol = '❤️';
+                this.name = 'Здоровье';
+                break;
+            case 'fullHealth':
+                this.color = '#ff00ff';
+                this.symbol = '💟';
+                this.name = 'Полное здоровье';
+                break;
+            case 'fireRate':
+                this.color = '#ffff00';
+                this.symbol = '⚡';
+                this.name = 'Скорострельность';
+                break;
+            case 'multiShot':
+                this.color = '#ff8800';
+                this.symbol = '🔗';
+                this.name = 'Мульти-выстрел';
+                break;
+            case 'shield':
+                this.color = '#00ffff';
+                this.symbol = '🛡️';
+                this.name = 'Щит';
+                break;
+            case 'strongShield':
+                this.color = '#8800ff';
+                this.symbol = '🔰';
+                this.name = 'Крепкий щит';
+                break;
+            case 'speed':
+                this.color = '#ecff95ff';
+                this.symbol = '🚀';
+                this.name = 'Ускорение';
+                break;
+        }
+    }
+    
+    move() {
+        this.y += this.speed;
+    }
+    
+    isExpired() {
+        return Date.now() - this.createdAt > this.lifetime;
+    }
+    
+    draw(ctx) {
+        // Рисуем фон
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.sizeX, this.sizeY);
+        
+        // Рисуем символ
+        ctx.font = '20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.symbol, this.x + this.sizeX / 2, this.y + this.sizeY / 2);
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\GameObjects\Bullet.js =====
+import { GameObject } from "./GameObject.js";
+
+export class Bullet extends GameObject {
+    constructor(x, y, sizeX = 10, sizeY = 10, speed = 5) {
+        super(x, y, sizeX, sizeY );
+        this.speed = speed;
+        // this.color = this.randomRgbColor();
+        this.color = "#990202dd";
+    }
+    
+    move() {
+        this.y -= this.speed; // Летит вверх
+    }
+    
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.sizeX, this.sizeY);
+    }
+    
+    randomRgbColor() {
+        const red = Math.floor(Math.random() * 256); // Случайное число от 0 до 255
+        // const green = Math.floor(Math.random() * 256);
+        // const blue = Math.floor(Math.random() * 256);
+        const green = 0;
+        const blue = 0;
+        return `rgb(${red}, ${green}, ${blue})`;
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\GameObjects\Creatures.js =====
+import { GameObject } from "./GameObject.js";
+import {Bullet} from "./Bullet.js"
+import { gameConfig } from "../config.js";
+
+class Creature extends GameObject{
+    constructor(width, height, sizeX, sizeY){
+        super(width, height, sizeX, sizeY);
+
+        this.speed = 1.5;// Скорость движения (пикселей за кадр)
+        this.dx = 2; // Изменение по X
+        this.dy = 2; // Изменение по Y
+    }
+
+}
+
+
+export class Player extends Creature{
+    constructor(width, height, sizeX, sizeY, sprites){
+        super(width, height, sizeX, sizeY);
+
+        this.canvasWidth = width;
+        this.canvasHeight = height;
+
+        this.x = (width - this.sizeX) / 2; 
+        this.y = (height - this.sizeY) - 20; 
+
+        this.lastShotTime = 0; // Время последнего выстрела
+        this.shootCooldown = 800;
+
+        this.playerHealth = 3;
+        this.weaponSpeedLevel = 1;
+        this.weaponBulletCount = 1;
+
+        this.sprites = sprites;
+        this.currentDirection = 'idle';
+
+        this.shield = null;
+        this.invulnerableUntil = 0; 
+
+        this.updateWeaponStats();
+    }
+
+    
+    moveRight(canvasWidth) {
+        if (this.x + this.sizeX < canvasWidth) {
+            this.x += this.dx * this.speed;
+        }
+    }
+    
+    moveLeft() {
+        this.x -= this.dx * this.speed;
+        if (this.x < 0) {
+            this.x = 0;
+        }
+    }
+    
+    moveUp() {
+        this.y -= this.dy * this.speed;
+        if (this.y < 0) {
+            this.y = 0;
+        }
+    }
+    
+    moveDown(canvasHeight) {
+        if (this.y + this.sizeY < canvasHeight) {
+            this.y += this.dy * this.speed;
+        }
+    }
+
+    canShoot() {
+        const currentTime = Date.now();
+        if (currentTime - this.lastShotTime >= this.shootCooldown) {
+            this.lastShotTime = Date.now();
+            return true; // Можно стрелять
+        }
+        return false; // Еще рано
+    }
+
+    createBullet(index) {
+        const centerX = this.x + this.sizeX / 2;
+        const bulletWidth = 10;
+        const spacing = 15; // Расстояние между центрами пуль
+
+        // Вычисляем смещение от центра
+        const offset = (index - (this.weaponBulletCount - 1) / 2) * spacing;
+
+        const bulletX = centerX + offset - bulletWidth / 2;
+        const bulletY = this.y;
+
+        return new Bullet(bulletX, bulletY);
+    }
+
+    activateInvulnerability(duration) {
+        this.invulnerableUntil = Date.now() + duration;
+    }
+
+    isInvulnerable() {
+        return Date.now() < this.invulnerableUntil;
+    }
+
+    hasShield() {
+        return this.shield && Date.now() < this.shield.expiresAt;
+    }
+    
+    takeDamage(damageAmount) {
+        if (this.hasShield()) {
+            return false; 
+        }
+
+        if (this.isInvulnerable()) {
+            return false;
+        }
+
+        this.playerHealth -= damageAmount;
+        this.activateInvulnerability(2000); // 1 секунда неуязвимости
+        
+        return this.playerHealth <= 0;
+    }
+        
+    handleShieldCollision(enemy) {
+        const armor = enemy.armor || 0;
+        if (this.shield.isStrong) {
+            //Сильный щит
+            if (armor < 2) {
+                // Броня меньше 2: щит цел, враг уничтожается
+                return true; // Враг умирает
+            } else if (armor === 2) {
+                // Ровно 2: щит ломается, враг уничтожается
+                this.shield = null;
+                this.activateInvulnerability(gameConfig.durationInvulnerability);
+                return true; // Враг умирает
+            } else {
+                // Больше 2: щит ломается, враг получает 10 урона и остается
+                this.shield = null;
+                this.activateInvulnerability(gameConfig.durationInvulnerability);
+                
+                enemy.enemyHealth -= 10;
+                return enemy.enemyHealth <= 0; // Умирает ли он от этого урона?
+            }
+        } else {
+            //Простой
+            this.shield = null; // Ломается всегда
+            this.activateInvulnerability(gameConfig.durationInvulnerability);
+            
+            if (armor < 1) {
+                return true; // Враг уничтожается
+            } else {
+                return false; // Враг остается
+            }
+        }
+    }
+
+    updateWeaponStats() {
+        switch (this.weaponSpeedLevel) {
+            case -4: this.shootCooldown = 1400; break;
+            case -3: this.shootCooldown = 1300; break;
+            case -2: this.shootCooldown = 1200; break;
+            case -1: this.shootCooldown = 1100; break;
+            case 0: this.shootCooldown = 1000; break;
+            case 1: this.shootCooldown = 800; break;
+            case 2: this.shootCooldown = 750; break;
+            case 3: this.shootCooldown = 700; break;
+            case 4: this.shootCooldown = 600; break;
+            case 5: this.shootCooldown = 500; break;
+            case 6: this.shootCooldown = 400; break;
+            case 7: this.shootCooldown = 200; break;
+        }
+
+    }
+
+    upgradeSpeed() {
+        this.speed += 0.2;
+    }
+
+    upgradeSpeedWeapon() {
+        this.weaponSpeedLevel++;
+        this.updateWeaponStats();
+    }
+
+    upgradeBulletCount() {
+        this.weaponBulletCount++;
+        this.weaponSpeedLevel--;
+        this.updateWeaponStats();
+    }
+
+    activateShield(duration, isStrong) {
+        this.shield = {
+            expiresAt: Date.now() + duration,
+            isStrong: isStrong
+        };
+    }
+
+
+    drawCooldownBar(ctx) {
+        const player = this;
+        const currentTime = Date.now();
+        const timeSinceLastShot = currentTime - player.lastShotTime;
+        
+        // Прогресс от 0 до 1 (1 = готов к стрельбе)
+        const progress = Math.min(timeSinceLastShot / player.shootCooldown, 1);
+        
+        const barWidth = player.sizeX;
+        const barHeight = 5;
+        const barX = player.x;
+        const barY = player.y-5; // Над игроком
+        
+        // Фон полоски (серый)
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        // Заполненная часть (зеленый, когда готов)
+        ctx.fillStyle = progress >= 1 ? '#00ff00' : '#ffff00';
+        ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+    }
+
+    drawHealthfBar(ctx) {
+        const player = this;
+
+        const barWidth = player.sizeX;
+        const barHeight = 5;
+        const barX = player.x;
+        const barY = player.y + player.sizeY + 5; // Под игроком
+
+        // Фон полоски (серый)
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        switch(this.playerHealth){
+            case(0):
+                ctx.fillStyle = '#333';
+                break;
+            case(1):
+                ctx.fillStyle =  '#af0202ff';
+                break;
+            case(2):
+                ctx.fillStyle =  '#ffff00';
+                break;
+            case(3):
+                ctx.fillStyle =  '#00ff00';
+                break;
+        }
+        ctx.fillRect(barX, barY, barWidth * (this.playerHealth/3), barHeight);
+    }
+
+    drawShield(ctx){
+        // Рисуем щит если активен
+        if (this.hasShield()) {
+            ctx.strokeStyle = this.shield.isStrong ? '#8800ff' : '#00ffff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(
+                this.x + this.sizeX / 2,
+                this.y + this.sizeY / 2,
+                this.sizeX / 2 + 5,
+                0,
+                Math.PI * 2
+            );
+            ctx.stroke();
+        }
+    }
+
+    draw(ctx) {
+        const sprite = this.sprites[this.currentDirection];
+        
+        if (this.isInvulnerable()) {
+            const blink = Math.floor(Date.now() / 50) % 2 === 0;
+            if (!blink) return; // Пропускаем отрисовку кадра
+        }
+        // Проверяем, что картинка загружена
+        if (sprite && sprite.complete) {
+            ctx.drawImage(sprite, this.x, this.y, this.sizeX, this.sizeY);
+
+            this.drawCooldownBar(ctx);
+            this.drawHealthfBar(ctx);
+            this.drawShield(ctx);
+        }
+    }
+}
+
+export class Enemy extends Creature{
+    constructor(width, height, enemyType, spriteID, spriteSheets){
+        super(width, height);
+
+        this.typeName = enemyType.name;
+        this.dx = 3;
+        this.dy = enemyType.dy;
+        this.speed = enemyType.speed;
+        this.costPoint = enemyType.points;
+        this.enemyHealth = enemyType.health;
+        this.enemyMaxHealth = enemyType.health;
+        this.damage = enemyType.damage;
+        this.armor = enemyType.armor;
+        
+        this.spriteSheet = spriteSheets;
+        this.spriteData = enemyType.sprites[spriteID];
+        this.sizeX = this.spriteData.swidth;
+        this.sizeY = this.spriteData.sheight;
+
+        this.x = Math.random() * (width - this.sizeX); 
+        this.y = -this.sizeY; 
+        
+        if (this.spriteSheet.complete) {
+            this.isLoaded = true;
+        } else {
+            this.isLoaded = false;
+            this.spriteSheet.onload = () => {
+                this.isLoaded = true;
+            };
+        }
+    }
+    
+    takeDamage() {
+        this.enemyHealth--;
+        return this.enemyHealth <= 0; // Возвращает true, если враг умер
+    }
+
+    draw(ctx) {
+        if (this.isLoaded) {
+            // Используем 9-аргументный drawImage для вырезания части спрайт-листа
+            ctx.drawImage(
+                this.spriteSheet,
+                this.spriteData.sx, this.spriteData.sy,
+                this.spriteData.swidth, this.spriteData.sheight,
+                this.x, this.y,
+                this.sizeX, this.sizeY
+            );
+            this.drawHealthfBar(ctx);
+        }
+    }
+
+    move(){
+        this.y += this.dy * this.speed;
+    }
+
+    drawHealthfBar(ctx) {
+        const enemy = this;
+
+        const barWidth = enemy.sizeX;
+        const barHeight = 5;
+        const barX = enemy.x;
+        const barY = enemy.y-5;; //Над врагом
+
+        // Фон полоски (серый)
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+
+        // // Цвет в зависимости от типа
+        // let healthColor = '#ff0000'; // По умолчанию красный
+        
+        // switch(this.typeName) {
+        //     case 'smalShip':
+        //         healthColor = '#ff6600'; // Оранжевый
+        //         break;
+        //     case 'mediumShip':
+        //         healthColor = '#ff0000'; // Красный
+        //         break;
+        //     case 'largeShip':
+        //         healthColor = '#9900ff'; // Фиолетовый
+        //         break;
+        //     case 'Boss':
+        //         healthColor = '#ff00ff'; // Розовый/магента
+        //         break;
+        // }
+        // ctx.fillStyle = healthColor;
+
+        const healthPercent = this.enemyHealth / this.enemyMaxHealth;
+        ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : '#ff0000';
+        ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\GameObjects\GameObject.js =====
+export class GameObject {
+    constructor(x, y, sizeX, sizeY) {
+        this.x = x;
+        this.y = y;
+        this.sizeX = sizeX;
+        this.sizeY = sizeY; 
+    }
+    
+    // Общий метод для проверки выхода за экран
+    isOffScreen(canvasWidth, canvasHeight) {
+        return (
+            this.x + this.sizeX < 0 ||    // Ушел за левый край
+            this.x > canvasWidth ||        // Ушел за правый край
+            this.y + this.sizeY < 0 ||    // Ушел за верхний край
+            this.y > canvasHeight          // Ушел за нижний край
+        );
+    }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\js\Factorys\EnemyFactory.js =====
+import { Enemy } from "../GameObjects/Creatures.js";
+import { gameConfig } from "../config.js";
+
+export class EnemyFactory {
+    constructor(spriteSheets) {
+        this.spriteSheets = spriteSheets;
+    }
+
+    createByType(typeName) {
+        const enemyType = gameConfig.enemyTypes.find(t => t.name === typeName);
+        
+        if (!enemyType) {
+            console.warn(`Тип врага "${typeName}" не найден!`);
+            return null;
+        }
+        
+        const spriteSheet = this.spriteSheets[typeName];
+        if (!spriteSheet) {
+            console.warn(`Спрайт-лист для "${typeName}" не загружен!`);
+            return null;
+        }
+        const spriteID = Math.floor(Math.random() * enemyType.sprites.length);
+
+        
+        return new Enemy(
+            gameConfig.canvas.width,
+            gameConfig.canvas.height,
+            enemyType,
+            spriteID,
+            spriteSheet
+        );
+    }
+    
+    createRandom() {
+        const types = gameConfig.enemyTypes;
+        const randomType = types[Math.floor(Math.random() * types.length)];
+        return this.createByType(randomType.name);
+    }
+
+    // createBoss(canvasWidth, canvasHeight){
+    //     const types = gameConfig.enemyTypes;
+    //     let randomTypeNum = types.length-1;
+    //     const bossType = types[randomTypeNum];
+    //     // const bossSprite = bossType.sprites[
+    //     //     Math.floor(Math.random() * randomType.sprites.length)
+    //     // ];
+    //     const spriteID = Math.floor(Math.random() * bossType.sprites.length);
+        
+ 
+    //     // Проверяем, что спрайт-лист загружен
+    //     const spriteSheet = this.spriteSheets[bossType.name];
+    //     if (!spriteSheet) {
+    //         console.warn(`Спрайт-лист для ${randomType.name} ещё не загружен!`);
+    //         // Возвращаем null или создаем врага с дефолтным спрайтом
+    //         return null;
+    //     }
+
+    //     return new Enemy(
+    //         canvasWidth,
+    //         canvasHeight,
+    //         randomTypeNum,
+    //         spriteID,
+    //         spriteSheet
+    //     );
+    // }
+}
+
+// ===== C:\Users\Vishnevskii\source\repos\TestCanvasGame\CosmoShuter\css\style.css =====
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #1a1a1a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    user-select: none;
+}
+
+/* Общие стили для игровых уведомлений */
+.game-notification {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 30px;
+    font-size: 28px;
+    font-weight: bold;
+    border-radius: 10px;
+    z-index: 150;
+    pointer-events: none; /* Чтобы не мешали кликам */
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Анимация появления/исчезновения */
+@keyframes slideFadeIn {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    70% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+
+.game-notification.show {
+    animation: slideFadeIn 2s ease-in-out forwards;
+}
+
+/* Специфичные стили для каждого типа */
+#notification-multiplier {
+    top: 40%;
+    background: rgba(255, 215, 0, 0.95);
+    color: #000;
+    border: 2px solid #ffd700;
+}
+
+#notification-wave {
+    top: 35%;
+    background: rgba(0, 150, 255, 0.95);
+    color: #fff;
+    border: 2px solid #0096ff;
+}
+
+#notification-bonus {
+    top: 45%;
+    background: rgba(0, 255, 100, 0.95);
+    color: #000;
+    border: 2px solid #00ff64;
+}
+
+
+#game-container {
+    position: relative;
+    width: 1000px;
+    height: 900px;
+}
+
+#gameCanvas {
+    width: 1000px;
+    height: 900px;
+    border: 2px solid #333;
+    background-color: rgb(81, 80, 165);
+    z-index: 1;
+}
+
+.ui-panel {
+    position: absolute;
+    background: rgba(77, 77, 77, 0.95);
+    border: 2px solid #8b7355;
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    z-index: 10;
+}
+
+#main-menu {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 400px;
+    z-index: 100;
+}
+
+#top-bar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    min-width: 550px;
+    width: auto;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+    z-index: 100;
+
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 16px;
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+}
+
+#bottom-bar {
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    gap: 10px;
+    min-height: 40px;
+    align-items: center;
+    z-index: 10;
+    pointer-events: auto !important; /* Убеждаемся, что клики проходят */
+}
+
+#game-over {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 200;
+}
+
+#game-pause {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 200;
+}
+
+button {
+    background: #000000;
+    color: #fff;
+    border: 1px solid #000000;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #4e4e4e;
+}
+
+button:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.hidden {
+    display: none !important;
+}
+
+h1 {
+    margin-top: 0;
+    color: #ffffff;
+}
+
+.control-group {
+    margin: 15px 0;
+}
+

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game test</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+    <body>
+        <div id="game-container">
+            <div id="top-bar">
+                <div>Волна: <span id="wave-display">1</span></div>
+                <div>Прогресс: <span id="wave-progress-display">0/10</span></div>
+                <div>Счет: <span id="score-display">0</span></div>
+                <div>Убито: <span id="kills-display">0</span></div>
+                <div>Множитель: <span id="multiplier-display">x1.00</span></div>
+            </div>
+            <canvas id="gameCanvas" width="1000" height="900"></canvas>
+
+            <div id="notification-multiplier" class="game-notification hidden">
+                Множитель x<span id="notif-mult-value">2.00</span>!
+            </div>
+            
+            <div id="notification-wave" class="game-notification hidden">
+                🌊 Волна: <span id="notif-wave-name">Разведка</span>!
+            </div>
+            
+            <div id="notification-bonus" class="game-notification hidden">
+                ✨ Получено: <span id="notif-bonus-name">Здоровье</span>!
+            </div>
+
+            <div id="main-menu" class="ui-panel">
+                <h1>Космический шутер</h1>
+                <button id="start-game-btn">Новая игра</button>
+            </div>
+            <div id="game-over" class="ui-panel hidden">
+                <h1>Увы, вы проиграли😢</h1>
+                <button id="restart-btn">Играть снова</button>
+            </div>
+            <div id="game-pause" class="ui-panel hidden">
+                <h1>Игра на паузе</h1>
+                <button id="resume-btn">Продолжить</button>
+            </div>
+
+        </div>
+        <script type="module" src="js/main.js"></script>
+    </body>
+</html>
