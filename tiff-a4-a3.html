@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIFF Сортировщик A4 / A3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .dropzone { transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; }
+        .dropzone.dragover {
+            background-color: #272018;
+            border-color: #c9a227;
+            box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.15);
+        }
+        .progress-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: #2c2118;
+            overflow: hidden;
+        }
+        .progress-bar > div {
+            height: 100%;
+            background: linear-gradient(90deg, #c9a227, #d4af37);
+            transition: width 0.2s ease;
+            border-radius: 999px;
+        }
+        .mode-btn.active {
+            background: #c9a227;
+            color: #1a120b;
+            border-color: #c9a227;
+        }
+        .page-row:hover { background: #342818; }
+    </style>
+</head>
+<body class="bg-[#1a120b] text-[#e8d5b7] min-h-screen">
+    <div class="max-w-6xl mx-auto p-6 md:p-10">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-[#c9a227] tracking-tight">TIFF Сортировщик A4 / A3</h1>
+                <p class="text-[#8b5e3c] mt-1 text-sm md:text-base">Физический формат по DPI · ориентация · PDF-экспорт</p>
+            </div>
+            <a href="index.html" class="self-start px-5 py-2.5 border border-[#5c4630] rounded-2xl hover:bg-[#2c2118] hover:border-[#c9a227] transition-colors text-sm">
+                ← Назад в хаб
+            </a>
+        </div>
+
+        <!-- Mode + options -->
+        <div class="bg-[#2c2118] border border-[#5c4630] rounded-3xl p-5 mb-6">
+            <div class="flex flex-col lg:flex-row lg:items-end gap-5">
+                <div class="flex-1">
+                    <div class="text-xs uppercase tracking-widest text-[#8b5e3c] mb-2">Режим классификации</div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="modePhysical" class="mode-btn active px-4 py-2 rounded-xl border border-[#5c4630] text-sm font-medium transition-colors">
+                            📐 Физический A4/A3
+                        </button>
+                        <button type="button" id="modeOrientation" class="mode-btn px-4 py-2 rounded-xl border border-[#5c4630] text-sm font-medium transition-colors">
+                            ↕️ Только ориентация
+                        </button>
+                    </div>
+                    <p id="modeHint" class="text-xs text-[#8b5e3c] mt-2 leading-relaxed">
+                        Считает мм по DPI (теги TIFF или 300 DPI по умолчанию) и сравнивает с ISO A4 (210×297) и A3 (297×420) ±допуск.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-4 items-end">
+                    <label class="block">
+                        <span class="text-xs text-[#8b5e3c] block mb-1">Допуск, %</span>
+                        <input type="number" id="toleranceInput" value="8" min="1" max="25" step="1"
+                            class="w-24 bg-[#1f1812] border border-[#5c4630] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#c9a227]">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs text-[#8b5e3c] block mb-1">DPI по умолчанию</span>
+                        <input type="number" id="defaultDpiInput" value="300" min="72" max="1200" step="1"
+                            class="w-28 bg-[#1f1812] border border-[#5c4630] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#c9a227]">
+                    </label>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer pb-2">
+                        <input type="checkbox" id="ignoreRotation" checked class="rounded accent-[#c9a227]">
+                        <span class="text-[#d4c3a3]">A4/A3 в любой ориентации</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dropzone -->
+        <div id="dropzone" class="dropzone border-2 border-dashed border-[#5c4630] rounded-3xl p-10 text-center cursor-pointer hover:border-[#c9a227]">
+            <div class="text-5xl mb-3">📄</div>
+            <h3 class="text-xl font-semibold mb-1">Перетащите файлы сюда</h3>
+            <p class="text-[#8b5e3c] mb-4 text-sm">TIFF (в т.ч. многостраничные), JPG, PNG, WEBP, BMP</p>
+            <input type="file" id="fileInput" multiple accept=".tif,.tiff,.jpg,.jpeg,.png,.webp,.bmp,image/*" class="hidden">
+            <button type="button" onclick="document.getElementById('fileInput').click()"
+                class="px-8 py-3 bg-[#c9a227] text-[#1a120b] font-semibold rounded-2xl hover:bg-[#d4af37] transition-colors">
+                Выбрать файлы
+            </button>
+            <div id="fileSummary" class="hidden mt-4 text-sm text-[#d4c3a3]"></div>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls" class="hidden mt-5 flex flex-col sm:flex-row gap-3">
+            <button type="button" id="analyzeBtn" onclick="analyzeFiles()"
+                class="flex-1 py-3.5 bg-[#c9a227] hover:bg-[#d4af37] text-[#1a120b] font-bold text-lg rounded-2xl transition-colors">
+                🔍 Проанализировать и отсортировать
+            </button>
+            <button type="button" onclick="resetAll()"
+                class="px-6 py-3.5 border border-[#5c4630] rounded-2xl hover:bg-[#2c2118] transition-colors">
+                Сбросить
+            </button>
+        </div>
+
+        <!-- Progress -->
+        <div id="progressWrap" class="hidden mt-4">
+            <div class="flex justify-between text-xs text-[#8b5e3c] mb-1.5">
+                <span id="progressLabel">Обработка…</span>
+                <span id="progressPct">0%</span>
+            </div>
+            <div class="progress-bar"><div id="progressFill" style="width:0%"></div></div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden mt-8 grid grid-cols-1 md:grid-cols-3 gap-5">
+            <!-- A4 -->
+            <div class="bg-[#2c2118] border border-[#5c4630] rounded-3xl p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-3 gap-2">
+                    <div class="min-w-0">
+                        <div class="text-lg font-bold text-emerald-400 truncate">A4</div>
+                        <div class="text-[11px] text-[#8b5e3c]">210 × 297 мм</div>
+                    </div>
+                    <span id="a4-count" class="text-xs bg-emerald-900/80 text-emerald-300 px-2.5 py-1 rounded-full shrink-0">0</span>
+                </div>
+                <div id="a4-list" class="flex-1 min-h-[160px] bg-[#1f1812] rounded-2xl p-2 text-sm space-y-1 overflow-auto max-h-[380px] mb-3">
+                    <div class="text-[#8b5e3c] text-center py-8 text-xs empty-hint">Пусто</div>
+                </div>
+                <button type="button" onclick="downloadGroup('a4')"
+                    class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 rounded-xl text-sm font-medium transition-colors">
+                    Скачать PDF
+                </button>
+            </div>
+
+            <!-- A3 -->
+            <div class="bg-[#2c2118] border border-[#5c4630] rounded-3xl p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-3 gap-2">
+                    <div class="min-w-0">
+                        <div class="text-lg font-bold text-amber-400 truncate">A3</div>
+                        <div class="text-[11px] text-[#8b5e3c]">297 × 420 мм</div>
+                    </div>
+                    <span id="a3-count" class="text-xs bg-amber-900/80 text-amber-300 px-2.5 py-1 rounded-full shrink-0">0</span>
+                </div>
+                <div id="a3-list" class="flex-1 min-h-[160px] bg-[#1f1812] rounded-2xl p-2 text-sm space-y-1 overflow-auto max-h-[380px] mb-3">
+                    <div class="text-[#8b5e3c] text-center py-8 text-xs empty-hint">Пусто</div>
+                </div>
+                <button type="button" onclick="downloadGroup('a3')"
+                    class="w-full py-2.5 bg-amber-700 hover:bg-amber-600 rounded-xl text-sm font-medium transition-colors">
+                    Скачать PDF
+                </button>
+            </div>
+
+            <!-- Other -->
+            <div class="bg-[#2c2118] border border-[#5c4630] rounded-3xl p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-3 gap-2">
+                    <div class="min-w-0">
+                        <div class="text-lg font-bold text-slate-400 truncate">Другое</div>
+                        <div class="text-[11px] text-[#8b5e3c]">не A4/A3 · ошибки</div>
+                    </div>
+                    <span id="other-count" class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full shrink-0">0</span>
+                </div>
+                <div id="other-list" class="flex-1 min-h-[160px] bg-[#1f1812] rounded-2xl p-2 text-sm space-y-1 overflow-auto max-h-[380px] mb-3">
+                    <div class="text-[#8b5e3c] text-center py-8 text-xs empty-hint">Пусто</div>
+                </div>
+                <button type="button" onclick="downloadGroup('other')"
+                    class="w-full py-2.5 bg-slate-600 hover:bg-slate-500 rounded-xl text-sm font-medium transition-colors">
+                    Скачать PDF
+                </button>
+            </div>
+        </div>
+
+        <div id="statsBar" class="hidden mt-5 text-center text-xs text-[#8b5e3c] space-y-1">
+            <div id="statsText"></div>
+            <div>PDF: страница = размер изображения (px → mm по DPI). JPEG 92%.</div>
+        </div>
+    </div>
+
+    <script>
+        // ISO sizes in mm
+        const ISO = {
+            A4: { w: 210, h: 297 },
+            A3: { w: 297, h: 420 }
+        };
+
+        let classifyMode = 'physical'; // 'physical' | 'orientation'
+        let filesData = [];
+        let classifiedPages = { a4: [], a3: [], other: [] };
+        let analyzing = false;
+
+        function initModes() {
+            const phys = document.getElementById('modePhysical');
+            const ori = document.getElementById('modeOrientation');
+            const hint = document.getElementById('modeHint');
+
+            phys.addEventListener('click', () => {
+                classifyMode = 'physical';
+                phys.classList.add('active');
+                ori.classList.remove('active');
+                hint.textContent = 'Считает мм по DPI (теги TIFF или DPI по умолчанию) и сравнивает с ISO A4 (210×297) и A3 (297×420) ±допуск.';
+            });
+            ori.addEventListener('click', () => {
+                classifyMode = 'orientation';
+                ori.classList.add('active');
+                phys.classList.remove('active');
+                hint.textContent = 'Вертикальные → A4, горизонтальные → A3, квадратные → Другое. Без учёта физических мм.';
+            });
+        }
+
+        function initDropzone() {
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+
+            dropzone.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                fileInput.click();
+            });
+            dropzone.addEventListener('dragover', e => {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+            dropzone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+            });
+            fileInput.addEventListener('change', e => {
+                if (e.target.files.length > 0) handleFiles(e.target.files);
+            });
+        }
+
+        function handleFiles(fileList) {
+            filesData = [];
+            classifiedPages = { a4: [], a3: [], other: [] };
+
+            for (const file of fileList) {
+                const name = file.name.toLowerCase();
+                const ext = name.split('.').pop();
+                const isImage = ['tif', 'tiff', 'jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(ext) ||
+                    (file.type && file.type.startsWith('image/'));
+                if (isImage) filesData.push({ file });
+            }
+
+            if (filesData.length === 0) {
+                alert('Выберите изображения (TIFF, JPG, PNG, …)');
+                return;
+            }
+
+            const totalMb = (filesData.reduce((s, f) => s + f.file.size, 0) / (1024 * 1024)).toFixed(1);
+            const summary = document.getElementById('fileSummary');
+            summary.classList.remove('hidden');
+            summary.textContent = `Выбрано: ${filesData.length} файл(ов) · ${totalMb} МБ`;
+
+            document.getElementById('controls').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('statsBar').classList.add('hidden');
+            document.getElementById('progressWrap').classList.add('hidden');
+        }
+
+        /** Parse X/YResolution from UTIF IFD (may be number or [num, den]) */
+        function resolveDpiFromIfd(ifd) {
+            const unit = ifd.t296 != null
+                ? (Array.isArray(ifd.t296) ? ifd.t296[0] : ifd.t296)
+                : 2; // 2 = inch, 3 = cm
+
+            function parseRes(tag) {
+                if (tag == null) return null;
+                const v = Array.isArray(tag) ? tag[0] : tag;
+                if (typeof v === 'number' && isFinite(v) && v > 0) return v;
+                if (v && typeof v === 'object' && v.length >= 2) {
+                    const n = Number(v[0]), d = Number(v[1]);
+                    if (d) return n / d;
+                }
+                // UTIF sometimes stores as [num, den] nested
+                if (Array.isArray(tag) && tag.length >= 2 && typeof tag[0] === 'number') {
+                    const d = Number(tag[1]);
+                    if (d) return Number(tag[0]) / d;
+                }
+                return null;
+            }
+
+            let xRes = parseRes(ifd.t282); // XResolution
+            let yRes = parseRes(ifd.t283); // YResolution
+
+            // Fallback keys some builds expose
+            if (xRes == null && ifd.xres) xRes = Number(ifd.xres);
+            if (yRes == null && ifd.yres) yRes = Number(ifd.yres);
+
+            if (xRes == null && yRes == null) return null;
+
+            let dpiX = xRes || yRes;
+            let dpiY = yRes || xRes;
+
+            // ResolutionUnit: 3 = centimeters → convert to DPI
+            if (unit === 3) {
+                dpiX = dpiX * 2.54;
+                dpiY = dpiY * 2.54;
+            }
+
+            if (!isFinite(dpiX) || dpiX < 1 || dpiX > 10000) return null;
+            return { dpiX, dpiY, source: 'tiff' };
+        }
+
+        function pxToMm(px, dpi) {
+            return (px / dpi) * 25.4;
+        }
+
+        function sizesMatch(wMm, hMm, stdW, stdH, tolPct) {
+            const tol = tolPct / 100;
+            const ok = (a, b) => Math.abs(a - b) / b <= tol;
+            return ok(wMm, stdW) && ok(hMm, stdH);
+        }
+
+        function classifyPage(width, height, dpiX, dpiY) {
+            const tol = Number(document.getElementById('toleranceInput').value) || 8;
+            const ignoreRot = document.getElementById('ignoreRotation').checked;
+            const orientation = height > width ? 'portrait' : (width > height ? 'landscape' : 'square');
+
+            if (classifyMode === 'orientation') {
+                if (orientation === 'portrait') {
+                    return { format: 'A4', orientation, reason: 'вертикальный (режим ориентации)', wMm: null, hMm: null, dpiX, dpiY };
+                }
+                if (orientation === 'landscape') {
+                    return { format: 'A3', orientation, reason: 'горизонтальный (режим ориентации)', wMm: null, hMm: null, dpiX, dpiY };
+                }
+                return { format: 'Other', orientation, reason: 'квадрат', wMm: null, hMm: null, dpiX, dpiY };
+            }
+
+            // Physical mode
+            const wMm = pxToMm(width, dpiX);
+            const hMm = pxToMm(height, dpiY);
+
+            const tryMatch = (name, sw, sh) => {
+                if (sizesMatch(wMm, hMm, sw, sh, tol)) return true;
+                if (ignoreRot && sizesMatch(wMm, hMm, sh, sw, tol)) return true;
+                return false;
+            };
+
+            if (tryMatch('A4', ISO.A4.w, ISO.A4.h)) {
+                return {
+                    format: 'A4',
+                    orientation,
+                    reason: `~${wMm.toFixed(0)}×${hMm.toFixed(0)} мм @ ${Math.round(dpiX)} DPI`,
+                    wMm, hMm, dpiX, dpiY
+                };
+            }
+            if (tryMatch('A3', ISO.A3.w, ISO.A3.h)) {
+                return {
+                    format: 'A3',
+                    orientation,
+                    reason: `~${wMm.toFixed(0)}×${hMm.toFixed(0)} мм @ ${Math.round(dpiX)} DPI`,
+                    wMm, hMm, dpiX, dpiY
+                };
+            }
+
+            return {
+                format: 'Other',
+                orientation,
+                reason: `~${wMm.toFixed(0)}×${hMm.toFixed(0)} мм @ ${Math.round(dpiX)} DPI (не A4/A3)`,
+                wMm, hMm, dpiX, dpiY
+            };
+        }
+
+        async function loadRasterImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                    URL.revokeObjectURL(url);
+                    resolve({
+                        width: img.width,
+                        height: img.height,
+                        rgba: new Uint8Array(imageData.data.buffer)
+                    });
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Ошибка загрузки изображения'));
+                };
+                img.src = url;
+            });
+        }
+
+        function setProgress(done, total, label) {
+            const wrap = document.getElementById('progressWrap');
+            wrap.classList.remove('hidden');
+            const pct = total ? Math.round((done / total) * 100) : 0;
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressPct').textContent = pct + '%';
+            document.getElementById('progressLabel').textContent = label || `Обработано ${done} / ${total}`;
+        }
+
+        async function analyzeFiles() {
+            if (analyzing || filesData.length === 0) return;
+            analyzing = true;
+
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Обработка…';
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.classList.remove('hidden');
+            document.getElementById('statsBar').classList.add('hidden');
+
+            ['a4-list', 'a3-list', 'other-list'].forEach(id => {
+                document.getElementById(id).innerHTML = '';
+            });
+            classifiedPages = { a4: [], a3: [], other: [] };
+            let counts = { a4: 0, a3: 0, other: 0 };
+            let pageTotal = 0;
+            let usedTiffDpi = 0;
+            let usedDefaultDpi = 0;
+
+            const defaultDpi = Number(document.getElementById('defaultDpiInput').value) || 300;
+
+            try {
+                const n = filesData.length;
+                for (let fi = 0; fi < n; fi++) {
+                    const file = filesData[fi].file;
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    setProgress(fi, n, `${file.name}`);
+
+                    try {
+                        const pagesFromFile = [];
+
+                        if (ext === 'tif' || ext === 'tiff') {
+                            const buffer = await file.arrayBuffer();
+                            const ifds = UTIF.decode(buffer);
+
+                            for (let i = 0; i < ifds.length; i++) {
+                                const ifd = ifds[i];
+                                try { UTIF.decodeImage(buffer, ifd); } catch (e) { /* partial */ }
+
+                                const width = ifd.width || ifd.ImageWidth || 0;
+                                const height = ifd.height || ifd.ImageLength || 0;
+                                if (!width || !height) continue;
+
+                                let rgba = null;
+                                try { rgba = UTIF.toRGBA8(ifd); } catch (e) { /* skip rgba */ }
+
+                                const dpiInfo = resolveDpiFromIfd(ifd);
+                                let dpiX, dpiY, dpiSource;
+                                if (dpiInfo) {
+                                    dpiX = dpiInfo.dpiX;
+                                    dpiY = dpiInfo.dpiY;
+                                    dpiSource = 'tiff';
+                                    usedTiffDpi++;
+                                } else {
+                                    dpiX = dpiY = defaultDpi;
+                                    dpiSource = 'default';
+                                    usedDefaultDpi++;
+                                }
+
+                                pagesFromFile.push({
+                                    fileName: file.name,
+                                    pageIndex: i,
+                                    width, height,
+                                    rgba: rgba ? new Uint8Array(rgba) : null,
+                                    dpiX, dpiY, dpiSource
+                                });
+                            }
+                        } else {
+                            const imgData = await loadRasterImage(file);
+                            usedDefaultDpi++;
+                            pagesFromFile.push({
+                                fileName: file.name,
+                                pageIndex: 0,
+                                width: imgData.width,
+                                height: imgData.height,
+                                rgba: imgData.rgba,
+                                dpiX: defaultDpi,
+                                dpiY: defaultDpi,
+                                dpiSource: 'default'
+                            });
+                        }
+
+                        for (const page of pagesFromFile) {
+                            pageTotal++;
+                            const classification = classifyPage(page.width, page.height, page.dpiX, page.dpiY);
+                            const pageInfo = { ...page, ...classification };
+
+                            if (classification.format === 'A4') {
+                                counts.a4++;
+                                classifiedPages.a4.push(pageInfo);
+                                addToList('a4-list', pageInfo);
+                            } else if (classification.format === 'A3') {
+                                counts.a3++;
+                                classifiedPages.a3.push(pageInfo);
+                                addToList('a3-list', pageInfo);
+                            } else {
+                                counts.other++;
+                                classifiedPages.other.push(pageInfo);
+                                addToList('other-list', pageInfo);
+                            }
+                        }
+                    } catch (err) {
+                        counts.other++;
+                        const div = document.createElement('div');
+                        div.className = 'text-red-400 text-xs p-2 rounded-xl bg-red-950/30';
+                        div.textContent = 'Ошибка: ' + file.name + ' — ' + (err.message || err);
+                        document.getElementById('other-list').appendChild(div);
+                    }
+                }
+
+                setProgress(n, n, 'Готово');
+            } finally {
+                analyzing = false;
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Проанализировать и отсортировать';
+            }
+
+            document.getElementById('a4-count').textContent = counts.a4 + ' стр.';
+            document.getElementById('a3-count').textContent = counts.a3 + ' стр.';
+            document.getElementById('other-count').textContent = counts.other + ' стр.';
+
+            // Empty placeholders if needed
+            ['a4', 'a3', 'other'].forEach(g => {
+                const list = document.getElementById(g + '-list');
+                if (!list.children.length) {
+                    list.innerHTML = '<div class="text-[#8b5e3c] text-center py-8 text-xs empty-hint">Пусто</div>';
+                }
+            });
+
+            const statsBar = document.getElementById('statsBar');
+            statsBar.classList.remove('hidden');
+            document.getElementById('statsText').textContent =
+                `Страниц: ${pageTotal} · A4: ${counts.a4} · A3: ${counts.a3} · Другое: ${counts.other}` +
+                (classifyMode === 'physical'
+                    ? ` · DPI из TIFF: ${usedTiffDpi}, по умолчанию: ${usedDefaultDpi}`
+                    : ' · режим ориентации');
+        }
+
+        function addToList(listId, pageInfo) {
+            const container = document.getElementById(listId);
+            const hint = container.querySelector('.empty-hint');
+            if (hint) hint.remove();
+
+            const div = document.createElement('div');
+            div.className = 'page-row bg-[#2c2118] px-3 py-2 rounded-xl text-xs flex justify-between items-start gap-2';
+
+            const mm = (pageInfo.wMm != null)
+                ? `${pageInfo.wMm.toFixed(0)}×${pageInfo.hMm.toFixed(0)} мм`
+                : `${pageInfo.width}×${pageInfo.height} px`;
+
+            const dpiNote = pageInfo.dpiSource === 'tiff'
+                ? `${Math.round(pageInfo.dpiX)} DPI (TIFF)`
+                : `${Math.round(pageInfo.dpiX)} DPI*`;
+
+            div.innerHTML = `
+                <div class="min-w-0 flex-1">
+                    <div class="font-medium truncate text-[#e8d5b7]">${escapeHtml(pageInfo.fileName)} <span class="text-[#8b5e3c]">#${pageInfo.pageIndex + 1}</span></div>
+                    <div class="text-[#8b5e3c] mt-0.5">${mm} · ${dpiNote} · ${pageInfo.orientation}</div>
+                    <div class="text-[#6b5344] mt-0.5 truncate" title="${escapeHtml(pageInfo.reason || '')}">${escapeHtml(pageInfo.reason || '')}</div>
+                </div>
+                <div class="shrink-0 text-[10px] px-2 py-0.5 rounded-lg bg-[#1f1812] text-[#c9a227] font-semibold">${pageInfo.format}</div>
+            `;
+            container.appendChild(div);
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        async function downloadGroup(group) {
+            const pages = classifiedPages[group];
+            if (!pages || pages.length === 0) {
+                alert('Нет страниц для экспорта');
+                return;
+            }
+
+            const withRgba = pages.filter(p => p.rgba && p.width && p.height);
+            if (withRgba.length === 0) {
+                alert('Нет декодированных изображений для PDF (ошибка чтения TIFF/растра)');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            let doc = null;
+
+            for (let i = 0; i < withRgba.length; i++) {
+                const page = withRgba[i];
+                setProgress(i, withRgba.length, `PDF: ${page.fileName}`);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = page.width;
+                canvas.height = page.height;
+                const ctx = canvas.getContext('2d');
+                const imageData = new ImageData(new Uint8ClampedArray(page.rgba), page.width, page.height);
+                ctx.putImageData(imageData, 0, 0);
+
+                const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+                // Prefer mm for print-ish size when we have physical dims
+                let pageW, pageH, unit;
+                if (page.wMm != null && page.hMm != null && page.wMm > 0 && page.hMm > 0) {
+                    unit = 'mm';
+                    pageW = page.wMm;
+                    pageH = page.hMm;
+                } else {
+                    unit = 'px';
+                    pageW = page.width;
+                    pageH = page.height;
+                }
+
+                const orient = pageW > pageH ? 'landscape' : 'portrait';
+
+                if (i === 0) {
+                    doc = new jsPDF({
+                        orientation: orient,
+                        unit,
+                        format: [pageW, pageH],
+                        compress: true
+                    });
+                } else {
+                    doc.addPage([pageW, pageH], orient);
+                }
+
+                doc.addImage(jpegDataUrl, 'JPEG', 0, 0, pageW, pageH);
+            }
+
+            if (doc) {
+                doc.save(`${group.toUpperCase()}_${withRgba.length}_pages.pdf`);
+                setProgress(withRgba.length, withRgba.length, 'PDF сохранён');
+            }
+        }
+
+        function resetAll() {
+            filesData = [];
+            classifiedPages = { a4: [], a3: [], other: [] };
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('statsBar').classList.add('hidden');
+            document.getElementById('progressWrap').classList.add('hidden');
+            document.getElementById('fileSummary').classList.add('hidden');
+            ['a4-list', 'a3-list', 'other-list'].forEach(id => {
+                document.getElementById(id).innerHTML = '<div class="text-[#8b5e3c] text-center py-8 text-xs empty-hint">Пусто</div>';
+            });
+            document.getElementById('fileInput').value = '';
+            document.getElementById('a4-count').textContent = '0';
+            document.getElementById('a3-count').textContent = '0';
+            document.getElementById('other-count').textContent = '0';
+        }
+
+        window.onload = () => {
+            initDropzone();
+            initModes();
+            console.log('%c[TIFF Sorter] Физический A4/A3 + ориентация + PDF', 'color:#c9a227');
+        };
+    </script>
+</body>
+</html>

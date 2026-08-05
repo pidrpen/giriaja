@@ -3,46 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game test</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Королевский Зал • dastrbob-hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            --bg: #120e0a;
+            --surface: #1f1812;
+            --surface-2: #2a2118;
+            --border: #4a3728;
+            --gold: #c9a227;
+            --gold-soft: #d4af37;
+            --cream: #e8d5b7;
+            --muted: #9a7b55;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201, 162, 39, 0.12), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(30, 60, 90, 0.15), transparent),
+                var(--bg);
+            color: var(--cream);
+            min-height: 100vh;
+        }
+
+        .title-font { font-family: 'Playfair Display', Georgia, serif; }
+        .section-title { font-family: 'Cinzel', serif; }
+
+        .game-card {
+            background: linear-gradient(165deg, var(--surface-2) 0%, var(--surface) 100%);
+            border: 1px solid var(--border);
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .game-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--gold);
+            box-shadow: 0 24px 40px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(201, 162, 39, 0.15);
+        }
+
+        .card-visual {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-visual::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(18, 14, 10, 0.55), transparent 55%);
+            pointer-events: none;
+        }
+
+        .badge {
+            letter-spacing: 0.12em;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .nav-blur {
+            background: rgba(18, 14, 10, 0.85);
+            backdrop-filter: blur(12px);
+        }
+
+        .hero-glow {
+            text-shadow: 0 0 40px rgba(201, 162, 39, 0.25);
+        }
+
+        .divider-line {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+        }
+    </style>
 </head>
-    <body>
-        <div id="game-container">
-            <div id="top-bar">
-                <div>Волна: <span id="wave-display">1</span></div>
-                <div>Прогресс: <span id="wave-progress-display">0/10</span></div>
-                <div>Счет: <span id="score-display">0</span></div>
-                <div>Убито: <span id="kills-display">0</span></div>
-                <div>Множитель: <span id="multiplier-display">x1.00</span></div>
+<body>
+    <nav class="border-b border-[#4a3728] nav-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-3">
+                <div class="w-10 h-10 bg-[#c9a227] rounded-2xl flex items-center justify-center shadow-lg shadow-amber-900/30">
+                    <i class="fa-solid fa-chess-king text-[#120e0a] text-xl"></i>
+                </div>
+                <div>
+                    <span class="title-font text-2xl tracking-wide font-bold text-[#c9a227]">Королевский Зал</span>
+                    <div class="text-[10px] tracking-[0.2em] text-[#9a7b55] uppercase -mt-0.5">dastrbob-hub</div>
+                </div>
             </div>
-            <canvas id="gameCanvas" width="1000" height="900"></canvas>
-
-            <div id="notification-multiplier" class="game-notification hidden">
-                Множитель x<span id="notif-mult-value">2.00</span>!
-            </div>
-            
-            <div id="notification-wave" class="game-notification hidden">
-                🌊 Волна: <span id="notif-wave-name">Разведка</span>!
-            </div>
-            
-            <div id="notification-bonus" class="game-notification hidden">
-                ✨ Получено: <span id="notif-bonus-name">Здоровье</span>!
-            </div>
-
-            <div id="main-menu" class="ui-panel">
-                <h1>Космический шутер</h1>
-                <button id="start-game-btn">Новая игра</button>
-            </div>
-            <div id="game-over" class="ui-panel hidden">
-                <h1>Увы, вы проиграли😢</h1>
-                <button id="restart-btn">Играть снова</button>
-            </div>
-            <div id="game-pause" class="ui-panel hidden">
-                <h1>Игра на паузе</h1>
-                <button id="resume-btn">Продолжить</button>
-            </div>
-
+            <a href="https://github.com/dastrbob-hub/igor" class="flex items-center gap-x-2 text-sm text-[#d4c3a3] hover:text-[#c9a227] transition-colors px-3 py-2 rounded-xl hover:bg-[#2a2118]">
+                <i class="fa-brands fa-github text-lg"></i>
+                <span class="hidden sm:inline">GitHub</span>
+            </a>
         </div>
-        <script type="module" src="js/main.js"></script>
-    </body>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-6 pt-14 pb-10">
+        <!-- Hero -->
+        <header class="text-center mb-16">
+            <div class="inline-flex items-center gap-x-2 px-4 py-1.5 bg-[#1f1812] border border-[#4a3728] rounded-full text-sm mb-6">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#c9a227] animate-pulse"></span>
+                <span class="tracking-[0.2em] text-[11px] font-medium text-[#9a7b55]">БРАУЗЕР • БЕЗ УСТАНОВКИ</span>
+            </div>
+            <h1 class="title-font text-5xl sm:text-6xl md:text-7xl tracking-tighter font-bold text-[#c9a227] mb-4 hero-glow">
+                Королевский Зал
+            </h1>
+            <p class="max-w-lg mx-auto text-[#d4c3a3] text-lg leading-relaxed">
+                Морские дуэли и утилиты для документов — всё работает прямо в браузере
+            </p>
+        </header>
+
+        <!-- Games -->
+        <section class="mb-14">
+            <div class="flex items-end justify-between mb-6 px-1">
+                <div>
+                    <h2 class="section-title text-3xl text-[#c9a227] tracking-wider">Игры</h2>
+                    <p class="text-[#9a7b55] mt-1 text-sm">Онлайн-сражения через WebRTC</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                <!-- Морская Битва -->
+                <a href="battleship.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
+                    <div class="card-visual h-48 bg-gradient-to-br from-[#0d2137] via-[#1a2a3a] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
+                        <div class="text-7xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">⚓</div>
+                        <div class="absolute top-4 right-4 badge bg-cyan-600/90 text-white px-3 py-1 rounded-full z-10">P2P</div>
+                    </div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Морская Битва</h3>
+                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Классический морской бой 10×10. WebRTC P2P, авторасстановка флота, чат и смена тем.</p>
+                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-users"></i> 2 игрока</span>
+                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
+                            <span>Без сервера</span>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Морской бой ПРО (если есть battleship2) -->
+                <a href="battleship2.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
+                    <div class="card-visual h-48 bg-gradient-to-br from-[#0a1a2e] via-[#132238] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
+                        <div class="text-7xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">⚔</div>
+                        <div class="absolute top-4 right-4 badge bg-blue-600/90 text-white px-3 py-1 rounded-full z-10">ФЛОТ-50</div>
+                    </div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">ФЛОТ-50 · ПРО</h3>
+                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Эпическая война 50×50: 20 кораблей, ОД, залпы, торпеды, радар, способности. WebRTC P2P + canvas.</p>
+                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-users"></i> 2 игрока</span>
+                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
+                            <span>Залпы · радар · ОД</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <div class="divider-line mb-14"></div>
+
+        <!-- Tools -->
+        <section class="mb-10">
+            <div class="flex items-end justify-between mb-6 px-1">
+                <div>
+                    <h2 class="section-title text-3xl text-[#c9a227] tracking-wider">Инструменты</h2>
+                    <p class="text-[#9a7b55] mt-1 text-sm">Работа с TIFF и изображениями</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                <!-- TIFF Сортировщик -->
+                <a href="tiff-a4-a3.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
+                    <div class="card-visual h-48 bg-gradient-to-br from-[#2a2520] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
+                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📐</div>
+                        <div class="absolute top-4 right-4 badge bg-emerald-700/90 text-white px-3 py-1 rounded-full z-10">A4 / A3</div>
+                    </div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">TIFF Сортировщик A4/A3</h3>
+                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Сортировка TIFF/JPG/PNG по ориентации. Экспорт групп в PDF с размером страницы под оригинал.</p>
+                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-sort"></i> Автосортировка</span>
+                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
+                            <span>PDF-экспорт</span>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- TIFF Merger -->
+                <a href="tiff_merger.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
+                    <div class="card-visual h-48 bg-gradient-to-br from-[#2a2118] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
+                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📜</div>
+                        <div class="absolute top-4 right-4 badge bg-amber-700/90 text-white px-3 py-1 rounded-full z-10">MERGER</div>
+                    </div>
+                    <div class="p-6 flex-1 flex flex-col">
+                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">TIFF Объединение</h3>
+                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Склейка нескольких TIFF и изображений в один многостраничный файл. Перетаскивание страниц, TIFF и PDF.</p>
+                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-layer-group"></i> Многостраничный</span>
+                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
+                            <span>Drag & drop</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 py-10 text-center text-sm text-[#9a7b55] border-t border-[#4a3728]/60">
+        <a href="https://github.com/dastrbob-hub/igor" class="hover:text-[#c9a227] transition-colors">Репозиторий на GitHub</a>
+        <div class="mt-3 text-xs tracking-wide">dastrbob-hub · 2026</div>
+    </footer>
+</body>
 </html>
