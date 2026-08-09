@@ -191,8 +191,9 @@
       <a class="back" href="index.html">← На главную</a>
       <h1>Скриншот → Обозначение / Наименование</h1>
       <div class="sub">
-        Вставь скрин (<span class="kbd">Ctrl+V</span>) или перетащи картинку. OCR (печатный + попытка рукописи) → таблица → Excel.
-        Правила: код вида <b>403Г-21-3</b> / <b>403Г-21-сб102</b> → обозначение; <b>ГОСТ/DIN/ISO</b> и крепёж → всё в наименование; без кода → всё в наименование.
+        Вставь скрин (<span class="kbd">Ctrl+V</span>) или перетащи картинку → OCR → таблица → Excel.
+        Как в ведомости: <b>216-01-10 | Прокладка</b>; если в обозначении стоит <b>«-»</b> — код пустой, текст целиком в наименование
+        (<b>Болт… ГОСТ…</b>, <b>Шайба… ГОСТ…</b>). Коды <b>сб</b>: 216-02-сб104.
       </div>
     </div>
     <div class="actions">
@@ -290,69 +291,202 @@
         .replace(/"/g, '&quot;');
     }
 
-    /* ---------- эвристика Обозначение / Наименование ---------- */
-    const STD_MARK = /(?:^|[\s,;])(?:ГОСТ|DIN|ISO|EN|ОСТ|ТУ|ГСОТ)\b/i;
-    // типовые обозначения: 403Г-21-3, 403Г-21-сб102, АБ.12.034, 12-34-56А
-    const DESIG_HEAD = /^([0-9]{2,5}[A-Za-zА-Яа-яЁё]?[0-9A-Za-zА-Яа-яЁё]*(?:[-./][0-9A-Za-zА-Яа-яЁё]+)+)\s+(.+)$/u;
-    // чуть мягче: есть дефис/точка и цифра в первом токене
-    const DESIG_SOFT = /^(\S*[0-9]\S*[-./]\S+)\s+(.+)$/u;
+    /* ---------- эвристика Обозначение / Наименование ----------
+       Реальный вид таблицы (см. Пример.jpg):
+         216-01-10     | Прокладка
+         -             | Прокладка 33 АД0 ГОСТ 23358-87
+         216-02-сб104  | Прокладка
+         -             | Болт М6-8gx20… ГОСТ 7805-70
+       «-» в колонке обозначения = пустое обозначение, НЕ отдельная позиция.
+    */
+    const STD_MARK = /(?:^|[\s,;])(?:ГОСТ|DIN|ISO|EN|ОСТ|ТУ|ГСОТ)\s*\d/i;
+    // 216-01-10, 830-01-102, 216-02-сб104, 403Г-21-3, 403Г-21-сб102
+    const CODE_RE = /^\d{2,4}[A-Za-zА-Яа-яЁё]?(?:[-./][0-9A-Za-zА-Яа-яЁёcCсСбБ]+)+$/u;
+
+    function fixOcrTypos(s) {
+      return String(s ?? '')
+        // латиница вместо кириллицы в «сб»
+        .replace(/(\d)[-.]?c[b6]/gi, '$1-сб')
+        .replace(/(\d)[-.]?с[b6]/gi, '$1-сб')
+        .replace(/\bcб(\d)/gi, 'сб$1')
+        .replace(/\bCБ(\d)/g, 'СБ$1')
+        // частые OCR-опечатки
+        .replace(/плосоки/gi, 'плоские')
+        .replace(/плоскне/gi, 'плоские')
+        .replace(/шай6а/gi, 'Шайба')
+        .replace(/бопт/gi, 'Болт')
+        .replace(/прокпад/gi, 'Проклад')
+        .replace(/уплотиение/gi, 'Уплотнение')
+        .replace(/хомуr/gi, 'Хомут')
+        .replace(/\bOСT\b/g, 'ОСТ')
+        .replace(/\bOCТ\b/g, 'ОСТ')
+        .replace(/\bГOCT\b/g, 'ГОСТ')
+        .replace(/\bGOST\b/gi, 'ГОСТ');
+    }
+
+    function cleanOcrLine(line) {
+      let s = fixOcrTypos(line);
+      // обрезка артефактов рамки таблицы
+      s = s.replace(/^[|\s.:;·•]+/, '').replace(/[|\s]+$/, '');
+      s = s.replace(/\s*[|]\s*/g, '  '); // вертикальные линии → разделитель колонок
+      s = s.replace(/[ \t]+/g, ' ').trim();
+      return s;
+    }
+
+    function isDashOnly(s) {
+      return /^[-–—−_­.·•…]+$/.test(String(s || '').trim());
+    }
+
+    function looksLikeCode(tok) {
+      const t = fixOcrTypos(String(tok || '').trim());
+      if (!t || isDashOnly(t)) return false;
+      if (/^М\d/i.test(t) || /^M\d/i.test(t)) return false; // резьба, не обозначение
+      if (CODE_RE.test(t)) return true;
+      // чуть мягче: цифры-цифры-…
+      if (/^\d{2,4}[-./]\d{1,4}([-./][0-9A-Za-zА-Яа-яЁёсбСБcC]+)*$/u.test(t)) return true;
+      return false;
+    }
 
     function isStandardProductLine(line) {
-      if (STD_MARK.test(line)) return true;
-      // Болт/винт/гайка/шайба + резьба М… часто без отдельного заводского кода
-      if (/^(болт|винт|гайка|шайба|штифт|заклепк|шплинт|гайка)\b/i.test(line) && /\bМ\s?\d/i.test(line)) return true;
+      const s = line;
+      if (STD_MARK.test(s)) return true;
+      if (/\b(?:ГОСТ|DIN|ISO|ОСТ|ТУ)\b/i.test(s)) return true;
+      if (/^(болт|винт|гайка|шайба|штифт|заклепк|шплинт|хомут|прокладка|кольцо|уплотнен)\b/i.test(s)
+          && (/\bМ\s?\d/i.test(s) || /\bГОСТ\b/i.test(s) || /\bОСТ\b/i.test(s))) {
+        return true;
+      }
       return false;
     }
 
     function splitDesignationName(line) {
-      let s = line.replace(/\s+/g, ' ').trim();
+      let s = cleanOcrLine(line);
       if (!s) return null;
 
-      // мусор OCR
-      if (/^[\d\W]{1,3}$/.test(s)) return null;
+      // мусор: одни дефисы, точки, «- -», короткие символы
+      if (isDashOnly(s)) return null;
+      if (/^[\d\W]{1,2}$/.test(s)) return null;
+      if (/^поз/i.test(s)) return null;
 
-      if (isStandardProductLine(s)) {
+      // две колонки через 2+ пробела (типичный OCR таблицы)
+      const cols = s.split(/\s{2,}/).map((x) => x.trim()).filter(Boolean);
+      if (cols.length >= 2) {
+        const left = cols[0];
+        const right = cols.slice(1).join(' ').trim();
+        if (isDashOnly(left) || left === '-' || left === '–' || left === '—') {
+          if (!right || isDashOnly(right)) return null;
+          return { code: '', name: right };
+        }
+        if (looksLikeCode(left)) {
+          return { code: fixOcrTypos(left), name: isDashOnly(right) ? '' : right };
+        }
+      }
+
+      // строка начинается с «- » = пустое обозначение (как в Excel-столбце)
+      if (/^[-–—−]\s+/.test(s)) {
+        const name = s.replace(/^[-–—−]\s*/, '').trim();
+        if (!name || isDashOnly(name)) return null;
+        // не считать «- 33» кодом
+        return { code: '', name };
+      }
+
+      // «-Прокладка…» без пробела
+      if (/^[-–—−](?=\S)/.test(s) && !looksLikeCode(s.slice(1))) {
+        const name = s.replace(/^[-–—−]/, '').trim();
+        if (name) return { code: '', name };
+      }
+
+      // стандартные изделия / ГОСТ — целиком в наименование
+      if (isStandardProductLine(s) && !looksLikeCode(s.split(/\s+/)[0])) {
         return { code: '', name: s };
       }
 
-      let m = s.match(DESIG_HEAD);
-      if (m) return { code: m[1].trim(), name: m[2].trim() };
-
-      m = s.match(DESIG_SOFT);
-      if (m) {
-        const code = m[1].trim();
-        // отсечь ложные «М24-6g» как обозначение у крепежа без ГОСТ в той же строке
-        if (/^М\d/i.test(code) || /^M\d/i.test(code)) {
-          return { code: '', name: s };
-        }
-        return { code, name: m[2].trim() };
+      // CODE + пробел + NAME
+      const m = s.match(/^(\S+)\s+(.+)$/u);
+      if (m && looksLikeCode(m[1])) {
+        let name = m[2].trim();
+        if (isDashOnly(name)) name = '';
+        return { code: fixOcrTypos(m[1]), name };
       }
 
-      // только обозначение в строке (без имени)
-      if (/^[0-9]{2,5}[A-Za-zА-Яа-яЁё]?[0-9A-Za-zА-Яа-яЁё]*(?:[-./][0-9A-Za-zА-Яа-яЁё]+)+$/u.test(s)) {
-        return { code: s, name: '' };
+      // только код
+      if (looksLikeCode(s)) {
+        return { code: fixOcrTypos(s), name: '' };
       }
 
+      // всё в наименование (в т.ч. крепёж без отдельного кода)
       return { code: '', name: s };
     }
 
     function parseOcrText(text) {
-      const lines = String(text || '')
-        .replace(/\r/g, '')
+      let raw = String(text || '').replace(/\r/g, '');
+      // иногда OCR клеит «код» и «-» соседней строки — нормализуем
+      raw = raw.replace(/\t/g, '  ');
+
+      const lines = raw
         .split('\n')
-        .map((l) => l.replace(/\s+/g, ' ').trim())
+        .map((l) => cleanOcrLine(l))
         .filter(Boolean);
 
       const rows = [];
-      for (const line of lines) {
-        // пропуск заголовков таблиц
-        if (/^(обозначен|наименован|№|n\/п|поз\.?|количество|кол-во|примечан)/i.test(line)) continue;
-        if (line.length < 2) continue;
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // пропуск заголовков
+        if (/^(обозначен|наименован|№|n[\\/]?п|поз\.?|количество|кол-?во|примечан|запасн)/i.test(line)) continue;
+        // пропуск одиночного дефиса (пустая ячейка таблицы, считанная отдельной строкой)
+        if (isDashOnly(line)) continue;
+
+        // склейка: строка только код, следующая — наименование без кода
+        if (looksLikeCode(line) && i + 1 < lines.length) {
+          const next = lines[i + 1];
+          if (next && !looksLikeCode(next.split(/\s+/)[0]) && !isDashOnly(next)
+              && !/^[-–—]/.test(next)) {
+            // если next не начинается как новый код
+            if (!looksLikeCode(next)) {
+              line = line + '  ' + next;
+              i += 1;
+            }
+          }
+        }
+
+        // склейка: «-» на своей строке + наименование на следующей
+        // (уже отфильтровали isDashOnly — на случай «- Прокладка» ок)
+
         const row = splitDesignationName(line);
-        if (row && (row.code || row.name)) rows.push(row);
+        if (!row) continue;
+        if (!row.code && !row.name) continue;
+        // отбросить совсем бессмысленный шум
+        if (!row.code && row.name.length < 2) continue;
+        if (row.name && /^[\d\W]+$/.test(row.name) && row.name.length < 4) continue;
+
+        rows.push(row);
       }
       return rows;
     }
+
+    /** Быстрый самотест на логике примера (без OCR) */
+    function selfTestParse() {
+      const sample = `
+216-01-10     Прокладка
+-             Прокладка 33 АД0 ГОСТ 23358-87
+830-01-102    Прокладка
+830-01-10     Прокладка
+-             Прокладка 18М1 ГОСТ 23358-87
+-             Шплинт 3,2x32.016 ГОСТ 397-79
+-             Хомут универсальный 38-44-1 ОСТ 3-6735-92
+216-02-сб104  Прокладка
+830-02-сб117  Уплотнение
+-             Болт М6-8gx20.48.019 ГОСТ 7805-70
+-             Шайба 6 65Г 05 ГОСТ 6402-70
+216-10-33     Прокладка
+-             Прокладка 24 АД0 ГОСТ 23358-87
+216-08-66     Кольцо
+`;
+      const rows = parseOcrText(sample);
+      console.log('[ocr-spec self-test]', rows);
+      return rows;
+    }
+    // selfTestParse(); // раскомментируй в DevTools при отладке
 
     /* ---------- image load ---------- */
     async function loadFile(file) {
