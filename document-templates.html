@@ -1,0 +1,2750 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Заполнение шаблонов документов</title>
+  <style>
+    :root {
+      --bg: #e8edf3;
+      --panel: #ffffff;
+      --line: #c5ced9;
+      --accent: #1f4e79;
+      --accent2: #2d6a9f;
+      --soft: #f4ecc5;
+      --soft2: #f8f2d8;
+      --soft3: #fbf9ec;
+      --muted: #5a6b7d;
+      --danger: #b42318;
+      --ok: #067647;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* ===== UI (не печатается) ===== */
+    .app {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 16px;
+      overflow: auto;
+      max-height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+    .sidebar h1 {
+      font-size: 16px;
+      margin: 0 0 4px;
+      color: var(--accent);
+      line-height: 1.3;
+    }
+    .sidebar .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 13px;
+      background: #fff;
+    }
+    .field textarea { min-height: 64px; resize: vertical; }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: 2px solid #9ec5e8;
+      border-color: var(--accent2);
+    }
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .tab {
+      border: 1px solid var(--line);
+      background: #f7f9fc;
+      color: #234;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .panel-section {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background: #fbfcfe;
+    }
+    .panel-section h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      background: #e9eef5;
+      color: #123;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    button.ok { background: var(--ok); color: #fff; }
+    button.danger { background: #fdecec; color: var(--danger); }
+    button:hover { filter: brightness(0.97); }
+    .mini-table-wrap { overflow: auto; max-height: 320px; border: 1px solid var(--line); border-radius: 8px; }
+    table.editor {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+    }
+    table.editor th, table.editor td {
+      border-bottom: 1px solid #edf1f5;
+      padding: 3px 4px;
+      vertical-align: middle;
+    }
+    table.editor th {
+      position: sticky; top: 0;
+      background: #f0f4f8;
+      text-align: left;
+      font-weight: 600;
+      color: var(--muted);
+      z-index: 1;
+      white-space: nowrap;
+    }
+    table.editor input, table.editor textarea {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 5px 6px;
+      font: inherit;
+      font-size: 12px;
+      background: transparent;
+      resize: vertical;
+      min-width: 0;
+    }
+    table.editor input:focus, table.editor textarea:focus {
+      border-color: #9ec5e8;
+      background: #fff;
+      outline: none;
+    }
+    table.editor input.col-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    table.editor .del {
+      width: 28px;
+      text-align: center;
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: 700;
+      user-select: none;
+    }
+    .paste-box {
+      margin-bottom: 10px;
+      border: 1px dashed #8aa4c0;
+      border-radius: 10px;
+      background: #f3f7fb;
+      padding: 8px 10px;
+    }
+    .paste-box label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .paste-box textarea {
+      width: 100%;
+      min-height: 72px;
+      max-height: 160px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      resize: vertical;
+      background: #fff;
+    }
+    .paste-box textarea:focus {
+      outline: 2px solid #9ec5e8;
+      border-color: var(--accent2);
+    }
+    .paste-box .cols-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 4px 0 6px;
+      line-height: 1.35;
+    }
+    .paste-box .cols-hint code {
+      background: #e8eef6;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+    .paste-status {
+      font-size: 11px;
+      color: var(--ok);
+      min-height: 1.2em;
+      margin-top: 4px;
+    }
+    .paste-status.err { color: var(--danger); }
+    .note {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .pack-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .pack-item {
+      display: grid;
+      grid-template-columns: 28px 1fr auto auto auto;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 12px;
+    }
+    .pack-item.off {
+      opacity: 0.55;
+      background: #f4f6f8;
+    }
+    .pack-item .ord {
+      font-weight: 700;
+      color: var(--accent);
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .pack-item label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      margin: 0;
+      font-weight: 500;
+      color: #123;
+    }
+    .pack-item label input { width: auto; margin: 0; }
+    .pack-item button.icon {
+      padding: 4px 7px;
+      min-width: 28px;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .pack-item button.icon:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    /* Модалка выбора печати комплекта */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(20, 30, 50, 0.45);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.22);
+      width: min(440px, 100%);
+      max-height: min(90vh, 720px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal header {
+      padding: 14px 16px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal header h3 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      color: var(--accent);
+    }
+    .modal header p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .modal .modal-body {
+      padding: 12px 16px;
+      overflow: auto;
+      flex: 1;
+    }
+    .modal footer {
+      padding: 10px 16px 14px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .modal footer .grow { margin-right: auto; }
+    @media print {
+      .modal-overlay { display: none !important; }
+    }
+    .workspace {
+      padding: 20px;
+      overflow: auto;
+    }
+    .workspace-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .workspace-top h2 {
+      margin: 0;
+      font-size: 15px;
+      color: var(--accent);
+    }
+    /* ===== Печатный лист A4 ===== */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: #fff;
+      box-shadow: 0 8px 28px rgba(20, 40, 70, .15);
+      padding: 12mm 12mm 14mm 15mm;
+      display: flex;
+      flex-direction: column;
+      color: #000;
+      position: relative;
+    }
+    .page.has-footer {
+      padding-bottom: 18mm;
+    }
+    /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
+    .page-body {
+      flex: 0 1 auto;
+      width: 100%;
+    }
+    /* Excel: подписи сразу под таблицей, с небольшим отступом */
+    .page-signatures {
+      flex: 0 0 auto;
+      margin-top: 8mm;
+      padding-top: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .page-signatures.word-sigs {
+      margin-top: 0;
+    }
+    /* Колонтитул как в Excel: на каждом листе + «Страница P из N» */
+    .sheet-footer {
+      display: none;
+      position: absolute;
+      left: 12mm;
+      right: 12mm;
+      bottom: 6mm;
+      text-align: center;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: #000;
+      line-height: 1.25;
+    }
+    .page.has-footer .sheet-footer {
+      display: block;
+    }
+    .sheet-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .sheet-stage .page + .page {
+      /* на экране видно разбиение листов */
+    }
+
+    .doc-title {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 14pt;
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 6px;
+      line-height: 1.2;
+    }
+    .doc-title.big {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14pt;
+      line-height: 1.15;
+      margin-bottom: 6px;
+    }
+    .doc-title.small {
+      font-size: 11pt;
+      font-weight: 400;
+    }
+    .section-title {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 11pt;
+      text-align: center;
+      margin: 10px 0 6px;
+      border: 1px solid #000;
+      padding: 3px;
+    }
+
+    table.doc {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 10pt;
+      height: auto !important;
+    }
+    table.doc tr {
+      height: auto !important;
+    }
+    table.doc th, table.doc td {
+      border: 1px solid #000;
+      padding: 1px 4px;
+      vertical-align: top;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.12;
+      height: auto !important;
+    }
+    table.doc th {
+      background: var(--soft);
+      font-weight: 400;
+      text-align: center;
+      vertical-align: middle;
+      padding: 2px 4px;
+      line-height: 1.15;
+    }
+    table.doc td.num {
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    table.doc tr.total td {
+      background: var(--soft);
+      font-weight: 600;
+      padding: 1px 4px;
+    }
+    table.doc tr.alt td { background: var(--soft3); }
+    table.doc tr.alt2 td { background: var(--soft2); }
+    /* Материалы: иерархия по «красной строке» (без ведущих пробелов) */
+    table.doc tr.row-parent td { background: var(--soft2); }
+    table.doc tr.row-child td { background: #ffffff; }
+    table.doc tr.row-empty td { background: #ffffff; }
+    /* многострочный текст: высота = по содержимому, отступы 1С сохраняются */
+    table.doc td.pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.12;
+    }
+    table.doc.arial { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; }
+    table.doc.compact { font-size: 9pt; }
+    table.doc.compact th, table.doc.compact td {
+      padding: 1px 3px;
+      line-height: 1.1;
+    }
+    table.doc .hdr-gray th { background: #f2f2f2; }
+
+    /* Excel-подписи: должность слева, ФИО справа — чуть ниже таблицы */
+    .sig-block {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      width: 100%;
+    }
+    .sig-line {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr 1fr;
+      align-items: end;
+      gap: 10px;
+      margin-bottom: 8px;
+      min-height: 18px;
+    }
+    .sig-line .role { text-align: left; }
+    .sig-line .space { min-height: 14px; }
+    .sig-line .fio { text-align: right; white-space: nowrap; }
+
+    /* Word-like docs — подписи как в исходном .docx */
+    .letter {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.35;
+    }
+    .letter .right { text-align: right; margin: 0 0 2px; }
+    .letter .center { text-align: center; margin: 18px 0 18px; font-weight: 400; }
+    .letter .justify { text-align: justify; margin: 0 0 10px; text-indent: 1.25cm; }
+    .letter .justify.no-indent { text-indent: 0; }
+    .letter ol {
+      margin: 0 0 12px;
+      padding-left: 1.4cm;
+    }
+    .letter ol li { margin-bottom: 6px; text-align: justify; }
+    .letter h3 {
+      margin: 0 0 4px;
+      font-size: 12pt;
+      font-weight: 700;
+      text-align: center;
+    }
+    .letter .products {
+      margin: 16px 0 24px;
+      white-space: pre-wrap;
+      text-align: left;
+      min-height: 2em;
+    }
+    /* Как в Word: одна строка «должность ……… ФИО», выравнивание по ширине */
+    .letter .word-sig {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      text-align: justify;
+      margin: 0;
+      font-size: 12pt;
+      page-break-inside: avoid;
+    }
+    .letter .word-sig .role { flex: 0 1 auto; }
+    .letter .word-sig .fio { flex: 0 0 auto; text-align: right; margin-left: 24px; }
+    .letter .word-sig-gap {
+      height: 1.15em;
+      margin: 0;
+    }
+    .letter .word-sig-spacer {
+      height: 4.5em;
+      margin: 0;
+    }
+
+    .hidden { display: none !important; }
+
+    @media screen and (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: relative;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      body { background: #fff; }
+      .sidebar, .workspace-top, .no-print { display: none !important; }
+      .app { display: block; }
+      .workspace { padding: 0; overflow: visible; }
+      .sheet-stage {
+        display: block;
+        gap: 0;
+        align-items: stretch;
+      }
+      .page {
+        box-shadow: none;
+        width: 210mm;
+        min-height: 297mm;
+        height: 297mm;
+        max-height: 297mm;
+        margin: 0 auto;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+      }
+      .page:last-child { page-break-after: auto; break-after: auto; }
+      /* если один лист с длинным текстом (статистика/word) — не обрезать */
+      .page.flow-auto {
+        height: auto;
+        max-height: none;
+        overflow: visible;
+      }
+      .page.has-footer .sheet-footer {
+        position: absolute;
+        left: 12mm;
+        right: 12mm;
+        bottom: 6mm;
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar no-print">
+      <h1>Шаблоны документов</h1>
+      <p class="hint">Данные из 1С: скопируйте диапазон (как в Excel) → вставьте в блок «Вставить из 1С / Excel» или в первую ячейку таблицы (Ctrl+V). Столбцы через Tab, строки с новой строки. Подписи и колонтитулы — как в исходных шаблонах.</p>
+
+      <div class="tabs" id="tabs"></div>
+
+      <div class="panel-section">
+        <h2>Общие данные</h2>
+        <div class="field">
+          <label>Номер / наименование изделия</label>
+          <input id="product" placeholder="например, 123-45" />
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Начальник БТН (ФИО)</label>
+            <input id="fioBtn" value="Алексеев А.А." />
+          </div>
+          <div class="field">
+            <label>Начальник БПП / ТБПП (ФИО)</label>
+            <input id="fioBpp" value="Сажнев Д.Н." />
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Главный инженер (ФИО)</label>
+            <input id="fioGi" value="Мельников И.В." />
+          </div>
+          <div class="field">
+            <label>Дата распоряжения (текст)</label>
+            <input id="orderDate" value="№342/02 от 16.01.2025" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section" id="editorPanel">
+        <h2 id="editorTitle">Данные документа</h2>
+        <div id="editorBody"></div>
+        <div class="btn-row">
+          <button type="button" id="btnAddRow">+ Строка</button>
+          <button type="button" id="btnClearRows" class="danger">Очистить строки</button>
+        </div>
+        <p class="note" id="editorNote"></p>
+      </div>
+
+      <div class="panel-section">
+        <h2>Комплект: печать и Excel</h2>
+        <p class="note" style="margin-top:0">Состав комплекта (Excel и база для печати). Перед печатью откроется окно выбора. Порядок по умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+        <div class="pack-list" id="packList"></div>
+        <div class="btn-row">
+          <button type="button" id="btnPackAll">Все</button>
+          <button type="button" id="btnPackNone">Снять</button>
+          <button type="button" id="btnPackDefault">Порядок по умолчанию</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Действия</h2>
+        <div class="btn-row">
+          <button type="button" class="primary" id="btnPrint">🖨 Печать комплекта</button>
+          <button type="button" id="btnPrintOne">Печать текущей</button>
+          <button type="button" class="ok" id="btnExportOne">⬇ Excel: текущий</button>
+          <button type="button" class="ok" id="btnExportAll">⬇ Excel: комплект</button>
+          <button type="button" id="btnSample">Образец данных</button>
+          <button type="button" id="btnSave">Сохранить в браузере</button>
+          <button type="button" id="btnLoad">Загрузить</button>
+          <button type="button" class="danger" id="btnReset">Сброс</button>
+        </div>
+        <p class="note">Печать комплекта — выбор форм перед печатью. Excel: те же данные, что на печать + <b>поля A4 и колонтитулы</b> «… Страница &amp;P из &amp;N» на каждом листе (как в превью). Откройте файл → Разметка страницы / колонтитулы.</p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="workspace-top no-print">
+        <h2 id="previewTitle">Превью</h2>
+        <div class="btn-row">
+          <button type="button" class="ok" id="btnExportOneTop">Excel текущий</button>
+          <button type="button" class="ok" id="btnExportAllTop">Excel комплект</button>
+          <button type="button" id="btnPrintOneTop">Печать текущей</button>
+          <button type="button" class="primary" id="btnPrintTop">Печать комплекта</button>
+        </div>
+      </div>
+      <div class="sheet-stage" id="sheetStage"></div>
+    </main>
+  </div>
+
+  <!-- Выбор форм и порядка перед печатью комплекта -->
+  <div class="modal-overlay no-print" id="printModal" role="dialog" aria-modal="true" aria-labelledby="printModalTitle">
+    <div class="modal">
+      <header>
+        <h3 id="printModalTitle">Печать комплекта</h3>
+        <p>Отметьте формы и задайте порядок (↑↓). По умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+      </header>
+      <div class="modal-body">
+        <div class="pack-list" id="printPackList"></div>
+        <div class="btn-row">
+          <button type="button" id="btnPrintModalAll">Все</button>
+          <button type="button" id="btnPrintModalNone">Снять</button>
+          <button type="button" id="btnPrintModalDefault">Порядок по умолчанию</button>
+        </div>
+      </div>
+      <footer>
+        <button type="button" class="grow" id="btnPrintModalCancel">Отмена</button>
+        <button type="button" class="primary" id="btnPrintModalGo">🖨 Печать</button>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const DOCS = [
+      { id: 'f1', name: 'Форма 1', short: 'Ф1', excelName: 'Форма1' },
+      { id: 'f2', name: 'Форма 2', short: 'Ф2', excelName: 'Форма2' },
+      { id: 'f3', name: 'Форма 3', short: 'Ф3', excelName: 'Форма3' },
+      { id: 'mat', name: 'Материалы', short: 'Мат.', excelName: 'Материалы' },
+      { id: 'stat', name: 'Статистика', short: 'Стат.', excelName: 'Статистика' },
+      { id: 'kit', name: 'Комплект', short: 'Компл.', excelName: 'Комплект' },
+      { id: 'rasp', name: 'Распоряжение', short: 'Расп.', excelName: 'Распоряжение' },
+      { id: 'cmp', name: 'Сравнение', short: 'Сравн.', excelName: 'Сравнение' },
+    ];
+
+    /**
+     * Порядок печати по умолчанию:
+     * Распоряжение → Комплект → Материалы → Форма 3 → Форма 2 → Форма 1 → остальное
+     */
+    const DEFAULT_PACK = ['rasp', 'kit', 'mat', 'f3', 'f2', 'f1', 'stat', 'cmp'];
+
+    function defaultPackState() {
+      return DEFAULT_PACK.map((id) => ({ id, on: true }));
+    }
+
+    /** Временный состав для модалки печати (не путать с state.pack до подтверждения) */
+    let printDraft = null;
+
+    const state = {
+      current: 'f1',
+      product: '',
+      fioBtn: 'Алексеев А.А.',
+      fioBpp: 'Сажнев Д.Н.',
+      fioGi: 'Мельников И.В.',
+      orderDate: '№342/02 от 16.01.2025',
+      /** [{id, on}] — состав и порядок комплекта для печати / Excel */
+      pack: defaultPackState(),
+      // tables
+      f1: [{ op: '', min: '', hour: '' }],
+      f2: [{ unit: '', min: '', hour: '' }],
+      f3: [{ name: '', qty: '', min: '', hour: '' }],
+      mat: [{ name: '', unit: '', qty: '' }],
+      statUnload: [{ status: '', section: '', info: '', qty: '', total: '' }],
+      statSum: [{ code: '', name: '', qtySum: '', laborSum: '' }],
+      kitPages: { stat: 1, f1: 1, f2: 1, f3: 1, mat: 1 },
+      raspProducts: '',
+      cmp: [{ oldCode: '', oldName: '', newCode: '', newName: '', note: '' }],
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /** Схемы столбцов — порядок как при копировании из 1С/Excel */
+    const SCHEMAS = {
+      f1: {
+        keys: ['op', 'min', 'hour'],
+        headers: ['Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'],
+        numeric: ['min', 'hour'],
+        autoHourFromMin: true,
+        aliases: {
+          op: ['операц', 'наименование', 'работа', 'вид работ', 'содержание'],
+          min: ['н.мин', 'нмин', 'мин', 'трудоемкость, н.мин', 'трудоёмкость, н.мин'],
+          hour: ['н.ч', 'нч', 'час', 'трудоемкость, н.ч', 'трудоёмкость, н.ч'],
+        },
+      },
+      f2: {
+        keys: ['unit', 'min', 'hour'],
+        headers: ['Подразделение/Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'],
+        numeric: ['min', 'hour'],
+        autoHourFromMin: true,
+        aliases: {
+          unit: ['подраздел', 'операц', 'наименование', 'цех'],
+          min: ['н.мин', 'нмин', 'мин', 'трудоемкость, н.мин'],
+          hour: ['н.ч', 'нч', 'час', 'трудоемкость, н.ч'],
+        },
+      },
+      f3: {
+        keys: ['name', 'qty', 'min', 'hour'],
+        headers: ['Изделие/Подразделение/Операция', 'Количество', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'],
+        numeric: ['qty', 'min', 'hour'],
+        autoHourFromMin: true,
+        aliases: {
+          name: ['изделие', 'подраздел', 'операц', 'наименование', 'номенклатур'],
+          qty: ['количеств', 'кол-во', 'колво', 'шт'],
+          min: ['н.мин', 'нмин', 'мин'],
+          hour: ['н.ч', 'нч', 'час'],
+        },
+      },
+      mat: {
+        keys: ['name', 'unit', 'qty'],
+        headers: ['Номенклатура / Полуфабрикат', 'Ед. изм.', 'Количество'],
+        numeric: ['qty'],
+        aliases: {
+          name: ['номенклатур', 'полуфабрик', 'наименование', 'материал'],
+          unit: ['ед', 'единиц', 'изм'],
+          qty: ['количеств', 'кол-во', 'колво'],
+        },
+      },
+      statUnload: {
+        keys: ['status', 'section', 'info', 'qty', 'total'],
+        headers: ['Статус', 'Раздел', 'Информация', 'Количество', 'Всего проверено'],
+        numeric: ['qty', 'total'],
+        aliases: {
+          status: ['статус'],
+          section: ['раздел'],
+          info: ['информац'],
+          qty: ['количеств', 'кол-во'],
+          total: ['всего', 'проверено'],
+        },
+      },
+      statSum: {
+        keys: ['code', 'name', 'qtySum', 'laborSum'],
+        headers: ['Код Союза', 'Наименование изделия', 'Контрольная сумма по количеству', 'Контрольная сумма по трудоемкости'],
+        numeric: ['qtySum', 'laborSum'],
+        aliases: {
+          code: ['код', 'союз'],
+          name: ['наименован', 'изделие'],
+          qtySum: ['количеств', 'сумма по кол'],
+          laborSum: ['трудоемк', 'трудоёмк'],
+        },
+      },
+      cmp: {
+        keys: ['oldCode', 'oldName', 'newCode', 'newName', 'note'],
+        headers: ['Старый код', 'Старое наименование', 'Новый код', 'Новое наименование', 'Примечание'],
+        numeric: [],
+        aliases: {
+          oldCode: ['старый код', 'код стар'],
+          oldName: ['старое', 'стар наим'],
+          newCode: ['новый код', 'код нов'],
+          newName: ['новое', 'нов наим'],
+          note: ['примеч', 'коммент'],
+        },
+      },
+    };
+
+    function cleanCell(v) {
+      // НЕ trim() слева — отступы из 1С нужны для иерархии «красной строки» в Материалах
+      return String(v ?? '')
+        .replace(/\u00a0/g, ' ')   // nbsp из 1С
+        .replace(/\u2007/g, ' ')
+        .replace(/\u202f/g, ' ')
+        .replace(/\r/g, '')
+        .replace(/\t/g, '    ')    // таб → 4 пробела (видно в иерархии)
+        .replace(/\s+$/g, '');     // только справа
+    }
+
+    /** Числа 1С: «1 234,56», «1234.56», «1&nbsp;234,56» */
+    function num(v) {
+      if (v === null || v === undefined) return null;
+      let s = cleanCell(v);
+      if (s === '' || s === '-' || s === '—') return null;
+      s = s.replace(/\s/g, '').replace(/^\+/, '');
+      // 1.234,56 → 1234.56 ; 1,234.56 → 1234.56
+      if (/\d,\d{1,}$/.test(s) && s.includes('.')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else if (s.includes(',') && !s.includes('.')) {
+        s = s.replace(',', '.');
+      } else if ((s.match(/\./g) || []).length > 1) {
+        s = s.replace(/\./g, '');
+      }
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function fmt(v) {
+      const n = num(v);
+      if (n === null) return esc(v);
+      // сохраняем привычный вид, без лишних нулей
+      return String(Math.round(n * 1000000) / 1000000).replace('.', ',');
+    }
+
+    function normalizeNumericString(v) {
+      const n = num(v);
+      if (n === null) return cleanCell(v);
+      return String(Math.round(n * 1000000) / 1000000).replace('.', ',');
+    }
+
+    function sumField(rows, key) {
+      let s = 0, any = false;
+      for (const r of rows) {
+        const n = num(r[key]);
+        if (n !== null) { s += n; any = true; }
+      }
+      if (!any) return '';
+      return String(Math.round(s * 1000) / 1000).replace('.', ',');
+    }
+
+    function productLabel(fallback = '(ввести номер изделия)') {
+      return state.product.trim() || fallback;
+    }
+
+    function emptyRowFor(id) {
+      const sch = SCHEMAS[id];
+      if (sch) return Object.fromEntries(sch.keys.map((k) => [k, '']));
+      return {};
+    }
+
+    function tableKeys(tableKey) {
+      return (SCHEMAS[tableKey] && SCHEMAS[tableKey].keys) || Object.keys(state[tableKey][0] || {});
+    }
+
+    /* ---------- парсинг буфера 1С / Excel ---------- */
+    function parseGridText(text) {
+      let raw = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      // HTML-таблица из 1С (иногда в text/html, иногда в text)
+      if (/<table[\s>]/i.test(raw) || /<tr[\s>]/i.test(raw)) {
+        return parseHtmlTable(raw);
+      }
+      const lines = raw.split('\n');
+      // убрать хвостовые пустые
+      while (lines.length && !cleanCell(lines[lines.length - 1])) lines.pop();
+      if (!lines.length) return [];
+
+      // определить разделитель: таб (Excel/1С), ; (csv), | 
+      const sample = lines.slice(0, Math.min(8, lines.length)).join('\n');
+      let delim = '\t';
+      const tabCount = (sample.match(/\t/g) || []).length;
+      const semiCount = (sample.match(/;/g) || []).length;
+      const pipeCount = (sample.match(/\|/g) || []).length;
+      if (tabCount === 0 && semiCount > 0) delim = ';';
+      else if (tabCount === 0 && pipeCount > 0 && pipeCount >= semiCount) delim = '|';
+      else if (tabCount === 0 && semiCount === 0) {
+        // несколько пробелов подряд (редко) — не трогаем, одна колонка
+        delim = null;
+      }
+
+      return lines.map((line) => {
+        if (delim === null) return [cleanCell(line)];
+        return line.split(delim).map(cleanCell);
+      }).filter((row) => row.some((c) => c !== ''));
+    }
+
+    function parseHtmlTable(html) {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const rows = [...doc.querySelectorAll('tr')];
+        return rows.map((tr) =>
+          [...tr.querySelectorAll('th,td')].map((td) => cleanCell(td.innerText || td.textContent))
+        ).filter((r) => r.some((c) => c !== ''));
+      } catch {
+        return [];
+      }
+    }
+
+    function looksLikeHeader(cells, schema) {
+      const joined = cells.join(' ').toLowerCase();
+      if (!joined.trim()) return false;
+      if (/^(итого|всего|total|sum)/i.test(cleanCell(cells[0]))) return false;
+      const headerHints = (schema.headers || []).join(' ').toLowerCase();
+      let hits = 0;
+      for (const h of schema.headers || []) {
+        const part = h.toLowerCase().slice(0, 6);
+        if (joined.includes(part)) hits++;
+      }
+      // типичные слова шапки 1С
+      if (/наименование|операц|трудоем|количеств|подраздел|номенклатур|статус|раздел|ед\.?\s*изм/i.test(joined)) hits++;
+      return hits >= 1 && cells.every((c) => num(c) === null || /[а-яa-z]/i.test(c));
+    }
+
+    function isTotalRow(cells) {
+      const a = cleanCell(cells[0] || '').trim().toLowerCase();
+      return /^(итого|всего|total|сумма)\b/i.test(a);
+    }
+
+    function mapHeaderToKeys(headerCells, schema) {
+      const map = [];
+      headerCells.forEach((cell, i) => {
+        const c = cell.toLowerCase();
+        let found = null;
+        for (const key of schema.keys) {
+          const als = schema.aliases?.[key] || [];
+          if (als.some((a) => c.includes(a)) || c.includes(key)) {
+            found = key;
+            break;
+          }
+        }
+        map[i] = found;
+      });
+      // если почти ничего не нашли — позиционный
+      const mapped = map.filter(Boolean).length;
+      if (mapped < Math.min(2, schema.keys.length)) return null;
+      return map;
+    }
+
+    /**
+     * grid[][] → массив объектов по схеме
+     * mode: 'replace' | merge from startRow/startCol
+     */
+    function gridToRows(grid, tableKey, options = {}) {
+      const schema = SCHEMAS[tableKey];
+      if (!schema || !grid.length) return [];
+      const keys = schema.keys;
+      let start = 0;
+      let colMap = null; // index in grid → key
+
+      if (looksLikeHeader(grid[0], schema)) {
+        colMap = mapHeaderToKeys(grid[0], schema);
+        start = 1;
+      }
+
+      const out = [];
+      for (let i = start; i < grid.length; i++) {
+        const cells = grid[i];
+        if (isTotalRow(cells)) continue;
+        if (!cells.some((c) => cleanCell(c) !== '')) continue;
+
+        const row = emptyRowFor(tableKey);
+        if (colMap) {
+          cells.forEach((cell, ci) => {
+            const k = colMap[ci];
+            if (k) row[k] = cell;
+          });
+        } else {
+          // позиционно: первые N столбцов = схема (как вставка в Excel с A1)
+          const offset = options.startCol || 0;
+          keys.forEach((k, ki) => {
+            const cell = cells[ki + offset];
+            if (cell !== undefined) row[k] = cell;
+          });
+          // если пришло больше столбцов, а startCol=0 и keys короче — уже записали
+        }
+
+        // нормализация чисел
+        (schema.numeric || []).forEach((k) => {
+          if (row[k] !== '' && row[k] != null) row[k] = normalizeNumericString(row[k]);
+        });
+
+        // н.ч. из н.мин., если час пустой
+        if (schema.autoHourFromMin && keys.includes('hour') && keys.includes('min')) {
+          const m = num(row.min);
+          if (m !== null && (row.hour === '' || row.hour == null)) {
+            row.hour = normalizeNumericString(Math.round((m / 60) * 1000) / 1000);
+          }
+        }
+
+        // пустые строки-имена пропускаем, если все числовые пусты
+        const hasText = keys.some((k) => !(schema.numeric || []).includes(k) && cleanCell(row[k]));
+        const hasNum = (schema.numeric || []).some((k) => num(row[k]) !== null);
+        if (!hasText && !hasNum) continue;
+
+        out.push(row);
+      }
+      return out;
+    }
+
+    function applyPasteToTable(tableKey, text, opts = {}) {
+      const grid = parseGridText(text);
+      if (!grid.length) return { ok: false, msg: 'Буфер пуст или не распознан' };
+
+      const schema = SCHEMAS[tableKey];
+      if (!schema) return { ok: false, msg: 'Нет схемы таблицы' };
+
+      const startRow = opts.startRow ?? 0;
+      const startCol = opts.startCol ?? 0;
+      const replace = opts.replace !== false && startRow === 0 && startCol === 0;
+
+      // вставка с середины (как Excel с активной ячейки)
+      if (!replace && (startRow > 0 || startCol > 0)) {
+        const rows = state[tableKey];
+        const keys = schema.keys;
+        let gi = 0;
+        let g = grid;
+        if (looksLikeHeader(g[0], schema)) g = g.slice(1);
+
+        g.forEach((cells, li) => {
+          if (isTotalRow(cells)) return;
+          const ri = startRow + li;
+          while (rows.length <= ri) rows.push(emptyRowFor(tableKey));
+          cells.forEach((cell, ci) => {
+            const k = keys[startCol + ci];
+            if (!k) return;
+            let val = cell;
+            if ((schema.numeric || []).includes(k)) val = normalizeNumericString(val);
+            rows[ri][k] = val;
+          });
+          if (schema.autoHourFromMin) {
+            const m = num(rows[ri].min);
+            if (m !== null && (rows[ri].hour === '' || rows[ri].hour == null)) {
+              rows[ri].hour = normalizeNumericString(Math.round((m / 60) * 1000) / 1000);
+            }
+          }
+          gi++;
+        });
+        return { ok: true, msg: `Вставлено строк: ${g.length} (с позиции ${startRow + 1})` };
+      }
+
+      const parsed = gridToRows(grid, tableKey, { startCol: 0 });
+      if (!parsed.length) return { ok: false, msg: 'Не удалось разобрать строки (проверьте столбцы)' };
+      state[tableKey] = parsed;
+      return { ok: true, msg: `Загружено строк: ${parsed.length}` };
+    }
+
+    /* ---------- tabs ---------- */
+    function buildTabs() {
+      const root = $('tabs');
+      root.innerHTML = '';
+      DOCS.forEach((d) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tab' + (state.current === d.id ? ' active' : '');
+        b.textContent = d.short;
+        b.title = d.name;
+        b.onclick = () => {
+          state.current = d.id;
+          buildTabs();
+          renderEditor();
+          renderPreview();
+        };
+        root.appendChild(b);
+      });
+    }
+
+    /* ---------- editor ---------- */
+    function pasteZoneHtml(tableKey, placeholder) {
+      const sch = SCHEMAS[tableKey];
+      const cols = (sch?.headers || []).map((h) => `<code>${esc(h)}</code>`).join(' → ');
+      return `
+        <div class="paste-box" data-paste-for="${tableKey}">
+          <label>Вставить из 1С / Excel</label>
+          <div class="cols-hint">Порядок столбцов: ${cols}<br>
+            Скопируйте диапазон в 1С (как в Excel) и вставьте сюда <b>Ctrl+V</b> — строки разложатся сами. Шапка и «Итого» отфильтруются.</div>
+          <textarea class="paste-area" data-paste-table="${tableKey}" placeholder="${esc(placeholder || 'Ctrl+V — таблица из 1С…')}" spellcheck="false"></textarea>
+          <div class="btn-row">
+            <button type="button" class="ok btn-apply-paste" data-paste-table="${tableKey}">Применить вставку</button>
+            <button type="button" class="btn-clear-paste" data-paste-table="${tableKey}">Очистить поле</button>
+          </div>
+          <div class="paste-status" data-paste-status="${tableKey}"></div>
+        </div>`;
+    }
+
+    function inputCell(i, key, val, tableKey, isNum) {
+      const tAttr = tableKey ? ` data-t="${tableKey}"` : '';
+      const cls = isNum ? ' class="col-num"' : '';
+      return `<td><input${cls} data-i="${i}" data-k="${key}"${tAttr} value="${esc(val)}" autocomplete="off" /></td>`;
+    }
+
+    function renderEditor() {
+      const id = state.current;
+      const body = $('editorBody');
+      const title = $('editorTitle');
+      const note = $('editorNote');
+      const addBtn = $('btnAddRow');
+      const clearBtn = $('btnClearRows');
+
+      addBtn.classList.remove('hidden');
+      clearBtn.classList.remove('hidden');
+
+      if (id === 'f1') {
+        title.textContent = 'Форма 1 — операции';
+        note.textContent = 'Вставка как в Excel: столбцы Операции | н.мин. | н.ч. Если н.ч. пусто — считается из н.мин./60. Итого — автоматически.';
+        body.innerHTML = pasteZoneHtml('f1', 'Операция1\t120\t2\nОперация2\t60\t1')
+          + editorTableFromSchema('f1', state.f1);
+      } else if (id === 'f2') {
+        title.textContent = 'Форма 2 — подразделения / операции';
+        note.textContent = 'Столбцы: Подразделение/Операции | н.мин. | н.ч. Вставка из 1С — в поле выше или Ctrl+V в ячейку таблицы.';
+        body.innerHTML = pasteZoneHtml('f2', 'Цех 1 / Операция\t90\t1,5')
+          + editorTableFromSchema('f2', state.f2);
+      } else if (id === 'f3') {
+        title.textContent = 'Форма 3 — номенклатура / работы';
+        note.textContent = 'Столбцы: Наименование | Количество | н.мин. | н.ч. Подпись «Начальник БТН» сразу под таблицей.';
+        body.innerHTML = pasteZoneHtml('f3', 'Деталь А\t2\t30\t0,5')
+          + editorTableFromSchema('f3', state.f3);
+      } else if (id === 'mat') {
+        title.textContent = 'Материальная ведомость';
+        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. Иерархия: строка без отступа (красная строка) — подкрашена; строки с пробелами в начале — белые. Колонтитул «Страница N из M».';
+        body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
+          + editorTableFromSchema('mat', state.mat);
+      } else if (id === 'stat') {
+        title.textContent = 'Статистика — две таблицы';
+        note.textContent = 'Вставляйте каждую таблицу отдельно (выгрузка / контрольные суммы).';
+        addBtn.classList.add('hidden');
+        body.innerHTML = `
+          <p class="note" style="margin:0 0 6px"><b>1) Статистика выгрузки</b></p>
+          ${pasteZoneHtml('statUnload', 'OK\tСборка\t...\t10\t10')}
+          ${editorTableFromSchema('statUnload', state.statUnload)}
+          <div class="btn-row" style="margin:8px 0">
+            <button type="button" id="btnAddUnload">+ Строка выгрузки</button>
+          </div>
+          <p class="note"><b>2) Контрольные суммы</b></p>
+          ${pasteZoneHtml('statSum', '001\tИзделие\t100\t250,5')}
+          ${editorTableFromSchema('statSum', state.statSum)}
+          <div class="btn-row" style="margin:8px 0">
+            <button type="button" id="btnAddSum">+ Строка сумм</button>
+          </div>
+        `;
+        $('btnAddUnload').onclick = () => {
+          state.statUnload.push(emptyRowFor('statUnload'));
+          renderEditor(); renderPreview();
+        };
+        $('btnAddSum').onclick = () => {
+          state.statSum.push(emptyRowFor('statSum'));
+          renderEditor(); renderPreview();
+        };
+      } else if (id === 'kit') {
+        title.textContent = 'Комплект документов';
+        note.textContent = 'Число листов считается автоматически по данным форм (как при печати) и склоняется: на 1 листе / на 2 листах / на 5 листах.';
+        addBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        recalcKitPages();
+        const p = state.kitPages;
+        const line = (label, n) =>
+          `<div class="field"><label>${esc(label)}</label>
+            <input type="text" readonly value="${esc(listovForm(n) + ' → ' + naListah(n) + ' формата А4')}" /></div>`;
+        body.innerHTML = `
+          <p class="note" style="margin-top:0">Пересчёт при открытии «Комплекта», печати и выгрузке в Excel.</p>
+          ${line('Статистика', p.stat)}
+          ${line('Форма 1', p.f1)}
+          ${line('Форма 2', p.f2)}
+          ${line('Форма 3', p.f3)}
+          ${line('Материалы', p.mat)}
+          <div class="field"><label>Всего по пакету в сопроводительном</label>
+            <input type="text" readonly value="${esc(listovForm(p.stat + p.f1 + p.f2 + p.f3 + p.mat))}" /></div>
+          <div class="btn-row"><button type="button" id="btnRecalcKit">Пересчитать листы</button></div>
+        `;
+        $('btnRecalcKit').onclick = () => {
+          recalcKitPages();
+          renderEditor();
+          renderPreview('screen');
+        };
+      } else if (id === 'rasp') {
+        title.textContent = 'Распоряжение — изделия';
+        note.textContent = 'Можно вставить список из 1С: по одному изделию в строке (или через Tab — возьмётся 1-й столбец).';
+        addBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        body.innerHTML = `
+          <div class="paste-box">
+            <label>Список изделий (из 1С)</label>
+            <div class="cols-hint">Вставьте копированием из таблицы 1С — лишние столбцы отбросятся, останется код/наименование.</div>
+            <textarea id="raspProducts" spellcheck="false">${esc(state.raspProducts || state.product)}</textarea>
+          </div>
+        `;
+        const ta = $('raspProducts');
+        ta.oninput = () => {
+          state.raspProducts = ta.value;
+          renderPreview();
+        };
+        ta.addEventListener('paste', (e) => {
+          const text = (e.clipboardData || window.clipboardData).getData('text');
+          if (!text || (!text.includes('\t') && !text.includes(';') && text.split('\n').length < 2)) return;
+          e.preventDefault();
+          const grid = parseGridText(text);
+          const lines = grid.map((row) => row.filter(Boolean).join(' — ')).filter(Boolean);
+          const block = lines.join('\n');
+          const start = ta.selectionStart ?? ta.value.length;
+          const end = ta.selectionEnd ?? ta.value.length;
+          ta.value = ta.value.slice(0, start) + block + ta.value.slice(end);
+          state.raspProducts = ta.value;
+          renderPreview();
+        });
+      } else if (id === 'cmp') {
+        title.textContent = 'Сравнение спецификаций';
+        note.textContent = 'Пять столбцов: старый код | старое наим. | новый код | новое наим. | примечание.';
+        body.innerHTML = pasteZoneHtml('cmp', 'A-1\tСтарое\tB-1\tНовое\tзамена')
+          + editorTableFromSchema('cmp', state.cmp);
+      }
+
+      bindEditorInputs();
+      bindPasteZones();
+    }
+
+    function editorTableFromSchema(tableKey, rows) {
+      const sch = SCHEMAS[tableKey];
+      const keys = sch.keys;
+      const headers = sch.headers.concat(['']);
+      const numeric = new Set(sch.numeric || []);
+      const tAttr = ` data-table="${tableKey}"`;
+      const body = rows.map((r, i) => {
+        const cells = keys.map((k) => inputCell(i, k, r[k], tableKey, numeric.has(k))).join('');
+        return `<tr>${cells}<td class="del" data-del="${i}" data-t="${tableKey}">×</td></tr>`;
+      }).join('');
+      return `<div class="mini-table-wrap"><table class="editor"${tAttr}><thead><tr>${
+        headers.map((h) => `<th>${esc(h)}</th>`).join('')
+      }</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function bindPasteZones() {
+      $('editorBody').querySelectorAll('.btn-apply-paste').forEach((btn) => {
+        btn.onclick = () => {
+          const tk = btn.dataset.pasteTable;
+          const ta = $('editorBody').querySelector(`textarea.paste-area[data-paste-table="${tk}"]`);
+          const st = $('editorBody').querySelector(`[data-paste-status="${tk}"]`);
+          const res = applyPasteToTable(tk, ta.value, { replace: true });
+          if (st) {
+            st.textContent = res.msg;
+            st.className = 'paste-status' + (res.ok ? '' : ' err');
+          }
+          if (res.ok) {
+            ta.value = '';
+            renderEditor();
+            renderPreview();
+            // restore status after re-render
+            const st2 = document.querySelector(`[data-paste-status="${tk}"]`);
+            if (st2) {
+              st2.textContent = res.msg;
+              st2.className = 'paste-status';
+            }
+          }
+        };
+      });
+      $('editorBody').querySelectorAll('.btn-clear-paste').forEach((btn) => {
+        btn.onclick = () => {
+          const tk = btn.dataset.pasteTable;
+          const ta = $('editorBody').querySelector(`textarea.paste-area[data-paste-table="${tk}"]`);
+          if (ta) ta.value = '';
+        };
+      });
+      // Ctrl+V в зоне вставки — сразу применить
+      $('editorBody').querySelectorAll('textarea.paste-area').forEach((ta) => {
+        ta.addEventListener('paste', (e) => {
+          const text = (e.clipboardData || window.clipboardData).getData('text/plain')
+            || (e.clipboardData || window.clipboardData).getData('text');
+          // также html-таблица
+          const html = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+          const payload = (html && /<table/i.test(html)) ? html : text;
+          if (!payload || !cleanCell(payload)) return;
+          e.preventDefault();
+          ta.value = text || payload;
+          const tk = ta.dataset.pasteTable;
+          const res = applyPasteToTable(tk, payload, { replace: true });
+          const st = document.querySelector(`[data-paste-status="${tk}"]`);
+          if (res.ok) {
+            renderEditor();
+            renderPreview();
+            const st2 = document.querySelector(`[data-paste-status="${tk}"]`);
+            if (st2) {
+              st2.textContent = res.msg + ' (авто из буфера)';
+              st2.className = 'paste-status';
+            }
+          } else if (st) {
+            st.textContent = res.msg;
+            st.className = 'paste-status err';
+          }
+        });
+      });
+    }
+
+    function bindEditorInputs() {
+      $('editorBody').querySelectorAll('input[data-k]').forEach((inp) => {
+        inp.oninput = () => {
+          const t = inp.dataset.t || currentTableKey();
+          const i = +inp.dataset.i;
+          const k = inp.dataset.k;
+          if (state[t] && state[t][i]) {
+            let val = inp.value;
+            const sch = SCHEMAS[t];
+            if (sch && (sch.numeric || []).includes(k)) {
+              // не нормализуем на каждый символ — только preview raw
+            }
+            state[t][i][k] = val;
+            if (sch?.autoHourFromMin && k === 'min') {
+              const m = num(val);
+              if (m !== null && (!state[t][i].hour || state[t][i].hour === '')) {
+                // не трогаем hour в input пока пользователь не вставит пачкой
+              }
+            }
+            renderPreview();
+          }
+        };
+        inp.addEventListener('blur', () => {
+          const t = inp.dataset.t || currentTableKey();
+          const i = +inp.dataset.i;
+          const k = inp.dataset.k;
+          const sch = SCHEMAS[t];
+          if (!sch || !state[t]?.[i]) return;
+          if ((sch.numeric || []).includes(k) && inp.value !== '') {
+            const n = normalizeNumericString(inp.value);
+            state[t][i][k] = n;
+            inp.value = n;
+          }
+          if (sch.autoHourFromMin && k === 'min') {
+            const m = num(state[t][i].min);
+            if (m !== null && (state[t][i].hour === '' || state[t][i].hour == null)) {
+              state[t][i].hour = normalizeNumericString(Math.round((m / 60) * 1000) / 1000);
+              const hourInp = $('editorBody').querySelector(`input[data-t="${t}"][data-i="${i}"][data-k="hour"], input[data-i="${i}"][data-k="hour"]`);
+              // when no data-t on f1, match within table
+              const hourEl = $('editorBody').querySelector(`table.editor[data-table="${t}"] input[data-i="${i}"][data-k="hour"]`);
+              if (hourEl) hourEl.value = state[t][i].hour;
+            }
+          }
+          renderPreview();
+        });
+      });
+      $('editorBody').querySelectorAll('[data-del]').forEach((el) => {
+        el.onclick = () => {
+          const t = el.dataset.t || currentTableKey();
+          const i = +el.dataset.del;
+          if (state[t] && state[t].length > 1) {
+            state[t].splice(i, 1);
+          } else if (state[t]) {
+            state[t][0] = emptyRowFor(t);
+          }
+          renderEditor();
+          renderPreview();
+        };
+      });
+    }
+
+    function currentTableKey() {
+      const m = { f1: 'f1', f2: 'f2', f3: 'f3', mat: 'mat', cmp: 'cmp' };
+      return m[state.current] || 'f1';
+    }
+
+    /* ---------- иерархия «Материалы»: красная строка / отступ ---------- */
+    /**
+     * Красная строка = текст начинается у левого края (без ведущих пробелов/табов).
+     * Вложенные позиции из 1С идут с несколькими пробелами/табом в начале —
+     * они без заливки; родительские (с красной строки) — подкрашены.
+     */
+    function matRowClass(name) {
+      const s = String(name ?? '');
+      if (!s.trim()) return 'row-empty';
+      // ведущие пробелы, табы, неразрывные пробелы 1С
+      const m = s.match(/^[\s\u00a0\u2007\u202f\u3000]+/);
+      if (m && m[0].replace(/\t/g, '  ').length >= 2) return 'row-child';
+      if (m && m[0].includes('\t')) return 'row-child';
+      return 'row-parent';
+    }
+
+    function excelSignature(role, fio) {
+      return `
+        <div class="sig-block">
+          <div class="sig-line">
+            <div class="role">${esc(role)}</div>
+            <div class="space"></div>
+            <div class="fio">${esc(fio)}</div>
+          </div>
+        </div>`;
+    }
+
+    function pageShell(bodyHtml, sigsHtml, footerHtml, opts = {}) {
+      const hasFooter = !!footerHtml;
+      const sigs = sigsHtml
+        ? `<div class="page-signatures">${sigsHtml}</div>`
+        : `<div class="page-signatures hidden"></div>`;
+      const foot = hasFooter
+        ? `<div class="sheet-footer">${footerHtml}</div>`
+        : '';
+      return `
+        <div class="page${hasFooter ? ' has-footer' : ''}${opts.extraClass ? ' ' + opts.extraClass : ''}">
+          <div class="page-body">${bodyHtml}</div>
+          ${sigs}
+          ${foot}
+        </div>`;
+    }
+
+    function footerExcel(textBase, pageNum, pageCount) {
+      return `${textBase} &nbsp; Страница ${pageNum} из ${pageCount}`;
+    }
+
+    function chunkRows(rows, size) {
+      const out = [];
+      const list = Array.isArray(rows) ? rows : [];
+      if (!list.length) return [[]];
+      const n = Math.max(1, size | 0);
+      for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+      return out;
+    }
+
+    /** Сколько строк данных на лист (A4); при компактных строках помещается больше */
+    function rowsPerPageFor(id) {
+      if (id === 'f3') return 36;
+      if (id === 'mat') return 40;
+      if (id === 'stat') return 22;
+      if (id === 'cmp') return 38;
+      return 42;
+    }
+
+    /* ---------- склонение «лист» и подсчёт листов для Комплекта ---------- */
+    /** 1 лист / 2 листа / 5 листов / 21 лист / 11 листов */
+    function listovForm(n) {
+      n = Math.max(0, Math.round(Number(n) || 0));
+      const n100 = n % 100;
+      const n10 = n % 10;
+      let w = 'листов';
+      if (n100 < 11 || n100 > 14) {
+        if (n10 === 1) w = 'лист';
+        else if (n10 >= 2 && n10 <= 4) w = 'листа';
+      }
+      return `${n} ${w}`;
+    }
+
+    /** на 1 листе / на 2 листах / на 5 листах / на 21 листе / на 11 листах */
+    function naListah(n) {
+      n = Math.max(1, Math.round(Number(n) || 1));
+      const n100 = n % 100;
+      const n10 = n % 10;
+      if (n10 === 1 && n100 !== 11) return `на ${n} листе`;
+      return `на ${n} листах`;
+    }
+
+    /** Число печатных листов документа (та же нарезка, что при печати) */
+    function countDocPages(id) {
+      if (id === 'f1' || id === 'f2' || id === 'f3' || id === 'mat' || id === 'cmp') {
+        const data = state[id] || [];
+        const filled = data.filter((r) =>
+          Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')
+        ).length;
+        const rpp = rowsPerPageFor(id);
+        if (filled === 0) return 1;
+        return Math.max(1, Math.ceil(filled / rpp));
+      }
+      if (id === 'stat') {
+        const u = (state.statUnload || []).filter((r) =>
+          Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')
+        ).length;
+        const s = (state.statSum || []).filter((r) =>
+          Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')
+        ).length;
+        // две таблицы + заголовки на листе ≈ как rowsPerPageFor('stat')
+        const rpp = rowsPerPageFor('stat');
+        const total = u + s;
+        if (total === 0) return 1;
+        // небольшой запас на два заголовка секций
+        return Math.max(1, Math.ceil((total + 4) / rpp));
+      }
+      // Word-бланки обычно 1 лист
+      return 1;
+    }
+
+    function recalcKitPages() {
+      state.kitPages = {
+        stat: countDocPages('stat'),
+        f1: countDocPages('f1'),
+        f2: countDocPages('f2'),
+        f3: countDocPages('f3'),
+        mat: countDocPages('mat'),
+      };
+      return state.kitPages;
+    }
+
+    function buildDocSpec(id) {
+      const p = productLabel();
+      if (id === 'f1') {
+        const rows = state.f1;
+        return {
+          paginate: true,
+          footerBase: `Сводная ведомость нормативной трудоемкости операций на изделие ${esc(p)}`,
+          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости операций на изделие<br>${esc(p)}</h1>`,
+          tableClass: 'doc',
+          colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
+          thead: `<tr><th>Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
+          dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.op)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
+          total: `<tr class="total"><td>Итого</td><td class="num">${esc(sumField(rows,'min'))}</td><td class="num">${esc(sumField(rows,'hour'))}</td></tr>`,
+          sigs: '',
+        };
+      }
+      if (id === 'f2') {
+        const rows = state.f2;
+        return {
+          paginate: true,
+          footerBase: `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(p)}`,
+          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(p)}</h1>`,
+          tableClass: 'doc',
+          colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
+          thead: `<tr><th>Подразделение/Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
+          dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.unit)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
+          total: `<tr class="total"><td>Итого</td><td class="num">${esc(sumField(rows,'min'))}</td><td class="num">${esc(sumField(rows,'hour'))}</td></tr>`,
+          sigs: '',
+        };
+      }
+      if (id === 'f3') {
+        const rows = state.f3;
+        return {
+          paginate: true,
+          footerBase: `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(p)}`,
+          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости работ по<br>подразделениям и номенклатуре на изделие ${esc(p)}</h1>`,
+          tableClass: 'doc compact',
+          colgroup: '<col style="width:58%"><col style="width:14%"><col style="width:14%"><col style="width:14%">',
+          thead: `<tr><th>Изделие/Подразделение/Операция</th><th>Количество:<br>шт — для изделий/подразделений<br>н.мин — для операций</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
+          dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.name)}</td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
+          total: `<tr class="total"><td>Итого</td><td></td><td class="num">${esc(sumField(rows,'min'))}</td><td class="num">${esc(sumField(rows,'hour'))}</td></tr>`,
+          sigs: excelSignature('Начальник БТН', state.fioBtn),
+        };
+      }
+      if (id === 'mat') {
+        const rows = state.mat;
+        const prod = productLabel('(ввести наименование изделия)');
+        return {
+          paginate: true,
+          footerBase: `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие &nbsp; (${esc(prod)})`,
+          title: `<h1 class="doc-title big">Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие<br>${esc(productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'))}</h1>`,
+          tableClass: 'doc arial',
+          colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
+          thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
+          dataRows: rows.map((r) => {
+            const cls = matRowClass(r.name);
+            return `<tr class="${cls}"><td class="pre">${esc(r.name)}</td><td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
+          }),
+          total: `<tr class="total"><td>Итого</td><td></td><td class="num">${esc(sumField(rows,'qty'))}</td></tr>`,
+          sigs: excelSignature('Начальник ТБПП', state.fioBpp),
+        };
+      }
+      if (id === 'stat') {
+        return {
+          paginate: false,
+          footerBase: `Статистика выгрузки и контрольные суммы спецификаций на изделие ${esc(p)}`,
+          singleBody: `
+            <h1 class="doc-title small">Статистика выгрузки и контрольные суммы спецификаций на изделие ${esc(p)}</h1>
+            <div class="section-title">Статистика выгрузки изделия</div>
+            <table class="doc">
+              <colgroup><col style="width:18%"><col style="width:22%"><col style="width:28%"><col style="width:16%"><col style="width:16%"></colgroup>
+              <thead><tr class="hdr-gray"><th>Статус</th><th>Раздел</th><th>Информация</th><th>Количество</th><th>Всего проверено</th></tr></thead>
+              <tbody>
+                ${state.statUnload.map((r) => `<tr><td>${esc(r.status)}</td><td>${esc(r.section)}</td><td>${esc(r.info)}</td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.total)}</td></tr>`).join('') || '<tr><td colspan="5">&nbsp;</td></tr>'}
+              </tbody>
+            </table>
+            <div class="section-title" style="margin-top:18px">Контрольные суммы на изделие</div>
+            <table class="doc">
+              <colgroup><col style="width:20%"><col style="width:30%"><col style="width:25%"><col style="width:25%"></colgroup>
+              <thead><tr><th>Код Союза</th><th>Наименование изделия</th><th>Контрольная сумма по количеству</th><th>Контрольная сумма по трудоемкости</th></tr></thead>
+              <tbody>
+                ${state.statSum.map((r) => `<tr><td class="num">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="num">${fmt(r.qtySum)}</td><td class="num">${fmt(r.laborSum)}</td></tr>`).join('') || '<tr><td colspan="4">&nbsp;</td></tr>'}
+              </tbody>
+            </table>`,
+          sigs: excelSignature('Начальник БТН', state.fioBtn) + excelSignature('Начальник БПП', state.fioBpp),
+        };
+      }
+      if (id === 'cmp') {
+        return {
+          paginate: true,
+          footerBase: `Сравнение старой и новой спецификации ${esc(p)}`,
+          title: `<h1 class="doc-title">Сравнение старой и новой спецификации<br>${esc(p)}</h1>`,
+          tableClass: 'doc arial',
+          colgroup: '',
+          thead: `<tr><th>Старый код</th><th>Старое наименование</th><th>Новый код</th><th>Новое наименование</th><th>Примечание</th></tr>`,
+          dataRows: state.cmp.map((r) => `<tr><td>${esc(r.oldCode)}</td><td>${esc(r.oldName)}</td><td>${esc(r.newCode)}</td><td>${esc(r.newName)}</td><td>${esc(r.note)}</td></tr>`),
+          total: '',
+          sigs: '',
+        };
+      }
+      if (id === 'kit') {
+        const pp = productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)');
+        const pages = recalcKitPages();
+        return {
+          paginate: false,
+          footerBase: '',
+          singleBody: `
+            <div class="letter">
+              <p class="right">Акционерное общество</p>
+              <p class="right">«Завод «Универсалмаш»</p>
+              <p class="center">Комплект документов на изделие ${esc(pp)}</p>
+              <p class="justify no-indent">
+                В соответствии с п-п 2-2.9 Распоряжения ${esc(state.orderDate)} направляю на согласование комиссии следующий пакет документов на изделие ${esc(pp)}:
+              </p>
+              <ol>
+                <li>Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${esc(naListah(pages.stat))} формата А4</li>
+                <li>Сводная ведомость нормативной трудоемкости операций на изделие ${esc(pp)} (Форма 1) ${esc(naListah(pages.f1))} формата А4</li>
+                <li>Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(pp)} (Форма 2) ${esc(naListah(pages.f2))} формата А4</li>
+                <li>Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(pp)} (Форма 3) ${esc(naListah(pages.f3))} формата А4</li>
+                <li>Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${esc(pp)} ${esc(naListah(pages.mat))} формата А4</li>
+              </ol>
+              <div class="word-sig-spacer"></div>
+              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(state.fioGi)}</span></p>
+            </div>`,
+          sigs: '',
+        };
+      }
+      if (id === 'rasp') {
+        const products = (state.raspProducts || state.product || 'Ввести номер изделия').trim();
+        return {
+          paginate: false,
+          footerBase: '',
+          singleBody: `
+            <div class="letter">
+              <h3>О запуске в работу спецификаций<br>изделий в 1С-ERP</h3>
+              <p class="justify">
+                На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${esc(state.orderDate)} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:
+              </p>
+              <div class="products">${esc(products)}</div>
+              <div class="word-sig-spacer" style="height:2em"></div>
+              <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">В.В. Романов</span></p>
+              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <p class="word-sig"><span class="role">Заместитель директора по ВК и МТС</span><span class="fio">Е.В. Мазур</span></p>
+              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <p class="word-sig"><span class="role">Заместитель директора по производству</span><span class="fio">С.В. Сухарев</span></p>
+              <div class="word-sig-gap"></div><div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">А.Г. Сыркина</span></p>
+              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(state.fioGi)}</span></p>
+            </div>`,
+          sigs: '',
+        };
+      }
+      return { paginate: false, singleBody: '', sigs: '', footerBase: '' };
+    }
+
+    /** «Итого» — сразу под шапкой (как в Excel-шаблонах), затем строки данных */
+    function tableBlock(spec, rowHtmls) {
+      return `
+        ${spec.title || ''}
+        <table class="${spec.tableClass || 'doc'}">
+          ${spec.colgroup ? `<colgroup>${spec.colgroup}</colgroup>` : ''}
+          <thead>${spec.thead || ''}</thead>
+          <tbody>
+            ${spec.total || ''}
+            ${rowHtmls.join('')}
+          </tbody>
+        </table>`;
+    }
+
+    /* ---------- комплект: выбор и порядок ---------- */
+    function normalizePack() {
+      const known = new Set(DOCS.map((d) => d.id));
+      let pack = Array.isArray(state.pack) ? state.pack.filter((p) => p && known.has(p.id)) : [];
+      const have = new Set(pack.map((p) => p.id));
+      DEFAULT_PACK.forEach((id) => {
+        if (!have.has(id)) pack.push({ id, on: true });
+      });
+      // убрать дубли
+      const seen = new Set();
+      pack = pack.filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        p.on = !!p.on;
+        return true;
+      });
+      state.pack = pack;
+    }
+
+    function getSelectedPackIds() {
+      normalizePack();
+      return state.pack.filter((p) => p.on).map((p) => p.id);
+    }
+
+    function renderPackList() {
+      normalizePack();
+      const root = $('packList');
+      if (!root) return;
+      root.innerHTML = state.pack.map((p, i) => {
+        const meta = DOCS.find((d) => d.id === p.id) || { name: p.id, short: p.id };
+        const ord = state.pack.filter((x, j) => j <= i && x.on).length;
+        const num = p.on ? ord : '—';
+        return `
+          <div class="pack-item${p.on ? '' : ' off'}" data-pack-i="${i}">
+            <span class="ord">${num}</span>
+            <label>
+              <input type="checkbox" data-pack-toggle="${i}" ${p.on ? 'checked' : ''} />
+              <span>${esc(meta.name)} <span style="color:var(--muted)">(${esc(meta.short)})</span></span>
+            </label>
+            <button type="button" class="icon" data-pack-up="${i}" title="Выше" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="icon" data-pack-down="${i}" title="Ниже" ${i === state.pack.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="icon" data-pack-open="${p.id}" title="Открыть для редактирования">✎</button>
+          </div>`;
+      }).join('');
+
+      root.querySelectorAll('[data-pack-toggle]').forEach((el) => {
+        el.onchange = () => {
+          const i = +el.dataset.packToggle;
+          state.pack[i].on = el.checked;
+          renderPackList();
+        };
+      });
+      root.querySelectorAll('[data-pack-up]').forEach((el) => {
+        el.onclick = () => {
+          const i = +el.dataset.packUp;
+          if (i <= 0) return;
+          const t = state.pack[i - 1];
+          state.pack[i - 1] = state.pack[i];
+          state.pack[i] = t;
+          renderPackList();
+        };
+      });
+      root.querySelectorAll('[data-pack-down]').forEach((el) => {
+        el.onclick = () => {
+          const i = +el.dataset.packDown;
+          if (i >= state.pack.length - 1) return;
+          const t = state.pack[i + 1];
+          state.pack[i + 1] = state.pack[i];
+          state.pack[i] = t;
+          renderPackList();
+        };
+      });
+      root.querySelectorAll('[data-pack-open]').forEach((el) => {
+        el.onclick = () => {
+          state.current = el.dataset.packOpen;
+          buildTabs();
+          renderEditor();
+          renderPreview('screen');
+        };
+      });
+    }
+
+    /**
+     * HTML страниц одного документа
+     * mode: 'screen' | 'print'
+     */
+    function buildDocPagesHtml(id, mode = 'print') {
+      const spec = buildDocSpec(id);
+      const isPrint = mode === 'print';
+
+      if (!spec.paginate) {
+        const body = spec.singleBody || '';
+        const sigs = spec.sigs || '';
+        if (spec.footerBase) {
+          return pageShell(body, sigs, footerExcel(spec.footerBase, 1, 1), { extraClass: 'flow-auto' });
+        }
+        return pageShell(body, sigs, '', { extraClass: 'flow-auto' });
+      }
+
+      const rpp = rowsPerPageFor(id);
+      let useChunks;
+      if (isPrint) {
+        useChunks = chunkRows(spec.dataRows, rpp);
+      } else if (spec.dataRows.length > rpp) {
+        useChunks = chunkRows(spec.dataRows, rpp);
+      } else {
+        useChunks = [spec.dataRows];
+      }
+      const totalPages = Math.max(1, useChunks.length);
+
+      return useChunks.map((chunk, idx) => {
+        const isLast = idx === useChunks.length - 1;
+        // Итого всегда под шапкой на каждом листе; суммы по всем данным документа
+        const body = tableBlock(spec, chunk);
+        const sigs = isLast ? (spec.sigs || '') : '';
+        const foot = footerExcel(spec.footerBase, idx + 1, totalPages);
+        return pageShell(body, sigs, foot);
+      }).join('');
+    }
+
+    /**
+     * mode: 'screen' — превью текущей вкладки
+     *        'print'  — (не используется напрямую; см. runPrintPack)
+     */
+    function renderPreview(mode = 'screen') {
+      const id = state.current;
+      // перед показом/печатью Комплекта — актуальные числа листов
+      if (id === 'kit') recalcKitPages();
+      const docMeta = DOCS.find((d) => d.id === id);
+      $('previewTitle').textContent = 'Превью: ' + (docMeta ? docMeta.name : id);
+      const stage = $('sheetStage');
+      stage.innerHTML = buildDocPagesHtml(id, mode === 'print' ? 'print' : 'screen');
+      // оценка N для flow-auto с колонтитулом
+      requestAnimationFrame(() => {
+        stage.querySelectorAll('.page.flow-auto.has-footer').forEach((page) => {
+          const f = page.querySelector('.sheet-footer');
+          if (!f) return;
+          const n = estimatePages(page);
+          // footerBase из текста до «Страница»
+          const base = f.textContent.replace(/\s*Страница\s+\d+\s+из\s+\d+\s*$/i, '').trim();
+          f.innerHTML = footerExcel(base, 1, n);
+        });
+      });
+    }
+
+    function estimatePages(pageEl) {
+      if (!pageEl) return 1;
+      const mm = 96 / 25.4;
+      const pageH = 297 * mm;
+      const h = Math.max(pageEl.scrollHeight, pageEl.offsetHeight);
+      return Math.max(1, Math.ceil(h / pageH));
+    }
+
+    function runPrintOne() {
+      recalcKitPages();
+      renderPreview('print');
+      setTimeout(() => window.print(), 50);
+    }
+
+    function clonePack(pack) {
+      return (pack || []).map((p) => ({ id: p.id, on: !!p.on }));
+    }
+
+    function openPrintModal() {
+      normalizePack();
+      // Порядок всегда стартует с эталона: Расп → Компл → Мат → Ф3 → Ф2 → Ф1 → …
+      // Галочки берём из сайдбара (что было отмечено).
+      const onMap = Object.fromEntries(state.pack.map((p) => [p.id, !!p.on]));
+      printDraft = defaultPackState().map((p) => ({
+        id: p.id,
+        on: onMap[p.id] !== undefined ? onMap[p.id] : true,
+      }));
+      // если в сайдбаре всё снято — включаем все
+      if (!printDraft.some((p) => p.on)) {
+        printDraft.forEach((p) => { p.on = true; });
+      }
+      renderPrintPackList();
+      const modal = $('printModal');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closePrintModal() {
+      const modal = $('printModal');
+      if (modal) modal.classList.remove('open');
+      printDraft = null;
+    }
+
+    function renderPrintPackList() {
+      const root = $('printPackList');
+      if (!root || !printDraft) return;
+      root.innerHTML = printDraft.map((p, i) => {
+        const meta = DOCS.find((d) => d.id === p.id) || { name: p.id, short: p.id };
+        const ord = p.on ? printDraft.filter((x, j) => j <= i && x.on).length : '—';
+        return `
+          <div class="pack-item${p.on ? '' : ' off'}" data-print-i="${i}">
+            <span class="ord">${ord}</span>
+            <label>
+              <input type="checkbox" data-print-toggle="${i}" ${p.on ? 'checked' : ''} />
+              <span>${esc(meta.name)} <span style="color:var(--muted)">(${esc(meta.short)})</span></span>
+            </label>
+            <button type="button" class="icon" data-print-up="${i}" title="Выше" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="icon" data-print-down="${i}" title="Ниже" ${i === printDraft.length - 1 ? 'disabled' : ''}>↓</button>
+            <span></span>
+          </div>`;
+      }).join('');
+
+      root.querySelectorAll('[data-print-toggle]').forEach((el) => {
+        el.onchange = () => {
+          printDraft[+el.dataset.printToggle].on = el.checked;
+          renderPrintPackList();
+        };
+      });
+      root.querySelectorAll('[data-print-up]').forEach((el) => {
+        el.onclick = () => {
+          const i = +el.dataset.printUp;
+          if (i <= 0) return;
+          [printDraft[i - 1], printDraft[i]] = [printDraft[i], printDraft[i - 1]];
+          renderPrintPackList();
+        };
+      });
+      root.querySelectorAll('[data-print-down]').forEach((el) => {
+        el.onclick = () => {
+          const i = +el.dataset.printDown;
+          if (i >= printDraft.length - 1) return;
+          [printDraft[i + 1], printDraft[i]] = [printDraft[i], printDraft[i + 1]];
+          renderPrintPackList();
+        };
+      });
+    }
+
+    function executePrintPack(ids) {
+      if (!ids || !ids.length) {
+        alert('Выберите хотя бы одну форму');
+        return;
+      }
+      // синхронизируем выбор/порядок в сайдбар-комплект
+      if (printDraft && printDraft.length) {
+        state.pack = clonePack(printDraft);
+        renderPackList();
+      }
+      closePrintModal();
+      recalcKitPages();
+      const stage = $('sheetStage');
+      const names = ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id);
+      $('previewTitle').textContent = 'Печать комплекта: ' + names.join(' → ');
+      stage.innerHTML = ids.map((id) => buildDocPagesHtml(id, 'print')).join('');
+      setTimeout(() => window.print(), 80);
+    }
+
+    /** Открыть диалог выбора форм перед печатью комплекта */
+    function runPrintPack() {
+      openPrintModal();
+    }
+
+    function confirmPrintModal() {
+      if (!printDraft) return;
+      const ids = printDraft.filter((p) => p.on).map((p) => p.id);
+      executePrintPack(ids);
+    }
+
+    window.addEventListener('afterprint', () => {
+      renderPreview('screen');
+    });
+
+    // Esc закрывает модалку
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('printModal')?.classList.contains('open')) {
+        closePrintModal();
+      }
+    });
+
+    /* ---------- выгрузка в Excel (модули форм + общая сборка) ---------- */
+    function xmlEsc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    const BORDER4 = `
+   <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+   <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+   <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>`;
+
+    function cellXml(v, styleId) {
+      const raw = v === null || v === undefined ? '' : v;
+      const style = styleId ? ` ss:StyleID="${styleId}"` : '';
+      const n = num(raw);
+      const asNum = n !== null && String(raw).trim() !== '' && !/[а-яa-z]/i.test(String(raw));
+      if (asNum) return `<Cell${style}><Data ss:Type="Number">${n}</Data></Cell>`;
+      return `<Cell${style}><Data ss:Type="String">${xmlEsc(raw)}</Data></Cell>`;
+    }
+
+    /**
+     * Параметры страницы и колонтитулы — как в HTML-печати (A4, подвал «Страница &P из &N»).
+     * id формы → pageSetup для SpreadsheetML / Excel.
+     */
+    function formPageSetup(id) {
+      const p = productLabel();
+      const prodMat = productLabel('(ввести наименование изделия)');
+      // те же тексты, что footerBase в buildDocSpec (без HTML-сущностей)
+      const footers = {
+        f1: `Сводная ведомость нормативной трудоемкости операций на изделие ${p}`,
+        f2: `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${p}`,
+        f3: `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${p}`,
+        mat: `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие  (${prodMat})`,
+        stat: `Статистика выгрузки и контрольные суммы спецификаций на изделие ${p}`,
+        cmp: `Сравнение старой и новой спецификации ${p}`,
+        kit: `Комплект документов на изделие ${p}`,
+        rasp: `О запуске в работу спецификаций изделий в 1С-ERP`,
+      };
+      const base = footers[id] || '';
+      // Excel: &P / &N — номер страницы / всего (как в HTML «Страница N из M»)
+      const footerCenter = base
+        ? `${base}  Страница &P из &N`
+        : `Страница &P из &N`;
+      // повторять шапку+Итого на каждом листе (R2:R3 = hdr + total после title)
+      const printTitles = {
+        f1: 'R2:R3', f2: 'R2:R3', f3: 'R2:R3', mat: 'R2:R3',
+        cmp: 'R2:R2',
+      };
+      return {
+        orientation: 'Portrait',
+        paperSizeIndex: 9, // A4
+        fitToWidth: 1,
+        fitToHeight: 0,
+        // поля ~ как в HTML (мм → дюймы)
+        margins: {
+          left: 0.59,   // ~15mm
+          right: 0.47,  // ~12mm
+          top: 0.47,    // ~12mm
+          bottom: 0.55, // ~14mm
+          header: 0.3,
+          footer: 0.45,
+        },
+        headerCenter: '',
+        footerCenter,
+        printTitleRows: printTitles[id] || null,
+        centerHorizontal: true,
+      };
+    }
+
+    /** Строка колонтитула Excel (&C центр, &8 размер, &P/&N страницы) для XML-атрибута */
+    function excelHFData(centerText) {
+      const t = String(centerText || '').replace(/\u00a0/g, ' ');
+      // &"Arial,Regular"&8 — мелкий шрифт как в HTML (8pt)
+      const raw = `&C&"Arial,Regular"&8${t}`;
+      return xmlEsc(raw);
+    }
+
+    function worksheetOptionsXml(pageSetup, sheetName) {
+      const ps = pageSetup || formPageSetup('');
+      const m = ps.margins || {};
+      const left = m.left ?? 0.6;
+      const right = m.right ?? 0.5;
+      const top = m.top ?? 0.5;
+      const bottom = m.bottom ?? 0.55;
+      const header = m.header ?? 0.3;
+      const footer = m.footer ?? 0.45;
+      const orient = ps.orientation === 'Landscape' ? 'Landscape' : 'Portrait';
+      const paper = ps.paperSizeIndex != null ? ps.paperSizeIndex : 9;
+      const footerData = excelHFData(ps.footerCenter || 'Страница &P из &N');
+      const headerData = ps.headerCenter
+        ? ` x:Data="${excelHFData(ps.headerCenter)}"`
+        : '';
+      const centerH = ps.centerHorizontal === false ? '0' : '1';
+
+      return `
+<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+ <PageSetup>
+  <Layout x:Orientation="${orient}" x:CenterHorizontal="${centerH}"/>
+  <Header x:Margin="${header}"${headerData}/>
+  <Footer x:Margin="${footer}" x:Data="${footerData}"/>
+  <PageMargins x:Bottom="${bottom}" x:Left="${left}" x:Right="${right}" x:Top="${top}"/>
+ </PageSetup>
+ <FitToPage/>
+ <Print>
+  <ValidPrinterInfo/>
+  <PaperSizeIndex>${paper}</PaperSizeIndex>
+  <Scale>100</Scale>
+  <FitWidth>${ps.fitToWidth != null ? ps.fitToWidth : 1}</FitWidth>
+  <FitHeight>${ps.fitToHeight != null ? ps.fitToHeight : 0}</FitHeight>
+  <HorizontalResolution>600</HorizontalResolution>
+  <VerticalResolution>600</VerticalResolution>
+ </Print>
+ <PageBreakZoom>100</PageBreakZoom>
+ <DoNotDisplayGridlines/>
+</WorksheetOptions>`;
+    }
+
+    function printTitlesNamesXml(sheetName, printTitleRows) {
+      if (!printTitleRows) return '';
+      // printTitleRows: 'R2:R3'
+      const q = `'${String(sheetName).replace(/'/g, "''")}'`;
+      return `<Names>
+  <NamedRange ss:Name="Print_Titles" ss:RefersTo="=${q}!${printTitleRows}"/>
+</Names>`;
+    }
+
+    function sheetFromMatrix(name, matrix) {
+      const safeName = String(name || 'Лист').replace(/[\\/*?:\[\]]/g, '_').slice(0, 31);
+      const colCount = matrix.colCount || Math.max(1, ...(matrix.rows || []).map((r) => (r.cells || []).length), 1);
+      const widths = matrix.colWidths || [];
+      const pageSetup = matrix.pageSetup || null;
+
+      let html = `<Worksheet ss:Name="${xmlEsc(safeName)}">`;
+      if (pageSetup && pageSetup.printTitleRows) {
+        html += printTitlesNamesXml(safeName, pageSetup.printTitleRows);
+      }
+      html += `<Table ss:ExpandedColumnCount="${colCount}" ss:DefaultRowHeight="14">`;
+      for (let i = 0; i < colCount; i++) {
+        const w = widths[i] != null ? widths[i] : (i === 0 ? 200 : 70);
+        html += `<Column ss:Index="${i + 1}" ss:AutoFitWidth="0" ss:Width="${w}"/>`;
+      }
+      (matrix.rows || []).forEach((r) => {
+        const cells = r.cells || [];
+        const style = r.style || 'data';
+        const h = r.height != null ? r.height : (style === 'title' ? 28 : style === 'hdr' ? 20 : style === 'letter' || style === 'letterRight' ? 15 : style === 'sig' ? 16 : 14);
+        html += `<Row ss:AutoFitHeight="0" ss:Height="${h}">`;
+        if (r.mergeAcross && r.mergeAcross > 0) {
+          html += `<Cell ss:StyleID="${style}" ss:MergeAcross="${r.mergeAcross}"><Data ss:Type="String">${xmlEsc(cells[0] ?? '')}</Data></Cell>`;
+        } else {
+          for (let i = 0; i < colCount; i++) html += cellXml(cells[i] ?? '', style);
+        }
+        html += '</Row>';
+      });
+      html += '</Table>';
+      // параметры страницы + колонтитулы (как в HTML-превью)
+      html += worksheetOptionsXml(pageSetup || formPageSetup(''), safeName);
+      html += '</Worksheet>';
+      return html;
+    }
+
+    function sheetXml(name, headers, rows) {
+      return sheetFromMatrix(name, {
+        colCount: headers.length,
+        colWidths: headers.map((_, i) => (i === 0 ? 160 : 100)),
+        rows: [
+          { cells: headers, style: 'hdr', height: 18 },
+          ...rows.map((r) => ({ cells: r, style: 'data', height: 14 })),
+        ],
+      });
+    }
+
+    /* --- билдеры листов (от субагентов по формам) --- */
+    function exportMatrixF1({ product, rows, sumMin, sumHour }) {
+      return {
+        sheetName: 'Форма1', colCount: 3, colWidths: [280, 70, 70],
+        rows: [
+          { cells: [`Сводная ведомость нормативной трудоемкости операций на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
+          { cells: ['Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 22 },
+          { cells: ['Итого', sumMin, sumHour], style: 'total', height: 16 },
+          ...rows.map((r) => ({ cells: [r.op, r.min, r.hour], style: 'data', height: 14 })),
+        ],
+      };
+    }
+    function exportMatrixF2({ product, rows, sumMin, sumHour }) {
+      return {
+        sheetName: 'Форма2', colCount: 3, colWidths: [280, 70, 70],
+        rows: [
+          { cells: [`Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
+          { cells: ['Подразделение/Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 22 },
+          { cells: ['Итого', sumMin, sumHour], style: 'total', height: 16 },
+          ...rows.map((r) => ({ cells: [r.unit, r.min, r.hour], style: 'data', height: 14 })),
+        ],
+      };
+    }
+    function exportMatrixF3({ product, rows, sumMin, sumHour, fioBtn }) {
+      const data = rows || [];
+      return {
+        sheetName: 'Форма3', colCount: 4, colWidths: [280, 90, 90, 90],
+        rows: [
+          { cells: [`Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${product}`], style: 'title', mergeAcross: 3, height: 32 },
+          { cells: ['Изделие/Подразделение/Операция', 'Количество', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 28 },
+          { cells: ['Итого', '', sumMin, sumHour], style: 'total', height: 16 },
+          ...data.map((r) => ({ cells: [r.name, r.qty, r.min, r.hour], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
+          { cells: ['', '', '', ''], height: 12 },
+          { cells: ['Начальник БТН', '', '', fioBtn], style: 'sig', height: 16 },
+        ],
+      };
+    }
+    function exportMatrixMat({ product, rows, sumQty, fioBpp }) {
+      const data = rows || [];
+      return {
+        sheetName: 'Материалы', colCount: 3, colWidths: [320, 80, 80],
+        rows: [
+          { cells: [`Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${product}`], style: 'title', mergeAcross: 2, height: 32 },
+          { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
+          { cells: ['Итого', '', sumQty], style: 'total', height: 16 },
+          ...data.map((r) => ({ cells: [r.name, r.unit, r.qty], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
+          { cells: ['', '', ''], height: 12 },
+          { cells: ['Начальник ТБПП', '', fioBpp], style: 'sig', height: 16 },
+        ],
+      };
+    }
+    function exportMatrixStat({ product, unload, sums, fioBtn, fioBpp }) {
+      return {
+        sheetName: 'Статистика', colCount: 5, colWidths: [90, 110, 160, 90, 90],
+        rows: [
+          { cells: [`Статистика выгрузки и контрольные суммы спецификаций на изделие ${product}`], style: 'title', mergeAcross: 4, height: 28 },
+          { cells: ['Статистика выгрузки изделия'], style: 'section', mergeAcross: 4, height: 18 },
+          { cells: ['Статус', 'Раздел', 'Информация', 'Количество', 'Всего проверено'], style: 'hdr', height: 20 },
+          ...(unload || []).map((r) => ({ cells: [r.status, r.section, r.info, r.qty, r.total], style: 'data', height: 14 })),
+          { cells: ['', '', '', '', ''], height: 10 },
+          { cells: ['Контрольные суммы на изделие'], style: 'section', mergeAcross: 4, height: 18 },
+          { cells: ['Код Союза', 'Наименование изделия', 'Контр. сумма по кол-ву', 'Контр. сумма по трудоёмкости', ''], style: 'hdr', height: 28 },
+          ...(sums || []).map((r) => ({ cells: [r.code, r.name, r.qtySum, r.laborSum, ''], style: 'data', height: 14 })),
+          { cells: ['', '', '', '', ''], height: 12 },
+          { cells: ['Начальник БТН', '', '', '', fioBtn], style: 'sig', height: 16 },
+          { cells: ['', '', '', '', ''], height: 8 },
+          { cells: ['Начальник БПП', '', '', '', fioBpp], style: 'sig', height: 16 },
+        ],
+      };
+    }
+    function exportMatrixCmp({ product, rows }) {
+      return {
+        sheetName: 'Сравнение', colCount: 5, colWidths: [80, 160, 80, 160, 120],
+        rows: [
+          { cells: [`Сравнение старой и новой спецификации ${product}`], style: 'title', mergeAcross: 4, height: 28 },
+          { cells: ['Старый код', 'Старое наименование', 'Новый код', 'Новое наименование', 'Примечание'], style: 'hdr', height: 20 },
+          ...(rows || []).map((r) => ({ cells: [r.oldCode, r.oldName, r.newCode, r.newName, r.note], style: 'data', height: 14 })),
+        ],
+      };
+    }
+
+    function wrapLines(text, maxLen) {
+      const s = String(text ?? '').replace(/\s+/g, ' ').trim();
+      if (!s) return [];
+      const limit = Math.max(8, Number(maxLen) || 90);
+      if (s.length <= limit) return [s];
+      const lines = [];
+      let rest = s;
+      while (rest.length > limit) {
+        let window = rest.slice(0, limit + 1);
+        let breakAt = window.lastIndexOf(' ');
+        if (breakAt <= 0) breakAt = limit;
+        const candidate = rest.slice(0, breakAt);
+        let sentAt = -1;
+        for (const sep of ['. ', '; ', '! ', '? ']) {
+          const i = candidate.lastIndexOf(sep);
+          if (i > sentAt) sentAt = i + sep.length - 1;
+        }
+        if (sentAt >= Math.floor(limit * 0.5)) breakAt = sentAt + 1;
+        const line = rest.slice(0, breakAt).trim();
+        if (line) lines.push(line);
+        rest = rest.slice(breakAt).trim();
+      }
+      if (rest) lines.push(rest);
+      return lines;
+    }
+
+    function exportMatrixKit({ product, orderDate, fioGi, pagePhrases }) {
+      const pp = product || '(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)';
+      const ph = (k) => (pagePhrases && pagePhrases[k]) || 'на 1 листе';
+      const rows = [];
+      const pushL = (t, st, h) => rows.push({ cells: [t, ''], style: st || 'letter', mergeAcross: 1, height: h || 15 });
+      rows.push({ cells: ['Акционерное общество', ''], style: 'letterRight', mergeAcross: 1, height: 15 });
+      rows.push({ cells: ['«Завод «Универсалмаш»', ''], style: 'letterRight', mergeAcross: 1, height: 15 });
+      rows.push({ cells: ['', ''], height: 10 });
+      rows.push({ cells: [`Комплект документов на изделие ${pp}`, ''], style: 'title', mergeAcross: 1, height: 24 });
+      rows.push({ cells: ['', ''], height: 10 });
+      wrapLines(
+        `В соответствии с п-п 2-2.9 Распоряжения ${orderDate || ''} направляю на согласование комиссии следующий пакет документов на изделие ${pp}:`,
+        96
+      ).forEach((ln) => pushL(ln));
+      rows.push({ cells: ['', ''], height: 8 });
+      [
+        `1. Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${ph('stat')} формата А4`,
+        `2. Сводная ведомость нормативной трудоемкости операций на изделие ${pp} (Форма 1) ${ph('f1')} формата А4`,
+        `3. Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${pp} (Форма 2) ${ph('f2')} формата А4`,
+        `4. Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${pp} (Форма 3) ${ph('f3')} формата А4`,
+        `5. Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${ph('mat')} формата А4`,
+      ].forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
+      rows.push({ cells: ['', ''], height: 16 });
+      rows.push({ cells: ['Главный инженер', fioGi || ''], style: 'sig', height: 16 });
+      return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
+    }
+
+    function exportMatrixRasp({ orderDate, productsText, fioGi }) {
+      const rows = [];
+      const pushL = (t) => rows.push({ cells: [t, ''], style: 'letter', mergeAcross: 1, height: 15 });
+      rows.push({ cells: ['О запуске в работу спецификаций изделий в 1С-ERP', ''], style: 'title', mergeAcross: 1, height: 24 });
+      rows.push({ cells: ['', ''], height: 10 });
+      wrapLines(
+        `На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${orderDate || ''} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:`,
+        80
+      ).forEach((ln) => pushL(ln));
+      rows.push({ cells: ['', ''], height: 10 });
+      const productLines = String(productsText || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (!productLines.length) pushL('Ввести номер изделия');
+      else productLines.forEach((line) => wrapLines(line, 90).forEach((ln) => pushL(ln)));
+      rows.push({ cells: ['', ''], height: 14 });
+      [
+        ['Операционный директор', 'В.В. Романов'],
+        ['Заместитель директора по ВК и МТС', 'Е.В. Мазур'],
+        ['Заместитель директора по производству', 'С.В. Сухарев'],
+        ['Заместитель директора по экономике и финансам', 'А.Г. Сыркина'],
+        ['Главный инженер', fioGi || ''],
+      ].forEach(([role, fio], i, arr) => {
+        rows.push({ cells: [role, fio], style: 'sig', height: 16 });
+        if (i < arr.length - 1) rows.push({ cells: ['', ''], height: 10 });
+      });
+      return { sheetName: 'Распоряжение', colCount: 2, colWidths: [280, 90], rows };
+    }
+
+    /** Диспетчер: печатные данные state → матрица листа формы + pageSetup/колонтитулы */
+    function buildPrintMatrix(id) {
+      const p = productLabel();
+      let matrix = null;
+      if (id === 'f1') matrix = exportMatrixF1({ product: p, rows: state.f1, sumMin: sumField(state.f1, 'min'), sumHour: sumField(state.f1, 'hour') });
+      else if (id === 'f2') matrix = exportMatrixF2({ product: p, rows: state.f2, sumMin: sumField(state.f2, 'min'), sumHour: sumField(state.f2, 'hour') });
+      else if (id === 'f3') matrix = exportMatrixF3({ product: p, rows: state.f3, sumMin: sumField(state.f3, 'min'), sumHour: sumField(state.f3, 'hour'), fioBtn: state.fioBtn });
+      else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumQty: sumField(state.mat, 'qty'), fioBpp: state.fioBpp });
+      else if (id === 'stat') matrix = exportMatrixStat({ product: p, unload: state.statUnload, sums: state.statSum, fioBtn: state.fioBtn, fioBpp: state.fioBpp });
+      else if (id === 'cmp') matrix = exportMatrixCmp({ product: p, rows: state.cmp });
+      else if (id === 'kit') {
+        const pages = recalcKitPages();
+        matrix = exportMatrixKit({
+          product: productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)'),
+          orderDate: state.orderDate,
+          fioGi: state.fioGi,
+          pagePhrases: {
+            stat: naListah(pages.stat), f1: naListah(pages.f1), f2: naListah(pages.f2),
+            f3: naListah(pages.f3), mat: naListah(pages.mat),
+          },
+        });
+      } else if (id === 'rasp') {
+        matrix = exportMatrixRasp({
+          orderDate: state.orderDate,
+          productsText: state.raspProducts || state.product || 'Ввести номер изделия',
+          fioGi: state.fioGi,
+        });
+      }
+      if (!matrix) return null;
+      // колонтитулы и поля страницы — те же смыслы, что в HTML-печати
+      matrix.pageSetup = formPageSetup(id);
+      return matrix;
+    }
+
+    function sheetsForDoc(id) {
+      const matrix = buildPrintMatrix(id);
+      if (!matrix) return [];
+      return [sheetFromMatrix(matrix.sheetName, matrix)];
+    }
+
+    function workbookXml(sheets) {
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+<Styles>
+ <Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Times New Roman" ss:Size="10"/><Alignment ss:Vertical="Center" ss:WrapText="0"/></Style>
+ <Style ss:ID="hdr"><Font ss:FontName="Times New Roman" ss:Size="10" ss:Bold="1"/>
+  <Interior ss:Color="#F4ECC5" ss:Pattern="Solid"/>
+  <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+  <Borders>${BORDER4}</Borders></Style>
+ <Style ss:ID="total"><Font ss:FontName="Times New Roman" ss:Size="10" ss:Bold="1"/>
+  <Interior ss:Color="#F4ECC5" ss:Pattern="Solid"/>
+  <Alignment ss:Vertical="Center"/><Borders>${BORDER4}</Borders></Style>
+ <Style ss:ID="data"><Font ss:FontName="Times New Roman" ss:Size="10"/>
+  <Alignment ss:Vertical="Center" ss:WrapText="1"/><Borders>${BORDER4}</Borders></Style>
+ <Style ss:ID="title"><Font ss:FontName="Times New Roman" ss:Size="12" ss:Bold="1"/>
+  <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/></Style>
+ <Style ss:ID="section"><Font ss:FontName="Times New Roman" ss:Size="11" ss:Bold="1"/>
+  <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/></Style>
+ <Style ss:ID="sig"><Font ss:FontName="Arial" ss:Size="9"/><Alignment ss:Vertical="Center"/></Style>
+ <Style ss:ID="parent"><Font ss:FontName="Times New Roman" ss:Size="10"/>
+  <Interior ss:Color="#F8F2D8" ss:Pattern="Solid"/>
+  <Alignment ss:Vertical="Center" ss:WrapText="1"/><Borders>${BORDER4}</Borders></Style>
+ <Style ss:ID="letter"><Font ss:FontName="Times New Roman" ss:Size="11"/>
+  <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="0"/></Style>
+ <Style ss:ID="letterRight"><Font ss:FontName="Times New Roman" ss:Size="11"/>
+  <Alignment ss:Horizontal="Right" ss:Vertical="Center" ss:WrapText="0"/></Style>
+ <Style ss:ID="letterwrap"><Font ss:FontName="Times New Roman" ss:Size="11"/>
+  <Alignment ss:Horizontal="Justify" ss:Vertical="Top" ss:WrapText="1"/></Style>
+</Styles>
+${sheets.join('\n')}
+</Workbook>`;
+    }
+
+    /** Образцовое заполнение всех форм (демо для проверки печати/Excel) */
+    function fillSampleData() {
+      state.product = 'УМ-450.12.001';
+      state.fioBtn = 'Алексеев А.А.';
+      state.fioBpp = 'Сажнев Д.Н.';
+      state.fioGi = 'Мельников И.В.';
+      state.orderDate = '№342/02 от 16.01.2025';
+      state.f1 = [
+        { op: 'Токарная обработка корпуса', min: '48', hour: '0,8' },
+        { op: 'Фрезерование посадочных мест', min: '72', hour: '1,2' },
+        { op: 'Сверление и нарезание резьбы', min: '36', hour: '0,6' },
+        { op: 'Слесарная доводка', min: '24', hour: '0,4' },
+        { op: 'Контроль ОТК', min: '18', hour: '0,3' },
+      ];
+      state.f2 = [
+        { unit: 'Цех 1 — механообработка', min: '156', hour: '2,6' },
+        { unit: '  Токарный участок', min: '48', hour: '0,8' },
+        { unit: '  Фрезерный участок', min: '72', hour: '1,2' },
+        { unit: '  Сверлильный участок', min: '36', hour: '0,6' },
+        { unit: 'Цех 3 — сборка', min: '90', hour: '1,5' },
+        { unit: '  Слесарный участок', min: '54', hour: '0,9' },
+        { unit: '  Контроль', min: '36', hour: '0,6' },
+      ];
+      state.f3 = [
+        { name: 'УМ-450.12.001 Изделие', qty: '1', min: '246', hour: '4,1' },
+        { name: '  Цех 1 Механообработка', qty: '1', min: '156', hour: '2,6' },
+        { name: '    Токарная обработка корпуса', qty: '48', min: '48', hour: '0,8' },
+        { name: '    Фрезерование посадочных мест', qty: '72', min: '72', hour: '1,2' },
+        { name: '    Сверление и нарезание резьбы', qty: '36', min: '36', hour: '0,6' },
+        { name: '  Цех 3 Сборка', qty: '1', min: '90', hour: '1,5' },
+        { name: '    Слесарная доводка', qty: '54', min: '54', hour: '0,9' },
+        { name: '    Контроль ОТК', qty: '36', min: '36', hour: '0,6' },
+      ];
+      state.mat = [
+        { name: 'Корпус УМ-450.12.010', unit: 'шт', qty: '1' },
+        { name: '    Лист Ст3сп 8×1500×6000', unit: 'кг', qty: '12,4' },
+        { name: '    Электрод УОНИ-13/55', unit: 'кг', qty: '0,8' },
+        { name: 'Вал УМ-450.12.020', unit: 'шт', qty: '1' },
+        { name: '    Круг ст.45 ⌀40', unit: 'кг', qty: '3,2' },
+        { name: '    Шпонка 10×8×40', unit: 'шт', qty: '2' },
+        { name: 'Комплект крепежа', unit: 'компл', qty: '1' },
+        { name: '    Болт М10×30 ГОСТ 7798', unit: 'шт', qty: '16' },
+        { name: '    Гайка М10 ГОСТ 5915', unit: 'шт', qty: '16' },
+        { name: '    Шайба 10 ГОСТ 11371', unit: 'шт', qty: '16' },
+      ];
+      state.statUnload = [
+        { status: 'OK', section: 'Сборка', info: 'Спецификация загружена', qty: '42', total: '42' },
+        { status: 'OK', section: 'Механообработка', info: 'Операции сверены', qty: '18', total: '18' },
+        { status: 'WARN', section: 'Закупка', info: '2 позиции без цены', qty: '2', total: '15' },
+        { status: 'OK', section: 'Контроль', info: 'КС совпали', qty: '1', total: '1' },
+      ];
+      state.statSum = [
+        { code: '450-12-001', name: 'УМ-450.12.001', qtySum: '78', laborSum: '246' },
+        { code: '450-12-010', name: 'Корпус', qtySum: '1', laborSum: '48' },
+      ];
+      state.cmp = [
+        { oldCode: 'А-12.01', oldName: 'Втулка старая', newCode: 'УМ-450.12.031', newName: 'Втулка направляющая', note: 'замена кода' },
+        { oldCode: 'А-12.08', oldName: 'Крышка', newCode: 'УМ-450.12.040', newName: 'Крышка корпуса', note: '' },
+        { oldCode: '—', oldName: '—', newCode: 'УМ-450.12.055', newName: 'Прокладка', note: 'новая позиция' },
+      ];
+      state.raspProducts = 'УМ-450.12.001\nУМ-450.12.002\nУМ-450.14.010';
+      recalcKitPages();
+      ['product', 'fioBtn', 'fioBpp', 'fioGi', 'orderDate'].forEach((k) => {
+        if ($(k)) $(k).value = state[k] ?? '';
+      });
+      buildTabs();
+      renderPackList();
+      renderEditor();
+      renderPreview('screen');
+    }
+
+    function downloadXmlExcel(filename, sheets) {
+      const xml = workbookXml(sheets);
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename.endsWith('.xls') ? filename : filename + '.xls';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 500);
+    }
+
+    function exportCurrentDoc() {
+      recalcKitPages();
+      const id = state.current;
+      const meta = DOCS.find((d) => d.id === id);
+      const name = (meta?.name || id) + (state.product ? '_' + state.product : '');
+      const safe = name.replace(/[\\/:*?"<>|]+/g, '_');
+      const sheets = sheetsForDoc(id);
+      if (!sheets.length) {
+        alert('Нет данных для выгрузки');
+        return;
+      }
+      downloadXmlExcel(safe, sheets);
+    }
+
+    /** Общий Excel: выбранные формы в порядке комплекта = те же данные, что на печать */
+    function exportAllDocs() {
+      const ids = getSelectedPackIds();
+      if (!ids.length) {
+        alert('Выберите хотя бы одну форму в блоке «Комплект»');
+        return;
+      }
+      recalcKitPages();
+      const sheets = [];
+      // состав = порядок печати
+      sheets.push(sheetXml('_Состав_печати', ['№', 'Форма', 'ID'], ids.map((id, i) => {
+        const m = DOCS.find((d) => d.id === id);
+        return [i + 1, m ? m.name : id, id];
+      })));
+      sheets.push(sheetXml('_Общее', ['Параметр', 'Значение'], [
+        ['Изделие', state.product],
+        ['Нач. БТН', state.fioBtn],
+        ['Нач. БПП/ТБПП', state.fioBpp],
+        ['Главный инженер', state.fioGi],
+        ['Распоряжение', state.orderDate],
+        ['Порядок печати/Excel', ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id).join(' → ')],
+      ]));
+      ids.forEach((id) => {
+        sheetsForDoc(id).forEach((sh) => sheets.push(sh));
+      });
+      const fname = 'Комплект_на_печать' + (state.product ? '_' + state.product : '') + '.xls';
+      downloadXmlExcel(fname.replace(/[\\/:*?"<>|]+/g, '_'), sheets);
+    }
+
+    /* ---------- common fields ---------- */
+    function bindCommon() {
+      const map = [
+        ['product', 'product'],
+        ['fioBtn', 'fioBtn'],
+        ['fioBpp', 'fioBpp'],
+        ['fioGi', 'fioGi'],
+        ['orderDate', 'orderDate'],
+      ];
+      map.forEach(([elId, key]) => {
+        const el = $(elId);
+        el.value = state[key];
+        el.oninput = () => {
+          state[key] = el.value;
+          if (key === 'product' && state.current === 'rasp' && !state.raspProducts) {
+            // keep live
+          }
+          renderPreview();
+        };
+      });
+
+      $('btnAddRow').onclick = () => {
+        const key = currentTableKey();
+        if (state[key]) {
+          state[key].push(emptyRowFor(key));
+          renderEditor();
+          renderPreview();
+        }
+      };
+      $('btnClearRows').onclick = () => {
+        if (state.current === 'stat') {
+          state.statUnload = [emptyRowFor('statUnload')];
+          state.statSum = [emptyRowFor('statSum')];
+        } else {
+          const key = currentTableKey();
+          state[key] = [emptyRowFor(key)];
+        }
+        renderEditor();
+        renderPreview();
+      };
+      $('btnPrint').onclick = runPrintPack;
+      const btnPrintTop = $('btnPrintTop');
+      if (btnPrintTop) btnPrintTop.onclick = runPrintPack;
+      $('btnPrintOne').onclick = runPrintOne;
+      const btnPrintOneTop = $('btnPrintOneTop');
+      if (btnPrintOneTop) btnPrintOneTop.onclick = runPrintOne;
+
+      const btnPrintModalGo = $('btnPrintModalGo');
+      const btnPrintModalCancel = $('btnPrintModalCancel');
+      if (btnPrintModalGo) btnPrintModalGo.onclick = confirmPrintModal;
+      if (btnPrintModalCancel) btnPrintModalCancel.onclick = closePrintModal;
+      $('btnPrintModalAll').onclick = () => {
+        if (!printDraft) return;
+        printDraft.forEach((p) => { p.on = true; });
+        renderPrintPackList();
+      };
+      $('btnPrintModalNone').onclick = () => {
+        if (!printDraft) return;
+        printDraft.forEach((p) => { p.on = false; });
+        renderPrintPackList();
+      };
+      $('btnPrintModalDefault').onclick = () => {
+        printDraft = defaultPackState();
+        renderPrintPackList();
+      };
+      // клик по фону — закрыть
+      const printModal = $('printModal');
+      if (printModal) {
+        printModal.addEventListener('click', (e) => {
+          if (e.target === printModal) closePrintModal();
+        });
+      }
+
+      $('btnExportOne').onclick = exportCurrentDoc;
+      const btnExTop = $('btnExportOneTop');
+      if (btnExTop) btnExTop.onclick = exportCurrentDoc;
+      $('btnExportAll').onclick = exportAllDocs;
+      const btnExAllTop = $('btnExportAllTop');
+      if (btnExAllTop) btnExAllTop.onclick = exportAllDocs;
+      const btnSample = $('btnSample');
+      if (btnSample) btnSample.onclick = () => {
+        if (!confirm('Заполнить все формы образцовыми данными? Текущий ввод будет заменён.')) return;
+        fillSampleData();
+      };
+
+      $('btnPackAll').onclick = () => {
+        state.pack.forEach((p) => { p.on = true; });
+        renderPackList();
+      };
+      $('btnPackNone').onclick = () => {
+        state.pack.forEach((p) => { p.on = false; });
+        renderPackList();
+      };
+      $('btnPackDefault').onclick = () => {
+        state.pack = defaultPackState();
+        renderPackList();
+      };
+
+      $('btnSave').onclick = saveState;
+      $('btnLoad').onclick = () => {
+        loadState();
+        normalizePack();
+        buildTabs();
+        renderPackList();
+        renderEditor();
+        renderPreview('screen');
+        alert('Данные загружены');
+      };
+      $('btnReset').onclick = () => {
+        if (!confirm('Сбросить все введённые данные?')) return;
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      };
+    }
+
+    const STORAGE_KEY = 'doc_templates_fill_v1';
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        alert('Сохранено в браузере (localStorage)');
+      } catch (e) {
+        alert('Не удалось сохранить: ' + e.message);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        Object.assign(state, data);
+        // sync inputs
+        ['product','fioBtn','fioBpp','fioGi','orderDate'].forEach((k) => {
+          if ($(k)) $(k).value = state[k] ?? '';
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    /* ---------- вставка в ячейку таблицы как в Excel (из 1С) ---------- */
+    document.addEventListener('paste', (e) => {
+      const t = e.target;
+      if (!t || !t.matches || !t.matches('table.editor input')) return;
+
+      const cd = e.clipboardData || window.clipboardData;
+      const text = cd.getData('text/plain') || cd.getData('text') || '';
+      const html = cd.getData('text/html') || '';
+      const multi = text.includes('\t') || text.includes('\n') || text.includes(';')
+        || (html && /<tr[\s>]/i.test(html));
+      if (!multi) return; // обычная вставка одного значения
+
+      e.preventDefault();
+      const payload = (html && /<table[\s>]/i.test(html)) ? html : text;
+      const tableKey = t.dataset.t || t.closest('table.editor')?.dataset.table || currentTableKey();
+      const schema = SCHEMAS[tableKey];
+      if (!schema) return;
+
+      const startRow = +t.dataset.i;
+      const startCol = schema.keys.indexOf(t.dataset.k);
+      if (startCol < 0) return;
+
+      // если вставка с первой ячейки первой строки и таблица почти пустая — полная замена
+      const rows = state[tableKey] || [];
+      const almostEmpty = rows.length <= 1 && schema.keys.every((k) => !cleanCell(rows[0]?.[k]));
+      const replace = almostEmpty && startRow === 0 && startCol === 0;
+
+      const res = applyPasteToTable(tableKey, payload, {
+        replace,
+        startRow,
+        startCol,
+      });
+
+      if (res.ok) {
+        renderEditor();
+        renderPreview();
+        // фокус на первую ячейку
+        const focus = document.querySelector(
+          `table.editor[data-table="${tableKey}"] input[data-i="0"][data-k="${schema.keys[0]}"]`
+        );
+        if (focus) focus.focus();
+      }
+    });
+
+    // init
+    loadState();
+    normalizePack();
+    // гарантировать схемы строк после загрузки
+    Object.keys(SCHEMAS).forEach((k) => {
+      if (!Array.isArray(state[k]) || !state[k].length) state[k] = [emptyRowFor(k)];
+    });
+    buildTabs();
+    bindCommon();
+    renderPackList();
+    renderEditor();
+    renderPreview('screen');
+  </script>
+</body>
+</html>
