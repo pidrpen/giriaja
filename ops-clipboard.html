@@ -6,581 +6,818 @@
   <title>Операции — быстрый буфер</title>
   <style>
     :root {
-      --bg: #eef2f6;
-      --panel: #fff;
-      --line: #d0d8e2;
-      --text: #1a2332;
-      --muted: #5c6b7e;
-      --accent: #1f4e79;
-      --accent2: #2d6a9f;
-      --ok: #0d7a4f;
-      --danger: #b42318;
-      --soft: #f0f5fa;
-      --shadow: 0 8px 28px rgba(20, 40, 70, .1);
+      --bg: #0f1419;
+      --bg2: #161d26;
+      --panel: #1a2330;
+      --line: #2a3648;
+      --text: #e8eef6;
+      --muted: #8b9bb0;
+      --accent: #3d8bfd;
+      --accent-dim: #1e4a8a;
+      --ok: #22c55e;
+      --ok-bg: rgba(34, 197, 94, 0.22);
+      --danger: #f07178;
+      --tile: #1e2836;
+      --tile-hover: #273246;
+      --tile-border: #334155;
+      --header-h: 56px;
     }
+
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
     body {
-      font-family: "Segoe UI", system-ui, sans-serif;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-    }
-    .wrap {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 20px 16px 48px;
-    }
-    header {
       display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    /* —— Header —— */
+    header {
+      flex: 0 0 auto;
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--line);
+      z-index: 10;
+    }
+    header .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+      min-width: 0;
     }
     header h1 {
-      margin: 0 0 4px;
-      font-size: 1.35rem;
-      color: var(--accent);
-    }
-    header p {
       margin: 0;
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.4;
-      max-width: 42rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
     }
-    .top-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    header .back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    header .back:hover { color: var(--accent); }
+
+    .hdr-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+    }
+
+    .search-wrap {
+      flex: 1 1 140px;
+      max-width: 280px;
+      min-width: 100px;
+    }
+    .search-wrap input {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-wrap input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(61, 139, 253, 0.25);
+    }
+    .search-wrap input::placeholder { color: var(--muted); }
+
     button, .btn {
-      border: 0;
-      border-radius: 9px;
-      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 12px;
       font: inherit;
       font-size: 13px;
       cursor: pointer;
-      background: #e4ebf3;
+      background: var(--panel);
       color: var(--text);
+      white-space: nowrap;
+      line-height: 1.2;
     }
-    button.primary { background: var(--accent); color: #fff; font-weight: 600; }
-    button.ok { background: var(--ok); color: #fff; font-weight: 600; }
-    button.danger { background: #fdecec; color: var(--danger); }
-    button.ghost { background: transparent; border: 1px solid var(--line); }
-    button:hover { filter: brightness(0.97); }
-    button:disabled { opacity: 0.45; cursor: default; }
+    button:hover { background: var(--tile-hover); border-color: #44566e; }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    button.ghost {
+      background: transparent;
+      color: var(--muted);
+      border-color: transparent;
+      padding: 7px 8px;
+    }
+    button.ghost:hover { color: var(--text); background: var(--panel); }
+    button.danger {
+      background: transparent;
+      border-color: #5a2a2e;
+      color: var(--danger);
+    }
+    button.danger:hover { background: rgba(240, 113, 120, 0.12); }
+    button:disabled { opacity: 0.4; cursor: default; }
 
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 14px;
-      padding: 12px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-    }
-    .toolbar input[type="search"],
-    .toolbar select {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 10px;
-      font: inherit;
-      font-size: 13px;
-      min-width: 160px;
-      background: #fff;
-    }
-    .toolbar .grow { flex: 1; min-width: 180px; }
-    .hint {
-      font-size: 12px;
-      color: var(--muted);
-      margin: 0 0 14px;
-      line-height: 1.4;
-    }
-    .list { display: flex; flex-direction: column; gap: 10px; }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px 14px;
-      box-shadow: var(--shadow);
-    }
-    .card.editing { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(45, 106, 159, .15); }
-    .card-head {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      align-items: start;
-      margin-bottom: 8px;
-    }
-    .card-title {
-      font-weight: 700;
-      font-size: 15px;
-      margin: 0 0 2px;
-      word-break: break-word;
-    }
-    .card-meta {
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .tag {
-      display: inline-block;
-      background: var(--soft);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 2px 8px;
-      font-size: 11px;
-      color: var(--accent);
-      margin-right: 4px;
-    }
-    .card-body {
-      white-space: pre-wrap;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 12.5px;
-      line-height: 1.4;
-      background: var(--soft);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      max-height: 220px;
+    /* —— Main grid —— */
+    main {
+      flex: 1 1 auto;
+      min-height: 0;
       overflow: auto;
-      margin: 0 0 10px;
+      padding: 14px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 139, 253, 0.08), transparent),
+        var(--bg);
     }
-    .card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-    .empty {
-      text-align: center;
-      padding: 36px 16px;
-      color: var(--muted);
-      background: var(--panel);
-      border: 1px dashed var(--line);
-      border-radius: 12px;
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+      align-content: start;
+      min-height: 100%;
     }
-    .modal-bg {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(20, 30, 45, .45);
-      z-index: 50;
+
+    .tile {
+      position: relative;
+      display: flex;
       align-items: center;
       justify-content: center;
+      min-height: 72px;
+      padding: 16px 14px;
+      background: var(--tile);
+      border: 1px solid var(--tile-border);
+      border-radius: 12px;
+      cursor: pointer;
+      user-select: none;
+      text-align: center;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--text);
+      transition: background 0.12s, border-color 0.12s, transform 0.08s, box-shadow 0.12s;
+      word-break: break-word;
+      line-height: 1.25;
+    }
+    .tile:hover {
+      background: var(--tile-hover);
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 1px var(--accent-dim);
+    }
+    .tile:active { transform: scale(0.98); }
+    .tile.copied {
+      background: var(--ok-bg);
+      border-color: var(--ok);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35);
+    }
+    .tile.dragging {
+      opacity: 0.45;
+      border-style: dashed;
+    }
+    .tile.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(61, 139, 253, 0.4);
+    }
+    .tile .edit-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      display: none;
+      gap: 4px;
+    }
+    body.edit-mode .tile .edit-badge { display: flex; }
+    body.edit-mode .tile { cursor: grab; }
+    body.edit-mode .tile:active { cursor: grabbing; }
+
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 6px;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .icon-btn:hover { color: var(--text); border-color: #556; }
+    .icon-btn.del:hover { color: var(--danger); border-color: #5a2a2e; }
+
+    .empty {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      min-height: 40vh;
+      color: var(--muted);
+      text-align: center;
+      font-size: 15px;
+    }
+
+    /* —— Toast —— */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #12261a;
+      color: #86efac;
+      border: 1px solid #166534;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s, transform 0.18s;
+      z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      max-width: min(90vw, 420px);
+      text-align: center;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* —— Modal —— */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
       padding: 16px;
     }
-    .modal-bg.open { display: flex; }
+    .modal-backdrop.open { display: flex; }
     .modal {
-      width: min(560px, 100%);
-      background: #fff;
+      background: var(--bg2);
+      border: 1px solid var(--line);
       border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 20px 50px rgba(0,0,0,.25);
-      max-height: 90vh;
-      overflow: auto;
+      padding: 20px;
+      width: min(420px, 100%);
+      box-shadow: 0 20px 50px rgba(0,0,0,.5);
     }
-    .modal h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--accent); }
-    .field { margin-bottom: 10px; }
-    .field label {
+    .modal h2 {
+      margin: 0 0 14px;
+      font-size: 1.1rem;
+    }
+    .modal label {
       display: block;
       font-size: 12px;
-      font-weight: 600;
       color: var(--muted);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
-    .field input, .field textarea, .field select {
+    .modal input[type="text"] {
       width: 100%;
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 9px 10px;
+      color: var(--text);
+      padding: 10px 12px;
       font: inherit;
-      font-size: 13px;
+      font-size: 16px;
+      outline: none;
+      margin-bottom: 16px;
     }
-    .field textarea {
-      min-height: 160px;
-      font-family: Consolas, "Courier New", monospace;
-      resize: vertical;
-      line-height: 1.4;
+    .modal input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(61, 139, 253, 0.25);
     }
-    .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-    .toast {
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    /* —— Context menu —— */
+    #ctx {
       position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: #123;
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: 999px;
-      font-size: 13px;
-      opacity: 0;
-      transition: .25s ease;
-      z-index: 100;
-      pointer-events: none;
+      z-index: 60;
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 4px;
+      min-width: 160px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.45);
+      display: none;
     }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    .toast.ok { background: var(--ok); }
-    a.back {
-      color: var(--accent2);
-      text-decoration: none;
-      font-size: 13px;
+    #ctx.open { display: block; }
+    #ctx button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: var(--text);
     }
-    a.back:hover { text-decoration: underline; }
+    #ctx button:hover { background: var(--tile-hover); }
+    #ctx button.danger { color: var(--danger); }
+
+    .hint-bar {
+      flex: 0 0 auto;
+      padding: 4px 14px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      border-top: 1px solid transparent;
+    }
+    body.edit-mode .hint-bar {
+      color: #fbbf24;
+      border-top-color: var(--line);
+      background: rgba(251, 191, 36, 0.06);
+    }
+
+    @media (max-width: 640px) {
+      header { height: auto; min-height: var(--header-h); flex-wrap: wrap; padding: 8px 10px; gap: 8px; }
+      .hdr-actions { flex-wrap: wrap; justify-content: flex-start; }
+      .search-wrap { max-width: none; flex: 1 1 100%; order: 10; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+      .tile { min-height: 64px; font-size: 0.95rem; padding: 12px 10px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div>
-        <a class="back" href="index.html">← На главную</a>
-        <h1>Операции — быстрый буфер</h1>
-        <p>
-          Складывай сюда куски текста/таблиц (из Excel, 1С, заметок), которые копируешь снова и снова.
-          Кнопка <b>Копировать</b> — сразу в буфер. После перезагрузки браузера всё на месте (localStorage).
-          Группы и названия — как удобно; структура пока свободная.
-        </p>
-      </div>
-      <div class="top-actions">
-        <button type="button" class="primary" id="btnAdd">+ Добавить</button>
-        <button type="button" id="btnExport">Экспорт JSON</button>
-        <button type="button" id="btnImport">Импорт JSON</button>
-        <input type="file" id="importFile" accept="application/json,.json" hidden />
-      </div>
-    </header>
-
-    <div class="toolbar">
-      <input type="search" class="grow" id="search" placeholder="Поиск по названию, группе, тексту…" />
-      <select id="filterGroup">
-        <option value="">Все группы</option>
-      </select>
-      <button type="button" class="ghost" id="btnClearFilter">Сброс фильтра</button>
+  <header>
+    <div class="brand">
+      <h1>Операции</h1>
+      <a class="back" href="index.html">← на главную</a>
     </div>
-    <p class="hint">
-      Подсказка: вставь из Excel диапазон (Tab + переносы строк) — сохранится как есть и скопируется так же.
-      Данные не уходят в интернет, только в этот браузер на этом компьютере.
-    </p>
+    <div class="hdr-actions">
+      <div class="search-wrap">
+        <input type="search" id="filter" placeholder="Фильтр…" autocomplete="off" />
+      </div>
+      <button type="button" class="primary" id="btnAdd" title="Добавить операцию">+ Добавить</button>
+      <button type="button" class="ghost" id="btnEditMode" title="Режим правки">Правка</button>
+      <button type="button" class="ghost" id="btnExport" title="Экспорт JSON">Экспорт</button>
+      <button type="button" class="ghost" id="btnImport" title="Импорт JSON">Импорт</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden />
+    </div>
+  </header>
 
-    <div class="list" id="list"></div>
+  <main>
+    <div class="grid" id="grid" aria-label="Список операций"></div>
+  </main>
+
+  <div class="hint-bar" id="hintBar">
+    Клик — скопировать · ПКМ — изменить / удалить · «Правка» — кнопки на плитках и перетаскивание
   </div>
 
-  <div class="modal-bg" id="modal">
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
-      <h2 id="modalTitle">Новая запись</h2>
-      <div class="field">
-        <label>Название</label>
-        <input id="fTitle" placeholder="например: Операции Ф1 — токарка" />
-      </div>
-      <div class="field">
-        <label>Группа (необязательно)</label>
-        <input id="fGroup" list="groupList" placeholder="Форма 1 / Материалы / Прочее…" />
-        <datalist id="groupList"></datalist>
-      </div>
-      <div class="field">
-        <label>Текст для копирования</label>
-        <textarea id="fBody" placeholder="Вставь сюда то, что обычно копируешь из Excel…"></textarea>
-      </div>
+      <h2 id="modalTitle">Новая операция</h2>
+      <label for="opText">Текст (копируется целиком)</label>
+      <input type="text" id="opText" maxlength="200" placeholder="напр. 3124 Слесарная" />
       <div class="modal-actions">
-        <button type="button" class="ghost" id="btnCancel">Отмена</button>
-        <button type="button" class="primary" id="btnSave">Сохранить</button>
+        <button type="button" class="ghost" id="modalCancel">Отмена</button>
+        <button type="button" class="danger" id="modalDelete" style="display:none; margin-right:auto">Удалить</button>
+        <button type="button" class="primary" id="modalSave">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div id="ctx" role="menu">
+    <button type="button" data-act="edit">Изменить…</button>
+    <button type="button" data-act="copy">Копировать</button>
+    <button type="button" class="danger" data-act="delete">Удалить</button>
+  </div>
 
   <script>
-    const STORAGE_KEY = 'ops_clipboard_v1';
-    const $ = (id) => document.getElementById(id);
+(function () {
+  'use strict';
 
-    /** @type {{ id: string, title: string, group: string, body: string, updated: number }[]} */
-    let items = [];
-    let editId = null;
+  const STORAGE_KEY = 'ops_clipboard_v1';
+  const SEED = [
+    '3124 Слесарная',
+    '3101 Токарная',
+    '3150 Контроль',
+    '3105 Фрезерная',
+    '3201 Сборка'
+  ];
 
-    function uid() {
-      return 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-    }
+  /** @type {{ id: string, text: string, order: number }[]} */
+  let items = [];
+  let editMode = false;
+  let editingId = null;
+  let ctxId = null;
+  let dragId = null;
+  let toastTimer = null;
 
-    function load() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-          items = seedIfEmpty();
-          save();
-          return;
-        }
-        const data = JSON.parse(raw);
-        items = Array.isArray(data.items) ? data.items : [];
-        if (!items.length) {
-          items = seedIfEmpty();
-          save();
-        }
-      } catch {
-        items = seedIfEmpty();
+  const grid = document.getElementById('grid');
+  const filterEl = document.getElementById('filter');
+  const toastEl = document.getElementById('toast');
+  const backdrop = document.getElementById('modalBackdrop');
+  const modalTitle = document.getElementById('modalTitle');
+  const opText = document.getElementById('opText');
+  const modalDelete = document.getElementById('modalDelete');
+  const ctx = document.getElementById('ctx');
+  const hintBar = document.getElementById('hintBar');
+  const btnEditMode = document.getElementById('btnEditMode');
+
+  function uid() {
+    return 'op_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
+
+  function normalizeFromLegacy(raw) {
+    if (!Array.isArray(raw)) return null;
+    const out = [];
+    raw.forEach((row, i) => {
+      if (!row || typeof row !== 'object') return;
+      if (typeof row.text === 'string' && row.text.trim()) {
+        out.push({
+          id: String(row.id || uid()),
+          text: row.text.trim(),
+          order: typeof row.order === 'number' ? row.order : i
+        });
+        return;
+      }
+      // Old card format: title / body
+      const title = (row.title || '').toString().trim();
+      const body = (row.body || '').toString().trim();
+      let text = '';
+      if (body && !body.includes('\n') && body.length <= 80) {
+        text = body;
+      } else if (title && body && !body.includes('\n') && (title + ' ' + body).length <= 80) {
+        text = (title + ' ' + body).trim();
+      } else if (title) {
+        text = title;
+      } else if (body) {
+        text = body.split('\n')[0].trim().slice(0, 80);
+      }
+      if (text) {
+        out.push({ id: String(row.id || uid()), text, order: typeof row.order === 'number' ? row.order : i });
+      }
+    });
+    return out.length ? out : null;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        items = SEED.map((text, i) => ({ id: uid(), text, order: i }));
+        save();
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const migrated = normalizeFromLegacy(parsed);
+      if (migrated) {
+        items = migrated.sort((a, b) => a.order - b.order);
+        // Re-save in new shape if needed
+        save();
+      } else {
+        items = SEED.map((text, i) => ({ id: uid(), text, order: i }));
         save();
       }
+    } catch {
+      items = SEED.map((text, i) => ({ id: uid(), text, order: i }));
+      save();
     }
+  }
 
-    function seedIfEmpty() {
-      // Пустые примеры-заготовки — чтобы было понятно «куда что»
-      return [
-        {
-          id: uid(),
-          title: 'Пример: несколько операций (TSV как из Excel)',
-          group: 'Примеры',
-          body: 'Токарная обработка\t48\t0,8\nФрезерование\t72\t1,2\nКонтроль ОТК\t18\t0,3',
-          updated: Date.now(),
-        },
-        {
-          id: uid(),
-          title: 'Пример: одна строка',
-          group: 'Примеры',
-          body: 'Слесарная доводка',
-          updated: Date.now(),
-        },
-      ];
-    }
+  function save() {
+    items.forEach((it, i) => { it.order = i; });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }
 
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, items }));
-    }
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1400);
+  }
 
-    function toast(msg, ok) {
-      const el = $('toast');
-      el.textContent = msg;
-      el.className = 'toast show' + (ok ? ' ok' : '');
-      clearTimeout(toast._t);
-      toast._t = setTimeout(() => { el.className = 'toast'; }, 1800);
-    }
-
-    function groups() {
-      const s = new Set();
-      items.forEach((it) => {
-        const g = (it.group || '').trim();
-        if (g) s.add(g);
-      });
-      return [...s].sort((a, b) => a.localeCompare(b, 'ru'));
-    }
-
-    function refreshGroupUI() {
-      const gs = groups();
-      const sel = $('filterGroup');
-      const cur = sel.value;
-      sel.innerHTML = '<option value="">Все группы</option>' +
-        gs.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
-      if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
-
-      $('groupList').innerHTML = gs.map((g) => `<option value="${esc(g)}"></option>`).join('');
-    }
-
-    function esc(s) {
-      return String(s ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function filtered() {
-      const q = ($('search').value || '').trim().toLowerCase();
-      const g = $('filterGroup').value;
-      return items
-        .filter((it) => {
-          if (g && (it.group || '').trim() !== g) return false;
-          if (!q) return true;
-          const blob = `${it.title}\n${it.group}\n${it.body}`.toLowerCase();
-          return blob.includes(q);
-        })
-        .sort((a, b) => (b.updated || 0) - (a.updated || 0));
-    }
-
-    function render() {
-      refreshGroupUI();
-      const list = $('list');
-      const rows = filtered();
-      if (!rows.length) {
-        list.innerHTML = `<div class="empty">Пока пусто или ничего не найдено.<br>Нажми «+ Добавить» и вставь то, что копируешь из Excel.</div>`;
-        return;
-      }
-      list.innerHTML = rows.map((it) => {
-        const preview = it.body.length > 800 ? it.body.slice(0, 800) + '…' : it.body;
-        const lines = (it.body.match(/\n/g) || []).length + 1;
-        const chars = it.body.length;
-        return `
-          <article class="card" data-id="${esc(it.id)}">
-            <div class="card-head">
-              <div>
-                <h3 class="card-title">${esc(it.title || 'Без названия')}</h3>
-                <div class="card-meta">
-                  ${it.group ? `<span class="tag">${esc(it.group)}</span>` : ''}
-                  ${lines} стр. · ${chars} симв.
-                  ${it.updated ? ' · ' + new Date(it.updated).toLocaleString('ru-RU') : ''}
-                </div>
-              </div>
-            </div>
-            <pre class="card-body">${esc(preview)}</pre>
-            <div class="card-actions">
-              <button type="button" class="ok" data-copy="${esc(it.id)}">📋 Копировать</button>
-              <button type="button" data-edit="${esc(it.id)}">Изменить</button>
-              <button type="button" class="danger" data-del="${esc(it.id)}">Удалить</button>
-            </div>
-          </article>`;
-      }).join('');
-    }
-
-    async function copyText(text) {
-      try {
+  async function copyText(text, tileEl) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        return true;
-      } catch {
-        // fallback
+      } else {
         const ta = document.createElement('textarea');
         ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
         document.body.appendChild(ta);
         ta.select();
-        try {
-          const ok = document.execCommand('copy');
-          ta.remove();
-          return ok;
-        } catch {
-          ta.remove();
-          return false;
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      if (tileEl) {
+        tileEl.classList.add('copied');
+        setTimeout(() => tileEl.classList.remove('copied'), 500);
+      }
+      showToast('Скопировано: ' + text);
+    } catch (e) {
+      showToast('Не удалось скопировать');
+    }
+  }
+
+  function getFiltered() {
+    const q = (filterEl.value || '').trim().toLowerCase();
+    const sorted = items.slice().sort((a, b) => a.order - b.order);
+    if (!q) return sorted;
+    return sorted.filter(it => it.text.toLowerCase().includes(q));
+  }
+
+  function render() {
+    const list = getFiltered();
+    grid.innerHTML = '';
+
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = items.length
+        ? '<div>Ничего не найдено</div>'
+        : '<div>Пока нет операций</div><button type="button" class="primary" id="emptyAdd">+ Добавить первую</button>';
+      grid.appendChild(empty);
+      const b = empty.querySelector('#emptyAdd');
+      if (b) b.addEventListener('click', () => openModal(null));
+      return;
+    }
+
+    list.forEach(it => {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.dataset.id = it.id;
+      tile.tabIndex = 0;
+      tile.setAttribute('role', 'button');
+      tile.setAttribute('aria-label', 'Скопировать: ' + it.text);
+      tile.draggable = editMode;
+
+      const label = document.createElement('span');
+      label.textContent = it.text;
+      tile.appendChild(label);
+
+      const badge = document.createElement('div');
+      badge.className = 'edit-badge';
+      const btnE = document.createElement('button');
+      btnE.type = 'button';
+      btnE.className = 'icon-btn';
+      btnE.title = 'Изменить';
+      btnE.textContent = '✎';
+      btnE.addEventListener('click', e => {
+        e.stopPropagation();
+        openModal(it.id);
+      });
+      const btnD = document.createElement('button');
+      btnD.type = 'button';
+      btnD.className = 'icon-btn del';
+      btnD.title = 'Удалить';
+      btnD.textContent = '×';
+      btnD.addEventListener('click', e => {
+        e.stopPropagation();
+        if (confirm('Удалить «' + it.text + '»?')) {
+          items = items.filter(x => x.id !== it.id);
+          save();
+          render();
         }
-      }
-    }
+      });
+      badge.appendChild(btnE);
+      badge.appendChild(btnD);
+      tile.appendChild(badge);
 
-    function openModal(item) {
-      editId = item ? item.id : null;
-      $('modalTitle').textContent = item ? 'Изменить запись' : 'Новая запись';
-      $('fTitle').value = item ? item.title : '';
-      $('fGroup').value = item ? (item.group || '') : '';
-      $('fBody').value = item ? item.body : '';
-      $('modal').classList.add('open');
-      setTimeout(() => $('fTitle').focus(), 50);
-    }
-
-    function closeModal() {
-      $('modal').classList.remove('open');
-      editId = null;
-    }
-
-    function saveModal() {
-      const title = $('fTitle').value.trim() || 'Без названия';
-      const group = $('fGroup').value.trim();
-      const body = $('fBody').value;
-      if (!body.trim()) {
-        toast('Вставь текст для копирования');
-        $('fBody').focus();
-        return;
-      }
-      if (editId) {
-        const it = items.find((x) => x.id === editId);
-        if (it) {
-          it.title = title;
-          it.group = group;
-          it.body = body;
-          it.updated = Date.now();
+      tile.addEventListener('click', () => {
+        if (editMode) return; // edit mode uses drag / icon buttons
+        copyText(it.text, tile);
+      });
+      tile.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!editMode) copyText(it.text, tile);
         }
-      } else {
-        items.push({ id: uid(), title, group, body, updated: Date.now() });
+      });
+      tile.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        openCtx(e.clientX, e.clientY, it.id);
+      });
+
+      if (editMode) {
+        tile.addEventListener('dragstart', e => {
+          dragId = it.id;
+          tile.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', it.id);
+        });
+        tile.addEventListener('dragend', () => {
+          dragId = null;
+          tile.classList.remove('dragging');
+          grid.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+        tile.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          tile.classList.add('drag-over');
+        });
+        tile.addEventListener('dragleave', () => tile.classList.remove('drag-over'));
+        tile.addEventListener('drop', e => {
+          e.preventDefault();
+          tile.classList.remove('drag-over');
+          const fromId = dragId || e.dataTransfer.getData('text/plain');
+          const toId = it.id;
+          if (!fromId || fromId === toId) return;
+          const fromIdx = items.findIndex(x => x.id === fromId);
+          const toIdx = items.findIndex(x => x.id === toId);
+          if (fromIdx < 0 || toIdx < 0) return;
+          const [moved] = items.splice(fromIdx, 1);
+          items.splice(toIdx, 0, moved);
+          save();
+          render();
+        });
       }
+
+      grid.appendChild(tile);
+    });
+  }
+
+  function openModal(id) {
+    editingId = id;
+    closeCtx();
+    if (id) {
+      const it = items.find(x => x.id === id);
+      modalTitle.textContent = 'Изменить операцию';
+      opText.value = it ? it.text : '';
+      modalDelete.style.display = '';
+    } else {
+      modalTitle.textContent = 'Новая операция';
+      opText.value = '';
+      modalDelete.style.display = 'none';
+    }
+    backdrop.classList.add('open');
+    setTimeout(() => { opText.focus(); opText.select(); }, 30);
+  }
+
+  function closeModal() {
+    backdrop.classList.remove('open');
+    editingId = null;
+  }
+
+  function saveModal() {
+    const text = opText.value.trim();
+    if (!text) {
+      opText.focus();
+      return;
+    }
+    if (editingId) {
+      const it = items.find(x => x.id === editingId);
+      if (it) it.text = text;
+    } else {
+      items.push({ id: uid(), text, order: items.length });
+    }
+    save();
+    closeModal();
+    render();
+  }
+
+  function openCtx(x, y, id) {
+    ctxId = id;
+    ctx.classList.add('open');
+    const pad = 8;
+    const w = ctx.offsetWidth || 160;
+    const h = ctx.offsetHeight || 120;
+    let left = x;
+    let top = y;
+    if (left + w > window.innerWidth - pad) left = window.innerWidth - w - pad;
+    if (top + h > window.innerHeight - pad) top = window.innerHeight - h - pad;
+    ctx.style.left = Math.max(pad, left) + 'px';
+    ctx.style.top = Math.max(pad, top) + 'px';
+  }
+
+  function closeCtx() {
+    ctx.classList.remove('open');
+    ctxId = null;
+  }
+
+  // —— Events ——
+  document.getElementById('btnAdd').addEventListener('click', () => openModal(null));
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('modalSave').addEventListener('click', saveModal);
+  opText.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); saveModal(); }
+    if (e.key === 'Escape') closeModal();
+  });
+  backdrop.addEventListener('click', e => {
+    if (e.target === backdrop) closeModal();
+  });
+  modalDelete.addEventListener('click', () => {
+    if (!editingId) return;
+    const it = items.find(x => x.id === editingId);
+    if (it && confirm('Удалить «' + it.text + '»?')) {
+      items = items.filter(x => x.id !== editingId);
       save();
       closeModal();
       render();
-      toast('Сохранено', true);
     }
+  });
 
-    $('list').addEventListener('click', async (e) => {
-      const t = e.target;
-      if (!(t instanceof HTMLElement)) return;
-      const copyId = t.getAttribute('data-copy');
-      const editIdBtn = t.getAttribute('data-edit');
-      const delId = t.getAttribute('data-del');
-      if (copyId) {
-        const it = items.find((x) => x.id === copyId);
-        if (!it) return;
-        const ok = await copyText(it.body);
-        toast(ok ? 'Скопировано — можно Ctrl+V куда нужно' : 'Не удалось скопировать', ok);
-        return;
-      }
-      if (editIdBtn) {
-        const it = items.find((x) => x.id === editIdBtn);
-        if (it) openModal(it);
-        return;
-      }
-      if (delId) {
-        const it = items.find((x) => x.id === delId);
-        if (!it) return;
-        if (!confirm(`Удалить «${it.title}»?`)) return;
-        items = items.filter((x) => x.id !== delId);
-        save();
-        render();
-        toast('Удалено');
-      }
-    });
-
-    $('btnAdd').onclick = () => openModal(null);
-    $('btnCancel').onclick = closeModal;
-    $('btnSave').onclick = saveModal;
-    $('modal').addEventListener('click', (e) => {
-      if (e.target === $('modal')) closeModal();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && $('modal').classList.contains('open')) closeModal();
-    });
-
-    $('search').oninput = render;
-    $('filterGroup').onchange = render;
-    $('btnClearFilter').onclick = () => {
-      $('search').value = '';
-      $('filterGroup').value = '';
-      render();
-    };
-
-    $('btnExport').onclick = () => {
-      const blob = new Blob([JSON.stringify({ version: 1, items }, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'ops-clipboard-backup.json';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 500);
-      toast('JSON скачан', true);
-    };
-
-    $('btnImport').onclick = () => $('importFile').click();
-    $('importFile').onchange = async () => {
-      const f = $('importFile').files && $('importFile').files[0];
-      $('importFile').value = '';
-      if (!f) return;
-      try {
-        const text = await f.text();
-        const data = JSON.parse(text);
-        const arr = Array.isArray(data) ? data : data.items;
-        if (!Array.isArray(arr)) throw new Error('bad format');
-        const mode = confirm('OK — добавить к текущим\nОтмена — заменить всё') ? 'merge' : 'replace';
-        const normalized = arr.map((x) => ({
-          id: x.id || uid(),
-          title: String(x.title || 'Без названия'),
-          group: String(x.group || ''),
-          body: String(x.body || ''),
-          updated: x.updated || Date.now(),
-        })).filter((x) => x.body);
-        if (mode === 'replace') items = normalized;
-        else {
-          const ids = new Set(items.map((i) => i.id));
-          normalized.forEach((n) => {
-            if (ids.has(n.id)) n.id = uid();
-            items.push(n);
-          });
-        }
-        save();
-        render();
-        toast('Импорт готов', true);
-      } catch {
-        toast('Не удалось прочитать JSON');
-      }
-    };
-
-    load();
+  btnEditMode.addEventListener('click', () => {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    btnEditMode.textContent = editMode ? 'Готово' : 'Правка';
+    btnEditMode.classList.toggle('primary', editMode);
+    hintBar.textContent = editMode
+      ? 'Режим правки: перетащите плитки · ✎ изменить · × удалить · «Готово» — выход'
+      : 'Клик — скопировать · ПКМ — изменить / удалить · «Правка» — кнопки на плитках и перетаскивание';
     render();
+  });
+
+  filterEl.addEventListener('input', render);
+
+  ctx.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn || !ctxId) return;
+    const act = btn.dataset.act;
+    const it = items.find(x => x.id === ctxId);
+    closeCtx();
+    if (!it) return;
+    if (act === 'edit') openModal(it.id);
+    else if (act === 'copy') copyText(it.text, grid.querySelector('[data-id="' + it.id + '"]'));
+    else if (act === 'delete' && confirm('Удалить «' + it.text + '»?')) {
+      items = items.filter(x => x.id !== it.id);
+      save();
+      render();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!ctx.contains(e.target)) closeCtx();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeCtx();
+      if (backdrop.classList.contains('open')) closeModal();
+    }
+  });
+
+  document.getElementById('btnExport').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ops-clipboard.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('Экспорт JSON');
+  });
+
+  document.getElementById('btnImport').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const migrated = normalizeFromLegacy(parsed);
+      if (!migrated) {
+        alert('Файл не содержит операций в ожидаемом формате.');
+        return;
+      }
+      if (items.length && !confirm('Заменить текущий список (' + items.length + ') данными из файла (' + migrated.length + ')?')) {
+        return;
+      }
+      items = migrated.sort((a, b) => a.order - b.order);
+      save();
+      render();
+      showToast('Импортировано: ' + items.length);
+    } catch {
+      alert('Не удалось прочитать JSON.');
+    }
+  });
+
+  load();
+  render();
+})();
   </script>
 </body>
 </html>

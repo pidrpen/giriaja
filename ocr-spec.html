@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Скриншот → Обозначение / Наименование → Excel</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel2: #232d3a;
+      --line: #354454;
+      --text: #e8eef4;
+      --muted: #8b9bab;
+      --accent: #3d8fd1;
+      --ok: #2f9e6b;
+      --warn: #c9a227;
+      --danger: #d64545;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      flex: 0 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    header h1 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+    header .sub { font-size: 12px; color: var(--muted); max-width: 48rem; line-height: 1.35; }
+    a.back { color: var(--accent); text-decoration: none; font-size: 13px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button, label.btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+    button.ok { background: var(--ok); border-color: transparent; color: #fff; font-weight: 600; }
+    button.danger { background: #3a1e1e; border-color: #6a3030; color: #ffb4b4; }
+    button:disabled { opacity: 0.45; cursor: default; }
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+      min-height: 0;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .pane {
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .pane:last-child { border-right: 0; }
+    .pane-h {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .drop {
+      flex: 1;
+      margin: 12px;
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      text-align: center;
+      padding: 16px;
+      position: relative;
+      overflow: auto;
+      background: #121820;
+    }
+    .drop.drag { border-color: var(--accent); background: #152030; }
+    .drop canvas, .drop img {
+      max-width: 100%;
+      max-height: 55vh;
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .drop .hint { font-size: 13px; line-height: 1.4; }
+    .kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      font-size: 11px;
+    }
+    .raw {
+      flex: 0 0 auto;
+      max-height: 28vh;
+      overflow: auto;
+      margin: 0 12px 12px;
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      color: #c5d0da;
+    }
+    .table-wrap {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0;
+      vertical-align: top;
+    }
+    th {
+      background: var(--panel2);
+      color: var(--muted);
+      font-weight: 600;
+      padding: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td input {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      padding: 8px;
+      font: inherit;
+      font-size: 13px;
+    }
+    td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: #152030; }
+    td.num { width: 40px; text-align: center; color: var(--muted); padding: 8px; }
+    tr.warn td { background: rgba(201, 162, 39, 0.08); }
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status.busy { color: var(--warn); }
+    .status.err { color: var(--danger); }
+    .note {
+      margin: 0 12px 12px;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+      background: var(--panel);
+      border-radius: 8px;
+      border: 1px solid var(--line);
+    }
+    .note b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <a class="back" href="index.html">← На главную</a>
+      <h1>Скриншот → Обозначение / Наименование</h1>
+      <div class="sub">
+        Вставь скрин (<span class="kbd">Ctrl+V</span>) или перетащи картинку. OCR (печатный + попытка рукописи) → таблица → Excel.
+        Правила: код вида <b>403Г-21-3</b> / <b>403Г-21-сб102</b> → обозначение; <b>ГОСТ/DIN/ISO</b> и крепёж → всё в наименование; без кода → всё в наименование.
+      </div>
+    </div>
+    <div class="actions">
+      <label class="btn">Файл… <input type="file" id="file" accept="image/*" hidden /></label>
+      <button type="button" id="btnOcr" class="primary" disabled>Распознать</button>
+      <button type="button" id="btnParse">Переразобрать текст</button>
+      <button type="button" id="btnAddRow">+ Строка</button>
+      <button type="button" id="btnExcel" class="ok" disabled>⬇ Excel</button>
+      <button type="button" id="btnClear" class="danger">Очистить</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="pane">
+      <div class="pane-h">
+        <span>Изображение / сырой OCR</span>
+        <span class="status" id="status">ожидание</span>
+      </div>
+      <div class="drop" id="drop" tabindex="0">
+        <div class="hint" id="dropHint">
+          <div style="font-size:40px;margin-bottom:8px">🖼</div>
+          Вставь скриншот <span class="kbd">Ctrl+V</span><br>
+          или перетащи / выбери файл<br>
+          <span style="font-size:11px;opacity:.8">Лучше: контраст, крупно, ровно. Рукопись — «на удачу».</span>
+        </div>
+        <canvas id="cv" style="display:none"></canvas>
+      </div>
+      <div class="note">
+        <b>Честно:</b> печатный текст (спецификация, PDF-скрин) обычно нормально.
+        Рукопись Tesseract часто калечит — правь таблицу руками, потом Excel.
+        Движок: Tesseract.js (rus+eng), без сервера.
+      </div>
+      <pre class="raw" id="raw" hidden></pre>
+    </section>
+
+    <section class="pane">
+      <div class="pane-h">
+        <span>Таблица (можно править)</span>
+        <span class="status" id="rowCount">0 строк</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px">№</th>
+              <th style="width:28%">Обозначение</th>
+              <th>Наименование</th>
+              <th style="width:44px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      imageBitmap: null,
+      rawText: '',
+      rows: [], // { code, name }
+    };
+
+    function setStatus(msg, cls) {
+      const el = $('status');
+      el.textContent = msg;
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    function updateRowCount() {
+      $('rowCount').textContent = state.rows.length + ' строк';
+      $('btnExcel').disabled = !state.rows.length;
+    }
+
+    function renderTable() {
+      const tb = $('tbody');
+      tb.innerHTML = state.rows.map((r, i) => `
+        <tr class="${!r.code && r.name ? '' : (!r.code && !r.name ? 'warn' : '')}" data-i="${i}">
+          <td class="num">${i + 1}</td>
+          <td><input data-f="code" data-i="${i}" value="${esc(r.code)}" placeholder="403Г-21-3" /></td>
+          <td><input data-f="name" data-i="${i}" value="${esc(r.name)}" placeholder="Наименование" /></td>
+          <td><button type="button" data-del="${i}" title="Удалить">×</button></td>
+        </tr>
+      `).join('') || `<tr><td colspan="4" class="num" style="padding:16px;color:var(--muted)">Пока пусто — распознай скрин или добавь строки</td></tr>`;
+      updateRowCount();
+    }
+
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /* ---------- эвристика Обозначение / Наименование ---------- */
+    const STD_MARK = /(?:^|[\s,;])(?:ГОСТ|DIN|ISO|EN|ОСТ|ТУ|ГСОТ)\b/i;
+    // типовые обозначения: 403Г-21-3, 403Г-21-сб102, АБ.12.034, 12-34-56А
+    const DESIG_HEAD = /^([0-9]{2,5}[A-Za-zА-Яа-яЁё]?[0-9A-Za-zА-Яа-яЁё]*(?:[-./][0-9A-Za-zА-Яа-яЁё]+)+)\s+(.+)$/u;
+    // чуть мягче: есть дефис/точка и цифра в первом токене
+    const DESIG_SOFT = /^(\S*[0-9]\S*[-./]\S+)\s+(.+)$/u;
+
+    function isStandardProductLine(line) {
+      if (STD_MARK.test(line)) return true;
+      // Болт/винт/гайка/шайба + резьба М… часто без отдельного заводского кода
+      if (/^(болт|винт|гайка|шайба|штифт|заклепк|шплинт|гайка)\b/i.test(line) && /\bМ\s?\d/i.test(line)) return true;
+      return false;
+    }
+
+    function splitDesignationName(line) {
+      let s = line.replace(/\s+/g, ' ').trim();
+      if (!s) return null;
+
+      // мусор OCR
+      if (/^[\d\W]{1,3}$/.test(s)) return null;
+
+      if (isStandardProductLine(s)) {
+        return { code: '', name: s };
+      }
+
+      let m = s.match(DESIG_HEAD);
+      if (m) return { code: m[1].trim(), name: m[2].trim() };
+
+      m = s.match(DESIG_SOFT);
+      if (m) {
+        const code = m[1].trim();
+        // отсечь ложные «М24-6g» как обозначение у крепежа без ГОСТ в той же строке
+        if (/^М\d/i.test(code) || /^M\d/i.test(code)) {
+          return { code: '', name: s };
+        }
+        return { code, name: m[2].trim() };
+      }
+
+      // только обозначение в строке (без имени)
+      if (/^[0-9]{2,5}[A-Za-zА-Яа-яЁё]?[0-9A-Za-zА-Яа-яЁё]*(?:[-./][0-9A-Za-zА-Яа-яЁё]+)+$/u.test(s)) {
+        return { code: s, name: '' };
+      }
+
+      return { code: '', name: s };
+    }
+
+    function parseOcrText(text) {
+      const lines = String(text || '')
+        .replace(/\r/g, '')
+        .split('\n')
+        .map((l) => l.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+
+      const rows = [];
+      for (const line of lines) {
+        // пропуск заголовков таблиц
+        if (/^(обозначен|наименован|№|n\/п|поз\.?|количество|кол-во|примечан)/i.test(line)) continue;
+        if (line.length < 2) continue;
+        const row = splitDesignationName(line);
+        if (row && (row.code || row.name)) rows.push(row);
+      }
+      return rows;
+    }
+
+    /* ---------- image load ---------- */
+    async function loadFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        setStatus('нужен файл изображения', 'err');
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+          img.src = url;
+        });
+        drawImage(img);
+        $('btnOcr').disabled = false;
+        setStatus('картинка загружена — нажми «Распознать»');
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    function drawImage(img) {
+      const cv = $('cv');
+      const maxW = 2000;
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (w > maxW) {
+        h = Math.round(h * (maxW / w));
+        w = maxW;
+      }
+      cv.width = w;
+      cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      // лёгкое усиление контраста
+      try {
+        const id = ctx.getImageData(0, 0, w, h);
+        const d = id.data;
+        const contrast = 1.25;
+        const intercept = 128 * (1 - contrast);
+        for (let i = 0; i < d.length; i += 4) {
+          let g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          g = contrast * g + intercept;
+          g = Math.max(0, Math.min(255, g));
+          // мягкий порог — чуть чётче штрихи
+          const v = g > 180 ? 255 : g < 90 ? 0 : g;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(id, 0, 0);
+      } catch (_) { /* ignore */ }
+
+      cv.style.display = 'block';
+      $('dropHint').style.display = 'none';
+      state.imageBitmap = true;
+    }
+
+    async function runOcr() {
+      if (!$('cv').width) {
+        setStatus('нет изображения', 'err');
+        return;
+      }
+      $('btnOcr').disabled = true;
+      setStatus('распознавание… (первый раз качает язык)', 'busy');
+      try {
+        const result = await Tesseract.recognize($('cv'), 'rus+eng', {
+          logger: (m) => {
+            if (m.status === 'recognizing text' && m.progress != null) {
+              setStatus('распознавание… ' + Math.round(m.progress * 100) + '%', 'busy');
+            }
+          },
+        });
+        state.rawText = (result && result.data && result.data.text) || '';
+        $('raw').hidden = false;
+        $('raw').textContent = state.rawText || '(пусто)';
+        state.rows = parseOcrText(state.rawText);
+        renderTable();
+        setStatus('готово — проверь и поправь строки');
+      } catch (e) {
+        console.error(e);
+        setStatus('ошибка OCR: ' + (e.message || e), 'err');
+      } finally {
+        $('btnOcr').disabled = false;
+      }
+    }
+
+    /* ---------- Excel SpreadsheetML ---------- */
+    function xmlEsc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function exportExcel() {
+      const rows = state.rows.filter((r) => r.code || r.name);
+      if (!rows.length) return;
+      let table = '';
+      table += `<Row>
+        <Cell ss:StyleID="hdr"><Data ss:Type="String">Обозначение</Data></Cell>
+        <Cell ss:StyleID="hdr"><Data ss:Type="String">Наименование</Data></Cell>
+      </Row>`;
+      rows.forEach((r) => {
+        table += `<Row>
+          <Cell><Data ss:Type="String">${xmlEsc(r.code)}</Data></Cell>
+          <Cell><Data ss:Type="String">${xmlEsc(r.name)}</Data></Cell>
+        </Row>`;
+      });
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+ <Style ss:ID="Default"><Font ss:FontName="Times New Roman" ss:Size="11"/></Style>
+ <Style ss:ID="hdr"><Font ss:Bold="1"/><Interior ss:Color="#F4ECC5" ss:Pattern="Solid"/></Style>
+</Styles>
+<Worksheet ss:Name="Спецификация">
+ <Table>
+  <Column ss:Width="140"/>
+  <Column ss:Width="320"/>
+  ${table}
+ </Table>
+</Worksheet>
+</Workbook>`;
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'oboznachenie-naimenovanie.xls';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      setStatus('Excel скачан');
+    }
+
+    /* ---------- events ---------- */
+    const drop = $('drop');
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('drag');
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) loadFile(f);
+    });
+    $('file').onchange = () => {
+      const f = $('file').files && $('file').files[0];
+      if (f) loadFile(f);
+      $('file').value = '';
+    };
+
+    document.addEventListener('paste', (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type.startsWith('image/')) {
+          e.preventDefault();
+          const f = it.getAsFile();
+          if (f) loadFile(f);
+          return;
+        }
+      }
+    });
+
+    $('btnOcr').onclick = runOcr;
+    $('btnParse').onclick = () => {
+      // можно править raw вручную
+      if (!$('raw').hidden) {
+        state.rawText = $('raw').textContent === '(пусто)' ? '' : $('raw').textContent;
+      }
+      state.rows = parseOcrText(state.rawText);
+      renderTable();
+      setStatus('текст переразобран');
+    };
+    $('raw').addEventListener('input', () => {
+      state.rawText = $('raw').innerText;
+    });
+    // raw is pre - make it editable
+    $('raw').contentEditable = 'true';
+
+    $('btnAddRow').onclick = () => {
+      state.rows.push({ code: '', name: '' });
+      renderTable();
+    };
+    $('btnExcel').onclick = exportExcel;
+    $('btnClear').onclick = () => {
+      if (!confirm('Очистить картинку и таблицу?')) return;
+      state.rawText = '';
+      state.rows = [];
+      state.imageBitmap = null;
+      const cv = $('cv');
+      cv.width = 0; cv.height = 0; cv.style.display = 'none';
+      $('dropHint').style.display = '';
+      $('raw').hidden = true;
+      $('raw').textContent = '';
+      $('btnOcr').disabled = true;
+      renderTable();
+      setStatus('очищено');
+    };
+
+    $('tbody').addEventListener('input', (e) => {
+      const t = e.target;
+      if (t.matches('input[data-f]')) {
+        const i = +t.dataset.i;
+        const f = t.dataset.f;
+        if (state.rows[i]) state.rows[i][f] = t.value;
+      }
+    });
+    $('tbody').addEventListener('click', (e) => {
+      const t = e.target;
+      if (t.matches('[data-del]')) {
+        const i = +t.getAttribute('data-del');
+        state.rows.splice(i, 1);
+        renderTable();
+      }
+    });
+
+    renderTable();
+  </script>
+</body>
+</html>
