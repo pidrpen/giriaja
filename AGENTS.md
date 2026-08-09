@@ -162,3 +162,10 @@ exportAllDocs / exportCurrentDoc
 - Этот файл: handoff для app-сессии  
 
 Язык UI и общения с пользователем: **русский**.
+
+---
+
+## ops-clipboard.html
+
+Быстрый буфер операций: именованные слоты, копирование одной кнопкой, localStorage `ops_clipboard_v1`, импорт/экспорт JSON. Структура свободная (название + группа + текст). Не путать с document-templates.html.
+

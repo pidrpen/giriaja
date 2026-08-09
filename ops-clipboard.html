@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Операции — быстрый буфер</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #fff;
+      --line: #d0d8e2;
+      --text: #1a2332;
+      --muted: #5c6b7e;
+      --accent: #1f4e79;
+      --accent2: #2d6a9f;
+      --ok: #0d7a4f;
+      --danger: #b42318;
+      --soft: #f0f5fa;
+      --shadow: 0 8px 28px rgba(20, 40, 70, .1);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      margin: 0 0 4px;
+      font-size: 1.35rem;
+      color: var(--accent);
+    }
+    header p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+      max-width: 42rem;
+    }
+    .top-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button, .btn {
+      border: 0;
+      border-radius: 9px;
+      padding: 9px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      background: #e4ebf3;
+      color: var(--text);
+    }
+    button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+    button.ok { background: var(--ok); color: #fff; font-weight: 600; }
+    button.danger { background: #fdecec; color: var(--danger); }
+    button.ghost { background: transparent; border: 1px solid var(--line); }
+    button:hover { filter: brightness(0.97); }
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    .toolbar input[type="search"],
+    .toolbar select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 13px;
+      min-width: 160px;
+      background: #fff;
+    }
+    .toolbar .grow { flex: 1; min-width: 180px; }
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 14px;
+      line-height: 1.4;
+    }
+    .list { display: flex; flex-direction: column; gap: 10px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+    .card.editing { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(45, 106, 159, .15); }
+    .card-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 15px;
+      margin: 0 0 2px;
+      word-break: break-word;
+    }
+    .card-meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .tag {
+      display: inline-block;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--accent);
+      margin-right: 4px;
+    }
+    .card-body {
+      white-space: pre-wrap;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12.5px;
+      line-height: 1.4;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 220px;
+      overflow: auto;
+      margin: 0 0 10px;
+    }
+    .card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .empty {
+      text-align: center;
+      padding: 36px 16px;
+      color: var(--muted);
+      background: var(--panel);
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+    }
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 30, 45, .45);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      width: min(560px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.25);
+      max-height: 90vh;
+      overflow: auto;
+    }
+    .modal h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--accent); }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font: inherit;
+      font-size: 13px;
+    }
+    .field textarea {
+      min-height: 160px;
+      font-family: Consolas, "Courier New", monospace;
+      resize: vertical;
+      line-height: 1.4;
+    }
+    .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #123;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      opacity: 0;
+      transition: .25s ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { background: var(--ok); }
+    a.back {
+      color: var(--accent2);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    a.back:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <a class="back" href="index.html">← На главную</a>
+        <h1>Операции — быстрый буфер</h1>
+        <p>
+          Складывай сюда куски текста/таблиц (из Excel, 1С, заметок), которые копируешь снова и снова.
+          Кнопка <b>Копировать</b> — сразу в буфер. После перезагрузки браузера всё на месте (localStorage).
+          Группы и названия — как удобно; структура пока свободная.
+        </p>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="primary" id="btnAdd">+ Добавить</button>
+        <button type="button" id="btnExport">Экспорт JSON</button>
+        <button type="button" id="btnImport">Импорт JSON</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <input type="search" class="grow" id="search" placeholder="Поиск по названию, группе, тексту…" />
+      <select id="filterGroup">
+        <option value="">Все группы</option>
+      </select>
+      <button type="button" class="ghost" id="btnClearFilter">Сброс фильтра</button>
+    </div>
+    <p class="hint">
+      Подсказка: вставь из Excel диапазон (Tab + переносы строк) — сохранится как есть и скопируется так же.
+      Данные не уходят в интернет, только в этот браузер на этом компьютере.
+    </p>
+
+    <div class="list" id="list"></div>
+  </div>
+
+  <div class="modal-bg" id="modal">
+    <div class="modal">
+      <h2 id="modalTitle">Новая запись</h2>
+      <div class="field">
+        <label>Название</label>
+        <input id="fTitle" placeholder="например: Операции Ф1 — токарка" />
+      </div>
+      <div class="field">
+        <label>Группа (необязательно)</label>
+        <input id="fGroup" list="groupList" placeholder="Форма 1 / Материалы / Прочее…" />
+        <datalist id="groupList"></datalist>
+      </div>
+      <div class="field">
+        <label>Текст для копирования</label>
+        <textarea id="fBody" placeholder="Вставь сюда то, что обычно копируешь из Excel…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="btnCancel">Отмена</button>
+        <button type="button" class="primary" id="btnSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = 'ops_clipboard_v1';
+    const $ = (id) => document.getElementById(id);
+
+    /** @type {{ id: string, title: string, group: string, body: string, updated: number }[]} */
+    let items = [];
+    let editId = null;
+
+    function uid() {
+      return 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          items = seedIfEmpty();
+          save();
+          return;
+        }
+        const data = JSON.parse(raw);
+        items = Array.isArray(data.items) ? data.items : [];
+        if (!items.length) {
+          items = seedIfEmpty();
+          save();
+        }
+      } catch {
+        items = seedIfEmpty();
+        save();
+      }
+    }
+
+    function seedIfEmpty() {
+      // Пустые примеры-заготовки — чтобы было понятно «куда что»
+      return [
+        {
+          id: uid(),
+          title: 'Пример: несколько операций (TSV как из Excel)',
+          group: 'Примеры',
+          body: 'Токарная обработка\t48\t0,8\nФрезерование\t72\t1,2\nКонтроль ОТК\t18\t0,3',
+          updated: Date.now(),
+        },
+        {
+          id: uid(),
+          title: 'Пример: одна строка',
+          group: 'Примеры',
+          body: 'Слесарная доводка',
+          updated: Date.now(),
+        },
+      ];
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, items }));
+    }
+
+    function toast(msg, ok) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (ok ? ' ok' : '');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => { el.className = 'toast'; }, 1800);
+    }
+
+    function groups() {
+      const s = new Set();
+      items.forEach((it) => {
+        const g = (it.group || '').trim();
+        if (g) s.add(g);
+      });
+      return [...s].sort((a, b) => a.localeCompare(b, 'ru'));
+    }
+
+    function refreshGroupUI() {
+      const gs = groups();
+      const sel = $('filterGroup');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Все группы</option>' +
+        gs.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+      if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+
+      $('groupList').innerHTML = gs.map((g) => `<option value="${esc(g)}"></option>`).join('');
+    }
+
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function filtered() {
+      const q = ($('search').value || '').trim().toLowerCase();
+      const g = $('filterGroup').value;
+      return items
+        .filter((it) => {
+          if (g && (it.group || '').trim() !== g) return false;
+          if (!q) return true;
+          const blob = `${it.title}\n${it.group}\n${it.body}`.toLowerCase();
+          return blob.includes(q);
+        })
+        .sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    }
+
+    function render() {
+      refreshGroupUI();
+      const list = $('list');
+      const rows = filtered();
+      if (!rows.length) {
+        list.innerHTML = `<div class="empty">Пока пусто или ничего не найдено.<br>Нажми «+ Добавить» и вставь то, что копируешь из Excel.</div>`;
+        return;
+      }
+      list.innerHTML = rows.map((it) => {
+        const preview = it.body.length > 800 ? it.body.slice(0, 800) + '…' : it.body;
+        const lines = (it.body.match(/\n/g) || []).length + 1;
+        const chars = it.body.length;
+        return `
+          <article class="card" data-id="${esc(it.id)}">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">${esc(it.title || 'Без названия')}</h3>
+                <div class="card-meta">
+                  ${it.group ? `<span class="tag">${esc(it.group)}</span>` : ''}
+                  ${lines} стр. · ${chars} симв.
+                  ${it.updated ? ' · ' + new Date(it.updated).toLocaleString('ru-RU') : ''}
+                </div>
+              </div>
+            </div>
+            <pre class="card-body">${esc(preview)}</pre>
+            <div class="card-actions">
+              <button type="button" class="ok" data-copy="${esc(it.id)}">📋 Копировать</button>
+              <button type="button" data-edit="${esc(it.id)}">Изменить</button>
+              <button type="button" class="danger" data-del="${esc(it.id)}">Удалить</button>
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          const ok = document.execCommand('copy');
+          ta.remove();
+          return ok;
+        } catch {
+          ta.remove();
+          return false;
+        }
+      }
+    }
+
+    function openModal(item) {
+      editId = item ? item.id : null;
+      $('modalTitle').textContent = item ? 'Изменить запись' : 'Новая запись';
+      $('fTitle').value = item ? item.title : '';
+      $('fGroup').value = item ? (item.group || '') : '';
+      $('fBody').value = item ? item.body : '';
+      $('modal').classList.add('open');
+      setTimeout(() => $('fTitle').focus(), 50);
+    }
+
+    function closeModal() {
+      $('modal').classList.remove('open');
+      editId = null;
+    }
+
+    function saveModal() {
+      const title = $('fTitle').value.trim() || 'Без названия';
+      const group = $('fGroup').value.trim();
+      const body = $('fBody').value;
+      if (!body.trim()) {
+        toast('Вставь текст для копирования');
+        $('fBody').focus();
+        return;
+      }
+      if (editId) {
+        const it = items.find((x) => x.id === editId);
+        if (it) {
+          it.title = title;
+          it.group = group;
+          it.body = body;
+          it.updated = Date.now();
+        }
+      } else {
+        items.push({ id: uid(), title, group, body, updated: Date.now() });
+      }
+      save();
+      closeModal();
+      render();
+      toast('Сохранено', true);
+    }
+
+    $('list').addEventListener('click', async (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      const copyId = t.getAttribute('data-copy');
+      const editIdBtn = t.getAttribute('data-edit');
+      const delId = t.getAttribute('data-del');
+      if (copyId) {
+        const it = items.find((x) => x.id === copyId);
+        if (!it) return;
+        const ok = await copyText(it.body);
+        toast(ok ? 'Скопировано — можно Ctrl+V куда нужно' : 'Не удалось скопировать', ok);
+        return;
+      }
+      if (editIdBtn) {
+        const it = items.find((x) => x.id === editIdBtn);
+        if (it) openModal(it);
+        return;
+      }
+      if (delId) {
+        const it = items.find((x) => x.id === delId);
+        if (!it) return;
+        if (!confirm(`Удалить «${it.title}»?`)) return;
+        items = items.filter((x) => x.id !== delId);
+        save();
+        render();
+        toast('Удалено');
+      }
+    });
+
+    $('btnAdd').onclick = () => openModal(null);
+    $('btnCancel').onclick = closeModal;
+    $('btnSave').onclick = saveModal;
+    $('modal').addEventListener('click', (e) => {
+      if (e.target === $('modal')) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('modal').classList.contains('open')) closeModal();
+    });
+
+    $('search').oninput = render;
+    $('filterGroup').onchange = render;
+    $('btnClearFilter').onclick = () => {
+      $('search').value = '';
+      $('filterGroup').value = '';
+      render();
+    };
+
+    $('btnExport').onclick = () => {
+      const blob = new Blob([JSON.stringify({ version: 1, items }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ops-clipboard-backup.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      toast('JSON скачан', true);
+    };
+
+    $('btnImport').onclick = () => $('importFile').click();
+    $('importFile').onchange = async () => {
+      const f = $('importFile').files && $('importFile').files[0];
+      $('importFile').value = '';
+      if (!f) return;
+      try {
+        const text = await f.text();
+        const data = JSON.parse(text);
+        const arr = Array.isArray(data) ? data : data.items;
+        if (!Array.isArray(arr)) throw new Error('bad format');
+        const mode = confirm('OK — добавить к текущим\nОтмена — заменить всё') ? 'merge' : 'replace';
+        const normalized = arr.map((x) => ({
+          id: x.id || uid(),
+          title: String(x.title || 'Без названия'),
+          group: String(x.group || ''),
+          body: String(x.body || ''),
+          updated: x.updated || Date.now(),
+        })).filter((x) => x.body);
+        if (mode === 'replace') items = normalized;
+        else {
+          const ids = new Set(items.map((i) => i.id));
+          normalized.forEach((n) => {
+            if (ids.has(n.id)) n.id = uid();
+            items.push(n);
+          });
+        }
+        save();
+        render();
+        toast('Импорт готов', true);
+      } catch {
+        toast('Не удалось прочитать JSON');
+      }
+    };
+
+    load();
+    render();
+  </script>
+</body>
+</html>
