@@ -555,17 +555,19 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: шапка ВЛЕВО — логотип + текст АО; «О запуске…» тоже слева */
-    .letter.rasp-doc { }
+    /* Распоряжение: логотип слева; текст ПОД логотипом, по центру относительно логотипа */
     .rasp-head {
       display: flex;
-      flex-direction: row;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: center; /* центр относительно логотипа */
       justify-content: flex-start;
-      text-align: left;
+      text-align: center;
       margin: 0 0 5mm;
-      gap: 4mm;
-      max-width: 95mm; /* левая часть листа, не на всю ширину */
+      gap: 2.5mm;
+      /* блок в левой части листа: ширина = логотип + небольшой запас под длинные строки */
+      width: max-content;
+      max-width: 72mm;
+      align-self: flex-start;
     }
     .rasp-logo {
       width: 16mm;
@@ -574,46 +576,60 @@
       object-fit: contain;
       display: block;
       flex-shrink: 0;
-      margin-top: 1mm;
     }
     .rasp-org {
-      text-align: left;
+      text-align: center;
       line-height: 1.2;
-      flex: 1 1 auto;
-      min-width: 0;
+      width: 100%;
     }
     .rasp-org .org-line {
       margin: 0;
-      font-size: 11pt;
+      font-size: 10.5pt;
       font-weight: 700;
       letter-spacing: 0.02em;
     }
     .rasp-org .org-line.small {
-      font-size: 11pt;
+      font-size: 10.5pt;
     }
     .rasp-org .doc-name {
-      margin: 8px 0 5px;
-      font-size: 13pt;
+      margin: 7px 0 4px;
+      font-size: 12.5pt;
       font-weight: 700;
       letter-spacing: 0.06em;
-      text-align: left;
+      text-align: center;
     }
     .rasp-org .doc-num {
       margin: 0;
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: 400;
       letter-spacing: 0.02em;
       white-space: nowrap;
-      text-align: left;
+      text-align: center;
     }
-    /* «О запуске…» — левая часть, не по центру */
+    /* «О запуске…» — под шапкой, по центру относительно того же блока (логотип) */
     .rasp-subject {
-      text-align: left;
+      text-align: center;
       font-weight: 700;
       font-size: 12pt;
-      margin: 6px 0 12px;
+      margin: 0 0 12px;
       line-height: 1.25;
-      max-width: 95mm;
+      width: max-content;
+      max-width: 72mm;
+      align-self: flex-start; /* блок слева на листе */
+    }
+    .letter.rasp-doc {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .letter.rasp-doc > .justify,
+    .letter.rasp-doc > .products,
+    .letter.rasp-doc > .word-sig,
+    .letter.rasp-doc > .word-sig-gap,
+    .letter.rasp-doc > .word-sig-spacer {
+      width: 100%;
+      max-width: none;
+      align-self: stretch;
     }
     /* Как в Word: одна строка «должность ……… ФИО» */
     .letter .word-sig {
