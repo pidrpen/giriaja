@@ -24,6 +24,15 @@ function hierarchyStyle(name) {
   return isChildName(name) ? 'data' : 'parent';
 }
 
+/** Материалы: подкраска только «Участок…» */
+function isMatSectionName(name) {
+  const t = String(name ?? '').trim();
+  return /^участок(?:\s|№|$)/i.test(t);
+}
+function matHierarchyStyle(name) {
+  return isMatSectionName(name) ? 'parent' : 'data';
+}
+
 function emptyCells(n) {
   return Array.from({ length: n }, () => '');
 }
@@ -113,7 +122,7 @@ function exportMatrixMat({ product, rows, sumQty, fioBpp }) {
     { cells: ['Итого', '', sumQty], style: 'total' },
     ...data.map((r) => ({
       cells: [r.name, r.unit, r.qty],
-      style: hierarchyStyle(r.name),
+      style: matHierarchyStyle(r.name),
     })),
     ...signatureRows(colCount, 'Начальник ТБПП', fioBpp),
   ];

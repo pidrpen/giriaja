@@ -364,14 +364,15 @@
       min-height: 297mm;
       background: #fff;
       box-shadow: 0 8px 28px rgba(20, 40, 70, .15);
-      padding: 12mm 12mm 14mm 15mm;
+      padding: 10mm 12mm 12mm 15mm;
       display: flex;
       flex-direction: column;
       color: #000;
       position: relative;
     }
     .page.has-footer {
-      padding-bottom: 18mm;
+      /* запас чтобы последняя строка не наехала на колонтитул (absolute bottom 6mm) */
+      padding-bottom: 12mm;
     }
     /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
     .page-body {
@@ -381,7 +382,7 @@
     /* Excel: подписи сразу под таблицей, с небольшим отступом */
     .page-signatures {
       flex: 0 0 auto;
-      margin-top: 8mm;
+      margin-top: 5mm;
       padding-top: 0;
       page-break-inside: avoid;
       break-inside: avoid;
@@ -417,17 +418,17 @@
 
     .doc-title {
       font-family: "Times New Roman", Times, serif;
-      font-size: 14pt;
+      font-size: 13pt;
       font-weight: 700;
       text-align: center;
-      margin: 0 0 6px;
-      line-height: 1.2;
+      margin: 0 0 3px;
+      line-height: 1.15;
     }
     .doc-title.big {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 14pt;
-      line-height: 1.15;
-      margin-bottom: 6px;
+      font-size: 13pt;
+      line-height: 1.12;
+      margin-bottom: 3px;
     }
     .doc-title.small {
       font-size: 11pt;
@@ -482,7 +483,7 @@
     }
     table.doc tr.alt td { background: var(--soft3); }
     table.doc tr.alt2 td { background: var(--soft2); }
-    /* Материалы: иерархия по «красной строке» (без ведущих пробелов) */
+    /* Материалы: подкраска только строк «Участок…» (row-parent) */
     table.doc tr.row-parent td { background: var(--soft2); }
     table.doc tr.row-child td { background: #ffffff; }
     table.doc tr.row-empty td { background: #ffffff; }
@@ -1247,7 +1248,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. Иерархия: строка без отступа (красная строка) — подкрашена; строки с пробелами в начале — белые. Колонтитул «Страница N из M».';
+        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. Подкраска только строк «Участок…»; остальное без заливки. Колонтитул «Страница N из M».';
         body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
@@ -1485,20 +1486,19 @@
       return m[state.current] || 'f1';
     }
 
-    /* ---------- иерархия «Материалы»: красная строка / отступ ---------- */
+    /* ---------- Материалы: подкраска только «Участок…» ---------- */
     /**
-     * Красная строка = текст начинается у левого края (без ведущих пробелов/табов).
-     * Вложенные позиции из 1С идут с несколькими пробелами/табом в начале —
-     * они без заливки; родительские (с красной строки) — подкрашены.
+     * Подкрашиваем только строки с «Участок» в начале названия.
+     * Остальные (номенклатура, полуфабрикаты) — без заливки.
+     * (раньше: все «красные строки» без отступа → parent → красилось почти всё)
      */
     function matRowClass(name) {
       const s = String(name ?? '');
       if (!s.trim()) return 'row-empty';
-      // ведущие пробелы, табы, неразрывные пробелы 1С
-      const m = s.match(/^[\s\u00a0\u2007\u202f\u3000]+/);
-      if (m && m[0].replace(/\t/g, '  ').length >= 2) return 'row-child';
-      if (m && m[0].includes('\t')) return 'row-child';
-      return 'row-parent';
+      const t = s.trim();
+      // без \b — кириллица; «Участок №31…», «Участок№31»
+      if (/^участок(?:\s|№|$)/i.test(t)) return 'row-parent';
+      return 'row-child';
     }
 
     function excelSignature(role, fio) {
@@ -1541,13 +1541,17 @@
       return out;
     }
 
-    /** Сколько строк данных на лист (A4); при компактных строках помещается больше */
+    /**
+     * Сколько строк данных на лист A4.
+     * Полезная высота ≈ 297 − поля − title − шапка+Итого − колонтитул → ~50–55 строк.
+     * Раньше 36–42 давали большую пустоту снизу до footer на каждом листе.
+     */
     function rowsPerPageFor(id) {
-      if (id === 'f3') return 36;
-      if (id === 'mat') return 40;
-      if (id === 'stat') return 22;
-      if (id === 'cmp') return 38;
-      return 42;
+      if (id === 'f3') return 50;
+      if (id === 'mat') return 52;
+      if (id === 'stat') return 28;
+      if (id === 'cmp') return 50;
+      return 54; // f1, f2
     }
 
     /* ---------- склонение «лист» и подсчёт листов для Комплекта ---------- */
@@ -2569,16 +2573,19 @@ ${sheets.join('\n')}
         { name: '9171 Термическая резка лазерная', qty: '18', min: '18', hour: '0,3' },
       ];
       state.mat = [
-        { name: 'Корпус УМ-450.12.010', unit: 'шт', qty: '1' },
-        { name: '    Лист Ст3сп 8×1500×6000', unit: 'кг', qty: '12,4' },
-        { name: '    Электрод УОНИ-13/55', unit: 'кг', qty: '0,8' },
-        { name: 'Вал УМ-450.12.020', unit: 'шт', qty: '1' },
-        { name: '    Круг ст.45 ⌀40', unit: 'кг', qty: '3,2' },
-        { name: '    Шпонка 10×8×40', unit: 'шт', qty: '2' },
+        { name: 'Участок №31 заготовительно-штамповочный', unit: '', qty: '' },
+        { name: 'Корпус 830М-10-010', unit: 'шт', qty: '1' },
+        { name: 'Лист Ст3сп 8×1500×6000', unit: 'кг', qty: '12,4' },
+        { name: 'Электрод УОНИ-13/55', unit: 'кг', qty: '0,8' },
+        { name: 'Участок №32 механической обработки и сборки', unit: '', qty: '' },
+        { name: 'Вал 830М-10-020', unit: 'шт', qty: '1' },
+        { name: 'Круг ст.45 ⌀40', unit: 'кг', qty: '3,2' },
+        { name: 'Шпонка 10×8×40', unit: 'шт', qty: '2' },
+        { name: 'Участок №33 сборочно-сварочный крупногабаритных узлов', unit: '', qty: '' },
         { name: 'Комплект крепежа', unit: 'компл', qty: '1' },
-        { name: '    Болт М10×30 ГОСТ 7798', unit: 'шт', qty: '16' },
-        { name: '    Гайка М10 ГОСТ 5915', unit: 'шт', qty: '16' },
-        { name: '    Шайба 10 ГОСТ 11371', unit: 'шт', qty: '16' },
+        { name: 'Болт М10×30 ГОСТ 7798', unit: 'шт', qty: '16' },
+        { name: 'Гайка М10 ГОСТ 5915', unit: 'шт', qty: '16' },
+        { name: 'Шайба 10 ГОСТ 11371', unit: 'шт', qty: '16' },
       ];
       state.statUnload = [
         { status: 'OK', section: 'Сборка', info: 'Спецификация загружена', qty: '42', total: '42' },
