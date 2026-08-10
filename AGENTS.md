@@ -188,7 +188,9 @@ exportAllDocs / exportCurrentDoc
 ---
 
 ## ops-clipboard.html (v2)
-Плитки на весь экран, одна строка операции (3124 Слесарная), клик = copy. localStorage ops_clipboard_v1.
+Плитки на весь экран, одна строка операции (код + имя), клик = copy.
+localStorage `ops_clipboard_v2`. SEED = шаблон операций из «шабло 1с.xlsx» (~47 шт).
+Кнопка «Шаблон 1С» — сброс к SEED.
 
 ## ocr-spec.html
 Скрин (Ctrl+V) → Tesseract.js rus+eng → таблица Обозначение | Наименование → Excel.

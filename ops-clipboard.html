@@ -381,6 +381,7 @@
       <button type="button" class="ghost" id="btnEditMode" title="Режим правки">Правка</button>
       <button type="button" class="ghost" id="btnExport" title="Экспорт JSON">Экспорт</button>
       <button type="button" class="ghost" id="btnImport" title="Импорт JSON">Импорт</button>
+      <button type="button" class="ghost" id="btnSeed" title="Загрузить шаблон операций из 1С">Шаблон 1С</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden />
     </div>
   </header>
@@ -399,7 +400,7 @@
     <div class="modal">
       <h2 id="modalTitle">Новая операция</h2>
       <label for="opText">Текст (копируется целиком)</label>
-      <input type="text" id="opText" maxlength="200" placeholder="напр. 3124 Слесарная" />
+      <input type="text" id="opText" maxlength="200" placeholder="напр. 0108 Слесарная" />
       <div class="modal-actions">
         <button type="button" class="ghost" id="modalCancel">Отмена</button>
         <button type="button" class="danger" id="modalDelete" style="display:none; margin-right:auto">Удалить</button>
@@ -418,13 +419,55 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'ops_clipboard_v1';
+  const STORAGE_KEY = 'ops_clipboard_v2';
   const SEED = [
-    '3124 Слесарная',
-    '3101 Токарная',
-    '3150 Контроль',
-    '3105 Фрезерная',
-    '3201 Сборка'
+    '0101 Разметка',
+    '0108 Слесарная',
+    '0109 Зачистка',
+    '0125 Промывка',
+    '0130 Очистка',
+    '0131 Очистка пескоструйная',
+    '0145 Изолирование, защита',
+    '0180 Маркирование',
+    '0190 Обезжиривание, обессмоливание',
+    '0196 Удаление изоляции',
+    '0405 Загрузка',
+    '0407 Выгрузка',
+    '2109 Вырубка',
+    '2129 Гибка',
+    '2142 Рельефная формовка',
+    '2170 Штамповка',
+    '4105 Резьбонарезная',
+    '4110 Токарная',
+    '4131 Круглошлифовальная',
+    '4132 Внутришлифовальная',
+    '4133 Плоскошлифовальная',
+    '4152 Зубодолбежная',
+    '4153 Зубофрезерная',
+    '4181 Горизонтально-протяжная',
+    '4210 Сверлильная',
+    '4212 Радиально-сверлильная',
+    '4221 Горизонтально-расточная',
+    '4222 Вертикально-расточная',
+    '4223 Координатно-расточная',
+    '4233 Токарная с ЧПУ',
+    '4234 Фрезерная с ЧПУ',
+    '4260 Фрезерная',
+    '4280 Отрезная',
+    '5000 Термическая обработка',
+    '5120 Диффузионное насыщение неметаллами',
+    '7310 Грунтование',
+    '7360 Окрашивание',
+    '7361 Окрашивание распылением пневматическим',
+    '7509 Профильно-вырезная электрофизическая электроэрозионная электроискровая проволочным электродом',
+    '8800 Сборка',
+    '8823 Запрессовывание',
+    '8842 Развальцовка',
+    '8846 Склеивание',
+    '9000 Сварка',
+    '9171 Термическая резка лазерная',
+    '9172 Термическая резка кислородная',
+    '9176 Термическая резка плазменно-дуговая',
   ];
 
   /** @type {{ id: string, text: string, order: number }[]} */
@@ -813,6 +856,17 @@
     } catch {
       alert('Не удалось прочитать JSON.');
     }
+  });
+
+
+  document.getElementById('btnSeed').addEventListener('click', () => {
+    if (items.length && !confirm('Заменить текущий список (' + items.length + ') шаблоном 1С (' + SEED.length + ' операций)?')) {
+      return;
+    }
+    items = SEED.map((text, i) => ({ id: uid(), text, order: i }));
+    save();
+    render();
+    showToast('Шаблон 1С: ' + items.length + ' операций');
   });
 
   load();
