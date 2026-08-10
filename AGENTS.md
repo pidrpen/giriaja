@@ -96,7 +96,9 @@ Pages (если включены): `https://pidrpen.github.io/giriaja/`
    - **f1/f2/f3** — образцы по эталонам 830М-10-сб1 (f3 — первые 3 изделия)  
 
 9. **Сохранение**  
-   - `localStorage` ключ `doc_templates_fill_v1` (включая `state.pack`)  
+   - Черновик: `localStorage` `doc_templates_fill_v1` (+ автосейв при вводе)  
+   - Библиотека снимков: `doc_templates_library_v1` (имя → JSON state, до 40 шт)  
+   - UI: «Локальные сохранения» — Сохранить / Быстро / Загрузить / JSON  
 
 ### Важные функции (ориентир по коду)
 ```
@@ -189,6 +191,7 @@ exportAllDocs / exportCurrentDoc
 
 ## ops-clipboard.html (v2)
 Плитки на весь экран, одна строка операции (код + имя), клик = copy.
+Перетаскивание удержанием всегда (не только «Правка»).
 localStorage `ops_clipboard_v2`. SEED = шаблон операций из «шабло 1с.xlsx» (~47 шт).
 Кнопка «Шаблон 1С» — сброс к SEED.
 

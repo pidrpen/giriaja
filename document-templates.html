@@ -621,6 +621,31 @@
         display: block;
       }
     }
+
+    .snap-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fafbfc;
+      margin-top: 6px;
+    }
+    .snap-box .snap-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+    .snap-box input[type="text"] {
+      flex: 1; min-width: 0; font-size: 12px; padding: 6px 8px;
+      border: 1px solid var(--line); border-radius: 6px; width: 100%;
+    }
+    .snap-list { max-height: 160px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+    .snap-item {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 4px; align-items: center;
+      padding: 5px 6px; border-radius: 6px; background: #fff; border: 1px solid var(--line); font-size: 11px;
+    }
+    .snap-item .snap-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--accent); }
+    .snap-item .snap-meta { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+    .snap-item button { padding: 3px 7px; font-size: 11px; }
+    .snap-status { font-size: 11px; color: var(--muted); min-height: 1.2em; margin-top: 4px; }
+    .snap-status.ok { color: #1a7f37; }
+    .snap-status.err { color: #b42318; }
+
   </style>
 </head>
 <body>
@@ -688,13 +713,30 @@
           <button type="button" class="ok" id="btnExportOne">⬇ Excel: текущий</button>
           <button type="button" class="ok" id="btnExportAll">⬇ Excel: комплект</button>
           <button type="button" id="btnSample">Образец данных</button>
-          <button type="button" id="btnSave">Сохранить в браузере</button>
-          <button type="button" id="btnLoad">Загрузить</button>
           <button type="button" class="danger" id="btnReset">Сброс</button>
         </div>
         <p class="note">Печать комплекта — выбор форм перед печатью. Excel: те же данные, что на печать + <b>поля A4 и колонтитулы</b> «… Страница &amp;P из &amp;N» на каждом листе (как в превью). Откройте файл → Разметка страницы / колонтитулы.</p>
       </div>
-    </aside>
+    
+      <div class="panel-section">
+        <h2>Локальные сохранения</h2>
+        <p class="note" style="margin-top:0">Черновик пишется в браузер автоматически. Именованные снимки — для быстрой загрузки вставленных данных.</p>
+        <div class="snap-box">
+          <div class="snap-row">
+            <input type="text" id="snapName" placeholder="Имя: 830М-10-сб1 …" maxlength="80" autocomplete="off" />
+          </div>
+          <div class="btn-row">
+            <button type="button" class="ok" id="btnSnapSave" title="Сохранить под именем">Сохранить</button>
+            <button type="button" id="btnSnapQuick" title="Быстрое сохранение">Быстро</button>
+            <button type="button" id="btnSnapExportFile" title="Скачать JSON">JSON ↓</button>
+            <button type="button" id="btnSnapImportFile" title="Загрузить JSON">JSON ↑</button>
+            <input type="file" id="snapImportInput" accept="application/json,.json" hidden />
+          </div>
+          <div class="snap-list" id="snapList" aria-label="Список сохранений"></div>
+          <div class="snap-status" id="snapStatus"></div>
+        </div>
+      </div>
+</aside>
 
     <main class="workspace">
       <div class="workspace-top no-print">
@@ -2768,31 +2810,227 @@ ${sheets.join('\n')}
         renderPackList();
       };
 
-      $('btnSave').onclick = saveState;
-      $('btnLoad').onclick = () => {
-        loadState();
-        normalizePack();
-        buildTabs();
-        renderPackList();
-        renderEditor();
-        renderPreview('screen');
-        alert('Данные загружены');
-      };
       $('btnReset').onclick = () => {
         if (!confirm('Сбросить все введённые данные?')) return;
         localStorage.removeItem(STORAGE_KEY);
         location.reload();
       };
+
+      (function bindSnapshots() {
+        const snapNameEl = $('snapName');
+        if (!snapNameEl) return;
+        if (!snapNameEl.value && state.product) snapNameEl.value = state.product;
+        const prodEl = $('product');
+        if (prodEl) {
+          prodEl.addEventListener('change', () => {
+            if (!snapNameEl.value.trim() && state.product) snapNameEl.value = state.product;
+          });
+        }
+        $('btnSnapSave').onclick = () => {
+          const name = (snapNameEl.value || '').trim() || defaultSnapName();
+          snapNameEl.value = name;
+          saveSnapshot(name);
+        };
+        $('btnSnapQuick').onclick = () => {
+          const name = (snapNameEl.value || '').trim() || 'Черновик';
+          snapNameEl.value = name;
+          saveSnapshot(name);
+        };
+        $('btnSnapExportFile').onclick = exportStateFile;
+        $('btnSnapImportFile').onclick = () => $('snapImportInput').click();
+        $('snapImportInput').onchange = async (e) => {
+          const f = e.target.files && e.target.files[0];
+          e.target.value = '';
+          if (!f) return;
+          try {
+            const text = await f.text();
+            const data = JSON.parse(text);
+            applyLoadedState(data.state || data);
+            const nm = data.name || f.name.replace(/\.json$/i, '') || defaultSnapName();
+            saveSnapshot(nm);
+            setSnapStatus('Загружено из файла: ' + nm, 'ok');
+          } catch (err) {
+            setSnapStatus('Не удалось прочитать JSON: ' + err.message, 'err');
+          }
+        };
+        document.addEventListener('input', (e) => {
+          if (!e.target || !e.target.closest) return;
+          if (!e.target.closest('.sidebar')) return;
+          scheduleDraftSave();
+        });
+        renderSnapList();
+      })();
     }
 
     const STORAGE_KEY = 'doc_templates_fill_v1';
+    const LIBRARY_KEY = 'doc_templates_library_v1';
+
+    function defaultSnapName() {
+      const p = (state.product || '').trim();
+      const d = new Date();
+      const ts = d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return p ? (p + ' · ' + ts) : ('Снимок ' + ts);
+    }
+
+    function setSnapStatus(msg, kind) {
+      const el = $('snapStatus');
+      if (!el) return;
+      el.textContent = msg || '';
+      el.className = 'snap-status' + (kind ? ' ' + kind : '');
+    }
+
+    function cloneState() {
+      return JSON.parse(JSON.stringify(state));
+    }
+
+    function readLibrary() {
+      try {
+        const raw = localStorage.getItem(LIBRARY_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function writeLibrary(list) {
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(list));
+    }
 
     function saveState() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        alert('Сохранено в браузере (localStorage)');
+        return true;
       } catch (e) {
-        alert('Не удалось сохранить: ' + e.message);
+        setSnapStatus('Не удалось сохранить черновик: ' + e.message, 'err');
+        return false;
+      }
+    }
+
+    function scheduleDraftSave() {
+      clearTimeout(window.__draftSaveTimer);
+      window.__draftSaveTimer = setTimeout(() => {
+        if (saveState()) {
+          const el = $('snapStatus');
+          if (el && (!el.textContent || el.textContent.startsWith('Черновик') || el.classList.contains('ok'))) {
+            setSnapStatus('Черновик автосохранён · ' + new Date().toLocaleTimeString('ru-RU'), 'ok');
+          }
+        }
+      }, 450);
+    }
+
+    function saveSnapshot(name) {
+      name = String(name || '').trim() || defaultSnapName();
+      try {
+        saveState();
+        const list = readLibrary();
+        const now = Date.now();
+        const existing = list.findIndex((s) => s.name === name);
+        const entry = {
+          id: existing >= 0 ? list[existing].id : ('snap_' + now.toString(36) + Math.random().toString(36).slice(2, 6)),
+          name,
+          savedAt: now,
+          product: state.product || '',
+          data: cloneState(),
+        };
+        if (existing >= 0) list[existing] = entry;
+        else list.unshift(entry);
+        while (list.length > 40) list.pop();
+        writeLibrary(list);
+        renderSnapList();
+        setSnapStatus('Сохранено: «' + name + '»', 'ok');
+        return true;
+      } catch (e) {
+        setSnapStatus('Ошибка сохранения: ' + e.message, 'err');
+        return false;
+      }
+    }
+
+    function applyLoadedState(data) {
+      if (!data || typeof data !== 'object') throw new Error('пустые данные');
+      Object.assign(state, data);
+      ['product','fioBtn','fioBpp','fioGi','orderDate'].forEach((k) => {
+        if ($(k)) $(k).value = state[k] ?? '';
+      });
+      normalizePack();
+      Object.keys(SCHEMAS).forEach((k) => {
+        if (!Array.isArray(state[k]) || !state[k].length) state[k] = [emptyRowFor(k)];
+      });
+      saveState();
+      buildTabs();
+      renderPackList();
+      renderEditor();
+      renderPreview('screen');
+    }
+
+    function loadSnapshot(id) {
+      const entry = readLibrary().find((s) => s.id === id);
+      if (!entry || !entry.data) {
+        setSnapStatus('Снимок не найден', 'err');
+        return;
+      }
+      try {
+        applyLoadedState(entry.data);
+        const nameEl = $('snapName');
+        if (nameEl) nameEl.value = entry.name || '';
+        setSnapStatus('Загружено: «' + entry.name + '»', 'ok');
+      } catch (e) {
+        setSnapStatus('Ошибка загрузки: ' + e.message, 'err');
+      }
+    }
+
+    function deleteSnapshot(id) {
+      writeLibrary(readLibrary().filter((s) => s.id !== id));
+      renderSnapList();
+      setSnapStatus('Удалено из библиотеки', 'ok');
+    }
+
+    function renderSnapList() {
+      const root = $('snapList');
+      if (!root) return;
+      const list = readLibrary().slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      if (!list.length) {
+        root.innerHTML = '<div class="note" style="margin:4px 0">Пока нет сохранений — вставьте данные из 1С и нажмите «Сохранить».</div>';
+        return;
+      }
+      root.innerHTML = list.map((s) => {
+        const when = s.savedAt ? new Date(s.savedAt).toLocaleString('ru-RU') : '';
+        const prod = s.product ? esc(s.product) : '—';
+        return '<div class="snap-item" data-id="' + esc(s.id) + '">'
+          + '<div class="snap-name" title="' + esc(s.name) + '">' + esc(s.name) + '</div>'
+          + '<button type="button" class="ok snap-load" data-id="' + esc(s.id) + '">Загрузить</button>'
+          + '<button type="button" class="danger snap-del" data-id="' + esc(s.id) + '">×</button>'
+          + '<div class="snap-meta">' + when + ' · изделие: ' + prod + '</div>'
+          + '</div>';
+      }).join('');
+      root.querySelectorAll('.snap-load').forEach((btn) => {
+        btn.onclick = () => loadSnapshot(btn.dataset.id);
+      });
+      root.querySelectorAll('.snap-del').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.dataset.id;
+          const entry = readLibrary().find((s) => s.id === id);
+          if (!entry) return;
+          if (!confirm('Удалить сохранение «' + entry.name + '»?')) return;
+          deleteSnapshot(id);
+        };
+      });
+    }
+
+    function exportStateFile() {
+      try {
+        const name = (($('snapName') && $('snapName').value) || state.product || 'doc-templates').trim();
+        const payload = { name, savedAt: Date.now(), product: state.product || '', state: cloneState() };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (name.replace(/[\\/:*?"<>|]+/g, '_') || 'doc-templates') + '.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setSnapStatus('JSON скачан', 'ok');
+      } catch (e) {
+        setSnapStatus('Экспорт не удался: ' + e.message, 'err');
       }
     }
 
@@ -2802,7 +3040,6 @@ ${sheets.join('\n')}
         if (!raw) return;
         const data = JSON.parse(raw);
         Object.assign(state, data);
-        // sync inputs
         ['product','fioBtn','fioBpp','fioGi','orderDate'].forEach((k) => {
           if ($(k)) $(k).value = state[k] ?? '';
         });
@@ -2810,6 +3047,7 @@ ${sheets.join('\n')}
         console.warn(e);
       }
     }
+
 
     /* ---------- вставка в ячейку таблицы как в Excel (из 1С) ---------- */
     document.addEventListener('paste', (e) => {
@@ -2847,6 +3085,7 @@ ${sheets.join('\n')}
       if (res.ok) {
         renderEditor();
         renderPreview();
+        if (typeof scheduleDraftSave === 'function') scheduleDraftSave();
         // фокус на первую ячейку
         const focus = document.querySelector(
           `table.editor[data-table="${tableKey}"] input[data-i="0"][data-k="${schema.keys[0]}"]`
