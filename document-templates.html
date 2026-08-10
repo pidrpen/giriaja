@@ -531,15 +531,16 @@
     .letter .center.bold { font-weight: 700; }
     .letter .justify { text-align: justify; margin: 0 0 10px; text-indent: 1.25cm; }
     .letter .justify.no-indent { text-indent: 0; }
-    /* Комплект: пункты БЕЗ нумерации (не ol/1.2.3.) */
+    /* Комплект: без цифр, но с тем же левым отступом, что был у <ol> (~1.4cm) */
     .letter .kit-items {
       margin: 8px 0 14px;
-      padding: 0;
+      padding: 0 0 0 1.4cm; /* как padding-left у нумерованного списка */
     }
     .letter .kit-items p {
       margin: 0 0 8px;
       text-align: justify;
       text-indent: 0;
+      padding: 0;
     }
     .letter h3 {
       margin: 0 0 4px;
@@ -554,58 +555,56 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип слева + шапка (как Word) */
-    .letter.rasp-doc {
-      /* поля ближе к docx: left ~30mm уже в .page padding; уплотняем top */
-    }
+    /* Распоряжение: логотип сверху по центру, под ним шапка АО → РАСПОРЯЖЕНИЕ → тема */
+    .letter.rasp-doc { }
     .rasp-head {
-      display: grid;
-      grid-template-columns: 32mm 1fr;
-      gap: 8mm;
-      align-items: start;
-      margin: 0 0 10mm;
-      min-height: 32mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: 0 0 6mm;
+      gap: 3mm;
     }
     .rasp-logo {
-      width: 30mm;
+      width: 18mm;
       height: auto;
-      max-height: 32mm;
+      max-height: 18mm;
       object-fit: contain;
       display: block;
     }
     .rasp-org {
       text-align: center;
       line-height: 1.2;
-      padding-top: 1mm;
+      width: 100%;
     }
     .rasp-org .org-line {
       margin: 0;
       font-size: 11pt;
       font-weight: 700;
-      text-transform: none;
       letter-spacing: 0.02em;
     }
     .rasp-org .org-line.small {
       font-size: 11pt;
     }
     .rasp-org .doc-name {
-      margin: 8px 0 6px;
+      margin: 10px 0 6px;
       font-size: 14pt;
       font-weight: 700;
       letter-spacing: 0.08em;
     }
     .rasp-org .doc-num {
-      margin: 0;
+      margin: 0 0 2px;
       font-size: 12pt;
       font-weight: 400;
       letter-spacing: 0.02em;
       white-space: nowrap;
     }
+    /* «О запуске…» — сразу под блоком РАСПОРЯЖЕНИЕ / № */
     .rasp-subject {
       text-align: center;
       font-weight: 700;
       font-size: 12pt;
-      margin: 0 0 12px;
+      margin: 8px 0 14px;
       line-height: 1.25;
     }
     /* Как в Word: одна строка «должность ……… ФИО» */
@@ -630,7 +629,7 @@
     }
     @media print {
       .rasp-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .rasp-logo { max-height: 34mm; width: 32mm; }
+      .rasp-logo { width: 18mm; max-height: 18mm; }
     }
 
     .hidden { display: none !important; }
