@@ -912,14 +912,38 @@
       return String(Math.round(n * 1000000) / 1000000).replace('.', ',');
     }
 
-    function sumField(rows, key) {
+    function sumField(rows, key, opts) {
       let s = 0, any = false;
+      const skip = opts && typeof opts.skip === 'function' ? opts.skip : null;
       for (const r of rows) {
+        if (skip && skip(r)) continue;
         const n = num(r[key]);
         if (n !== null) { s += n; any = true; }
       }
       if (!any) return '';
       return String(Math.round(s * 1000) / 1000).replace('.', ',');
+    }
+
+    /**
+     * Форма 2: строка-подытог участка/цеха (эталон (Форма 2).xlsx).
+     * Такие строки показываются, но в «Итого» НЕ входят — иначе двойной счёт.
+     * Операции с ведущим отступом («  …») — не участок.
+     * Без подкраски (в отличие от Материалов).
+     */
+    function isF2SectionRow(unit) {
+      const raw = String(unit ?? '');
+      if (/^[\s\u00a0\u2007\u202f\u3000\t]/.test(raw)) return false;
+      const t = raw.trim();
+      if (!t) return false;
+      // без \b — в JS граница слова не работает с кириллицей
+      if (/^участок(?:\s|№|$)/i.test(t)) return true;
+      if (/^цех(?:\s|№|$)/i.test(t)) return true;
+      return false;
+    }
+
+    /** Сумма Формы 2: только операции (листья), без строк участка/цеха */
+    function sumF2(rows, key) {
+      return sumField(rows, key, { skip: (r) => isF2SectionRow(r.unit) });
     }
 
     function productLabel(fallback = '(ввести номер изделия)') {
@@ -1189,8 +1213,8 @@
           + editorTableFromSchema('f1', state.f1);
       } else if (id === 'f2') {
         title.textContent = 'Форма 2 — подразделения / операции';
-        note.textContent = 'Столбцы: Подразделение/Операции | н.мин. | н.ч. Вставка из 1С — в поле выше или Ctrl+V в ячейку таблицы.';
-        body.innerHTML = pasteZoneHtml('f2', 'Цех 1 / Операция\t90\t1,5')
+        note.textContent = 'Столбцы: Подразделение/Операции | н.мин. | н.ч. Строки «Участок…» / «Цех…» — подытоги (видны в таблице), в «Итого» не входят. Подкраски нет. Вставка из 1С — в поле выше или Ctrl+V в ячейку.';
+        body.innerHTML = pasteZoneHtml('f2', 'Участок №31 …\t928,5\t15,475\n0108 Слесарная\t284,8\t4,7467')
           + editorTableFromSchema('f2', state.f2);
       } else if (id === 'f3') {
         title.textContent = 'Форма 3 — номенклатура / работы';
@@ -1590,8 +1614,9 @@
           tableClass: 'doc',
           colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
           thead: `<tr><th>Подразделение/Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
+          // без row-parent / подкраски — все строки одинаковые (эталон xlsx)
           dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.unit)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
-          total: `<tr class="total"><td>Итого</td><td class="num">${esc(sumField(rows,'min'))}</td><td class="num">${esc(sumField(rows,'hour'))}</td></tr>`,
+          total: `<tr class="total"><td>Итого</td><td class="num">${esc(sumF2(rows,'min'))}</td><td class="num">${esc(sumF2(rows,'hour'))}</td></tr>`,
           sigs: '',
         };
       }
@@ -2194,6 +2219,7 @@
       };
     }
     function exportMatrixF2({ product, rows, sumMin, sumHour }) {
+      // sumMin/sumHour уже без строк-участков (см. sumF2). Строки без style parent — без подкраски.
       return {
         sheetName: 'Форма2', colCount: 3, colWidths: [280, 70, 70],
         rows: [
@@ -2347,7 +2373,7 @@
       const p = productLabel();
       let matrix = null;
       if (id === 'f1') matrix = exportMatrixF1({ product: p, rows: state.f1, sumMin: sumField(state.f1, 'min'), sumHour: sumField(state.f1, 'hour') });
-      else if (id === 'f2') matrix = exportMatrixF2({ product: p, rows: state.f2, sumMin: sumField(state.f2, 'min'), sumHour: sumField(state.f2, 'hour') });
+      else if (id === 'f2') matrix = exportMatrixF2({ product: p, rows: state.f2, sumMin: sumF2(state.f2, 'min'), sumHour: sumF2(state.f2, 'hour') });
       else if (id === 'f3') matrix = exportMatrixF3({ product: p, rows: state.f3, sumMin: sumField(state.f3, 'min'), sumHour: sumField(state.f3, 'hour'), fioBtn: state.fioBtn });
       else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumQty: sumField(state.mat, 'qty'), fioBpp: state.fioBpp });
       else if (id === 'stat') matrix = exportMatrixStat({ product: p, unload: state.statUnload, sums: state.statSum, fioBtn: state.fioBtn, fioBpp: state.fioBpp });
@@ -2435,13 +2461,40 @@ ${sheets.join('\n')}
         { op: 'Контроль ОТК', min: '18', hour: '0,3' },
       ];
       state.f2 = [
-        { unit: 'Цех 1 — механообработка', min: '156', hour: '2,6' },
-        { unit: '  Токарный участок', min: '48', hour: '0,8' },
-        { unit: '  Фрезерный участок', min: '72', hour: '1,2' },
-        { unit: '  Сверлильный участок', min: '36', hour: '0,6' },
-        { unit: 'Цех 3 — сборка', min: '90', hour: '1,5' },
-        { unit: '  Слесарный участок', min: '54', hour: '0,9' },
-        { unit: '  Контроль', min: '36', hour: '0,6' },
+        { unit: 'Участок №31 заготовительно-штамповочный', min: '928,5', hour: '15,475' },
+        { unit: '0108 Слесарная', min: '284,8', hour: '4,7467' },
+        { unit: '0131 Очистка пескоструйная', min: '2,6', hour: '0,0433' },
+        { unit: '2129 Гибка', min: '462', hour: '7,7' },
+        { unit: '4280 Отрезная', min: '78,2', hour: '1,3033' },
+        { unit: '5000 Термическая обработка', min: '8', hour: '0,1333' },
+        { unit: '9171 Термическая резка лазерная', min: '92,9', hour: '1,5483' },
+        { unit: 'Участок №32 механической обработки и сборки', min: '2101,67', hour: '35,0278' },
+        { unit: '0101 Разметка', min: '40', hour: '0,6667' },
+        { unit: '0108 Слесарная', min: '67,5', hour: '1,125' },
+        { unit: '4110 Токарная', min: '515,32', hour: '8,5887' },
+        { unit: '4131 Круглошлифовальная', min: '33,11', hour: '0,5518' },
+        { unit: '4165 Шлицефрезерная', min: '175,74', hour: '2,929' },
+        { unit: '4210 Сверлильная', min: '156,9', hour: '2,615' },
+        { unit: '4233 Токарная с ЧПУ', min: '467,8', hour: '7,7967' },
+        { unit: '4260 Фрезерная', min: '645,3', hour: '10,755' },
+        { unit: 'Участок №33 сборочно-сварочный крупногабаритных узлов', min: '4841,9', hour: '80,6983' },
+        { unit: '0108 Слесарная', min: '663,9', hour: '11,065' },
+        { unit: '0675 Испытания на герметичность', min: '165', hour: '2,75' },
+        { unit: '8800 Сборка', min: '2264', hour: '37,7333' },
+        { unit: '9000 Сварка', min: '1744', hour: '29,0667' },
+        { unit: '9051 Дуговая сварка в смеси инертных и активных газов плавящимся электродом', min: '5', hour: '0,0833' },
+        { unit: 'Участок №44 трубогибочный', min: '1,8', hour: '0,03' },
+        { unit: '0109 Зачистка', min: '0,3', hour: '0,005' },
+        { unit: '2142 Рельефная формовка', min: '1', hour: '0,0167' },
+        { unit: '4280 Отрезная', min: '0,5', hour: '0,0083' },
+        { unit: 'Участок №45 узловой сборки', min: '30', hour: '0,5' },
+        { unit: '8846 Склеивание', min: '30', hour: '0,5' },
+        { unit: 'Участок №46 подготовки и окраски', min: '205', hour: '3,4167' },
+        { unit: '7360 Окрашивание', min: '205', hour: '3,4167' },
+        { unit: 'Участок №47 Монтажа РЭА и пошивки', min: '133,2', hour: '2,22' },
+        { unit: '0101 Разметка', min: '16', hour: '0,2667' },
+        { unit: '0104 Раскрой', min: '67,2', hour: '1,12' },
+        { unit: '8846 Склеивание', min: '50', hour: '0,8333' },
       ];
       state.f3 = [
         { name: 'УМ-450.12.001 Изделие', qty: '1', min: '246', hour: '4,1' },

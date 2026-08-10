@@ -1,6 +1,11 @@
 /**
  * SpreadsheetML export matrices for Форма 1 / Форма 2.
  * Matrix: { sheetName, colCount, colWidths, rows: [{ cells, style?, mergeAcross?, height? }] }
+ *
+ * Форма 2 (эталон (Форма 2).xlsx):
+ * - строки «Участок…» / «Цех…» — подытоги, видны в таблице
+ * - sumMin / sumHour считаются ТОЛЬКО по операциям (без участков), иначе двойной счёт
+ * - без style parent / подкраски
  */
 
 /**
@@ -39,6 +44,7 @@ function exportMatrixF1({ product, rows, sumMin, sumHour }) {
 
 /**
  * @param {{ product: string, rows: Array<{ unit: string, min: string|number, hour: string|number }>, sumMin: string|number, sumHour: string|number }} args
+ * sumMin/sumHour must already exclude section rows (Участок/Цех) — caller uses sumF2.
  */
 function exportMatrixF2({ product, rows, sumMin, sumHour }) {
   const colCount = 3;
@@ -58,6 +64,7 @@ function exportMatrixF2({ product, rows, sumMin, sumHour }) {
       cells: ['Итого', sumMin, sumHour],
       style: 'total',
     },
+    // always style 'data' — no parent highlight (unlike Материалы)
     ...rows.map((r) => ({
       cells: [r.unit, r.min, r.hour],
       style: 'data',
