@@ -520,21 +520,27 @@
     .sig-line .space { min-height: 14px; }
     .sig-line .fio { text-align: right; white-space: nowrap; }
 
-    /* Word-like docs — подписи как в исходном .docx */
+    /* Word-like docs — как бланк .docx */
     .letter {
       font-family: "Times New Roman", Times, serif;
       font-size: 12pt;
       line-height: 1.35;
     }
     .letter .right { text-align: right; margin: 0 0 2px; }
-    .letter .center { text-align: center; margin: 18px 0 18px; font-weight: 400; }
+    .letter .center { text-align: center; margin: 14px 0 12px; font-weight: 400; }
+    .letter .center.bold { font-weight: 700; }
     .letter .justify { text-align: justify; margin: 0 0 10px; text-indent: 1.25cm; }
     .letter .justify.no-indent { text-indent: 0; }
-    .letter ol {
-      margin: 0 0 12px;
-      padding-left: 1.4cm;
+    /* Комплект: пункты БЕЗ нумерации (не ol/1.2.3.) */
+    .letter .kit-items {
+      margin: 8px 0 14px;
+      padding: 0;
     }
-    .letter ol li { margin-bottom: 6px; text-align: justify; }
+    .letter .kit-items p {
+      margin: 0 0 8px;
+      text-align: justify;
+      text-indent: 0;
+    }
     .letter h3 {
       margin: 0 0 4px;
       font-size: 12pt;
@@ -542,12 +548,67 @@
       text-align: center;
     }
     .letter .products {
-      margin: 16px 0 24px;
+      margin: 14px 0 20px;
       white-space: pre-wrap;
-      text-align: left;
+      text-align: justify;
+      text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Как в Word: одна строка «должность ……… ФИО», выравнивание по ширине */
+    /* Распоряжение: логотип слева + шапка (как Word) */
+    .letter.rasp-doc {
+      /* поля ближе к docx: left ~30mm уже в .page padding; уплотняем top */
+    }
+    .rasp-head {
+      display: grid;
+      grid-template-columns: 32mm 1fr;
+      gap: 8mm;
+      align-items: start;
+      margin: 0 0 10mm;
+      min-height: 32mm;
+    }
+    .rasp-logo {
+      width: 30mm;
+      height: auto;
+      max-height: 32mm;
+      object-fit: contain;
+      display: block;
+    }
+    .rasp-org {
+      text-align: center;
+      line-height: 1.2;
+      padding-top: 1mm;
+    }
+    .rasp-org .org-line {
+      margin: 0;
+      font-size: 11pt;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0.02em;
+    }
+    .rasp-org .org-line.small {
+      font-size: 11pt;
+    }
+    .rasp-org .doc-name {
+      margin: 8px 0 6px;
+      font-size: 14pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .rasp-org .doc-num {
+      margin: 0;
+      font-size: 12pt;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .rasp-subject {
+      text-align: center;
+      font-weight: 700;
+      font-size: 12pt;
+      margin: 0 0 12px;
+      line-height: 1.25;
+    }
+    /* Как в Word: одна строка «должность ……… ФИО» */
     .letter .word-sig {
       display: flex;
       justify-content: space-between;
@@ -564,8 +625,12 @@
       margin: 0;
     }
     .letter .word-sig-spacer {
-      height: 4.5em;
+      height: 3.2em;
       margin: 0;
+    }
+    @media print {
+      .rasp-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .rasp-logo { max-height: 34mm; width: 32mm; }
     }
 
     .hidden { display: none !important; }
@@ -1771,17 +1836,17 @@
             <div class="letter">
               <p class="right">Акционерное общество</p>
               <p class="right">«Завод «Универсалмаш»</p>
-              <p class="center">Комплект документов на изделие ${esc(pp)}</p>
-              <p class="justify no-indent">
+              <p class="center bold">Комплект документов на изделие ${esc(pp)}</p>
+              <p class="justify">
                 В соответствии с п-п 2-2.9 Распоряжения ${esc(state.orderDate)} направляю на согласование комиссии следующий пакет документов на изделие ${esc(pp)}:
               </p>
-              <ol>
-                <li>Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${esc(naListah(pages.stat))} формата А4</li>
-                <li>Сводная ведомость нормативной трудоемкости операций на изделие ${esc(pp)} (Форма 1) ${esc(naListah(pages.f1))} формата А4</li>
-                <li>Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(pp)} (Форма 2) ${esc(naListah(pages.f2))} формата А4</li>
-                <li>Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(pp)} (Форма 3) ${esc(naListah(pages.f3))} формата А4</li>
-                <li>Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${esc(pp)} ${esc(naListah(pages.mat))} формата А4</li>
-              </ol>
+              <div class="kit-items">
+                <p>Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${esc(naListah(pages.stat))} формата А4</p>
+                <p>Сводная ведомость нормативной трудоемкости операций на изделие ${esc(pp)} (Форма 1) ${esc(naListah(pages.f1))} формата А4</p>
+                <p>Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(pp)} (Форма 2) ${esc(naListah(pages.f2))} формата А4</p>
+                <p>Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(pp)} (Форма 3) ${esc(naListah(pages.f3))} формата А4</p>
+                <p>Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${esc(pp)} ${esc(naListah(pages.mat))} формата А4</p>
+              </div>
               <div class="word-sig-spacer"></div>
               <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(state.fioGi)}</span></p>
             </div>`,
@@ -1794,22 +1859,37 @@
           paginate: false,
           footerBase: '',
           singleBody: `
-            <div class="letter">
-              <h3>О запуске в работу спецификаций<br>изделий в 1С-ERP</h3>
+            <div class="letter rasp-doc">
+              <div class="rasp-head">
+                <img class="rasp-logo" src="images/universalmash-logo.png" alt="АО Завод Универсалмаш" />
+                <div class="rasp-org">
+                  <p class="org-line">АКЦИОНЕРНОЕ ОБЩЕСТВО</p>
+                  <p class="org-line small">«ЗАВОД</p>
+                  <p class="org-line small">«УНИВЕРСАЛМАШ»</p>
+                  <p class="doc-name">РАСПОРЯЖЕНИЕ</p>
+                  <p class="doc-num">_______________&nbsp;&nbsp;№_______________</p>
+                </div>
+              </div>
+              <p class="rasp-subject">О запуске в работу спецификаций<br>изделий в 1С-ERP</p>
               <p class="justify">
                 На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${esc(state.orderDate)} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:
               </p>
               <div class="products">${esc(products)}</div>
-              <div class="word-sig-spacer" style="height:2em"></div>
+              <div class="word-sig-spacer"></div>
               <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">В.В. Романов</span></p>
-              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Заместитель директора по ВК и МТС</span><span class="fio">Е.В. Мазур</span></p>
-              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Заместитель директора по производству</span><span class="fio">С.В. Сухарев</span></p>
-              <div class="word-sig-gap"></div><div class="word-sig-gap"></div><div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">А.Г. Сыркина</span></p>
-              <div class="word-sig-gap"></div><div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(state.fioGi)}</span></p>
+              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap"></div>
+              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(state.fioGi || 'И.В. Мельников')}</span></p>
             </div>`,
           sigs: '',
         };
@@ -2401,12 +2481,13 @@
         96
       ).forEach((ln) => pushL(ln));
       rows.push({ cells: ['', ''], height: 8 });
+      // без нумерации пунктов (как в бланке / требование)
       [
-        `1. Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${ph('stat')} формата А4`,
-        `2. Сводная ведомость нормативной трудоемкости операций на изделие ${pp} (Форма 1) ${ph('f1')} формата А4`,
-        `3. Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${pp} (Форма 2) ${ph('f2')} формата А4`,
-        `4. Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${pp} (Форма 3) ${ph('f3')} формата А4`,
-        `5. Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${ph('mat')} формата А4`,
+        `Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${ph('stat')} формата А4`,
+        `Сводная ведомость нормативной трудоемкости операций на изделие ${pp} (Форма 1) ${ph('f1')} формата А4`,
+        `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${pp} (Форма 2) ${ph('f2')} формата А4`,
+        `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${pp} (Форма 3) ${ph('f3')} формата А4`,
+        `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${ph('mat')} формата А4`,
       ].forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
       rows.push({ cells: ['Главный инженер', fioGi || ''], style: 'sig', height: 16 });
@@ -2415,9 +2496,16 @@
 
     function exportMatrixRasp({ orderDate, productsText, fioGi }) {
       const rows = [];
-      const pushL = (t) => rows.push({ cells: [t, ''], style: 'letter', mergeAcross: 1, height: 15 });
-      rows.push({ cells: ['О запуске в работу спецификаций изделий в 1С-ERP', ''], style: 'title', mergeAcross: 1, height: 24 });
+      const pushL = (t, st, h) => rows.push({ cells: [t, ''], style: st || 'letter', mergeAcross: 1, height: h || 15 });
+      // Шапка (логотип в Excel не вставляем — текстовый бланк; в печати/превью HTML — logo)
+      pushL('АКЦИОНЕРНОЕ ОБЩЕСТВО', 'letter', 14);
+      pushL('«ЗАВОД «УНИВЕРСАЛМАШ»', 'letter', 14);
+      rows.push({ cells: ['', ''], height: 6 });
+      pushL('РАСПОРЯЖЕНИЕ', 'title', 20);
+      pushL('_______________  №_______________', 'letter', 16);
       rows.push({ cells: ['', ''], height: 10 });
+      pushL('О запуске в работу спецификаций изделий в 1С-ERP', 'title', 22);
+      rows.push({ cells: ['', ''], height: 8 });
       wrapLines(
         `На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${orderDate || ''} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:`,
         80
@@ -2432,7 +2520,7 @@
         ['Заместитель директора по ВК и МТС', 'Е.В. Мазур'],
         ['Заместитель директора по производству', 'С.В. Сухарев'],
         ['Заместитель директора по экономике и финансам', 'А.Г. Сыркина'],
-        ['Главный инженер', fioGi || ''],
+        ['Главный инженер', fioGi || 'И.В. Мельников'],
       ].forEach(([role, fio], i, arr) => {
         rows.push({ cells: [role, fio], style: 'sig', height: 16 });
         if (i < arr.length - 1) rows.push({ cells: ['', ''], height: 10 });
