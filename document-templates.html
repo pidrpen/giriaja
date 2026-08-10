@@ -1933,21 +1933,22 @@
       const anyIndent = list.some((r) => !matIsBlankRow(r) && leadingSpaceLevel(r.name) != null);
       if (anyIndent) return list;
 
-      // нет пробелов: parent + blank + children… (+ blank + …)
-      for (let i = 0; i < list.length; i++) {
-        if (matIsBlankRow(list[i])) continue;
-        // parent, если сразу после него (возможен только blank) есть blank, а потом данные
-        let j = i + 1;
-        if (j >= list.length || !matIsBlankRow(list[j])) continue;
-        // children after blank until next blank or next parent-with-blank
-        j++;
-        while (j < list.length && !matIsBlankRow(list[j])) {
-          // если эта строка сама parent (за ней blank) — стоп
-          if (j + 1 < list.length && matIsBlankRow(list[j + 1])) break;
-          const n = String(list[j].name ?? '').replace(/^\s+/, '');
-          if (n) list[j].name = '    ' + n;
-          j++;
+      // нет пробелов: узел + пустая + дети… (+ пустая + узел + пустая + дети…)
+      let i = 0;
+      while (i < list.length) {
+        if (matIsBlankRow(list[i])) { i++; continue; }
+        // parent, если следующая строка — пустой разделитель 1С
+        if (i + 1 < list.length && matIsBlankRow(list[i + 1])) {
+          let j = i + 2;
+          while (j < list.length && !matIsBlankRow(list[j])) {
+            const n = String(list[j].name ?? '').replace(/^\s+/, '');
+            if (n) list[j].name = '    ' + n;
+            j++;
+          }
+          i = j;
+          continue;
         }
+        i++;
       }
       return list;
     }
