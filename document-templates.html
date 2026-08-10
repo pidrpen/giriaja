@@ -1354,7 +1354,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. Подкраска только строк «Участок…»; остальное без заливки. Колонтитул «Страница N из M».';
+        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. «Итого» без суммы количества (разные ед. изм.). Подкраска только «Участок…». Колонтитул «Страница N из M».';
         body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
@@ -1783,7 +1783,7 @@
             const cls = matRowClass(r.name);
             return `<tr class="${cls}"><td class="pre">${esc(r.name)}</td><td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
           }),
-          total: `<tr class="total"><td>Итого</td><td></td><td class="num">${esc(sumField(rows,'qty'))}</td></tr>`,
+          total: `<tr class="total"><td>Итого</td><td></td><td class="num"></td></tr>`, // количество не суммируем (разные ед. изм.)
           sigs: excelSignature('Начальник ТБПП', state.fioBpp),
         };
       }
@@ -2402,7 +2402,7 @@
         rows: [
           { cells: [`Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${product}`], style: 'title', mergeAcross: 2, height: 32 },
           { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
-          { cells: ['Итого', '', sumQty], style: 'total', height: 16 },
+          { cells: ['Итого', '', sumQty != null && sumQty !== '' ? sumQty : ''], style: 'total', height: 16 },
           ...data.map((r) => ({ cells: [r.name, r.unit, r.qty], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
           { cells: ['', '', ''], height: 12 },
           { cells: ['Начальник ТБПП', '', fioBpp], style: 'sig', height: 16 },
@@ -2534,7 +2534,7 @@
       if (id === 'f1') matrix = exportMatrixF1({ product: p, rows: state.f1, sumMin: sumField(state.f1, 'min'), sumHour: sumField(state.f1, 'hour') });
       else if (id === 'f2') matrix = exportMatrixF2({ product: p, rows: state.f2, sumMin: sumF2(state.f2, 'min'), sumHour: sumF2(state.f2, 'hour') });
       else if (id === 'f3') matrix = exportMatrixF3({ product: p, rows: state.f3, sumMin: sumF3(state.f3, 'min'), sumHour: sumF3(state.f3, 'hour'), fioBtn: state.fioBtn });
-      else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumQty: sumField(state.mat, 'qty'), fioBpp: state.fioBpp });
+      else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumQty: '', fioBpp: state.fioBpp });
       else if (id === 'stat') matrix = exportMatrixStat({ product: p, unload: state.statUnload, sums: state.statSum, fioBtn: state.fioBtn, fioBpp: state.fioBpp });
       else if (id === 'cmp') matrix = exportMatrixCmp({ product: p, rows: state.cmp });
       else if (id === 'kit') {

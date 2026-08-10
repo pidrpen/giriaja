@@ -119,7 +119,7 @@ function exportMatrixMat({ product, rows, sumQty, fioBpp }) {
       style: 'hdr',
     },
     // IMMEDIATELY after header
-    { cells: ['Итого', '', sumQty], style: 'total' },
+    { cells: ['Итого', '', ''], style: 'total' }, // qty not summed (mixed units)
     ...data.map((r) => ({
       cells: [r.name, r.unit, r.qty],
       style: matHierarchyStyle(r.name),
