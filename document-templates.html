@@ -2,10 +2,39 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Заполнение шаблонов документов</title>
+  <script>
+    // Временный загрузчик: полный файл с коммита f895a6e (последний рабочий)
+    // + позже зальём фикс пустых строк
+    (async function () {
+      try {
+        const urls = [
+          'https://cdn.jsdelivr.net/gh/pidrpen/giriaja@f895a6e/document-templates.html',
+          'https://raw.githack.com/pidrpen/giriaja/f895a6e/document-templates.html',
+          'https://raw.githubusercontent.com/pidrpen/giriaja/f895a6e/document-templates.html'
+        ];
+        let html = null;
+        for (const u of urls) {
+          try {
+            const r = await fetch(u, { cache: 'no-store' });
+            if (r.ok) { html = await r.text(); break; }
+          } catch (e) {}
+        }
+        if (!html || html.length < 10000) {
+          document.body.innerHTML = '<p style="font:16px/1.4 system-ui;padding:24px">Не удалось загрузить шаблоны. Открой вручную:<br><a href="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@f895a6e/document-templates.html">рабочая версия</a></p>';
+          return;
+        }
+        // подмена относительных путей к картинкам на CDN
+        html = html.replace(/(src|href)=["']images\//g, '$1="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@f895a6e/images/');
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (e) {
+        document.body.innerHTML = '<p style="padding:24px">Ошибка: ' + e + '</p>';
+      }
+    })();
+  </script>
 </head>
-<body>
-<p>Восстановление файла… Если видите это больше 30 секунд — напишите, повторю пуш.</p>
-<script>setTimeout(function(){ location.reload(true); }, 15000);</script>
-</body>
+<body style="font:16px system-ui;padding:24px">Загрузка шаблонов…</body>
 </html>
