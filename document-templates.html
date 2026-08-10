@@ -1239,21 +1239,106 @@
     function looksLikeHeader(cells, schema) {
       const joined = cells.join(' ').toLowerCase();
       if (!joined.trim()) return false;
-      if (/^(итого|всего|total|sum)/i.test(cleanCell(cells[0]))) return false;
-      const headerHints = (schema.headers || []).join(' ').toLowerCase();
+      if (isTotalRow(cells) || isTitleNoiseRow(cells)) return false;
       let hits = 0;
       for (const h of schema.headers || []) {
         const part = h.toLowerCase().slice(0, 6);
         if (joined.includes(part)) hits++;
       }
-      // типичные слова шапки 1С
-      if (/наименование|операц|трудоем|количеств|подраздел|номенклатур|статус|раздел|ед\.?\s*изм/i.test(joined)) hits++;
-      return hits >= 1 && cells.every((c) => num(c) === null || /[а-яa-z]/i.test(c));
+      if (/наименование|операц|трудоем|количеств|подраздел|номенклатур|статус|раздел|ед\.?\s*изм|полуфабрик|старый код|новый код/i.test(joined)) hits++;
+      const mostlyText = cells.every((c) => {
+        const t = cleanCell(c).trim();
+        if (!t) return true;
+        return num(c) === null || /[а-яa-z]/i.test(t);
+      });
+      return hits >= 1 && mostlyText;
     }
 
     function isTotalRow(cells) {
       const a = cleanCell(cells[0] || '').trim().toLowerCase();
       return /^(итого|всего|total|сумма)\b/i.test(a);
+    }
+
+    function isTitleNoiseRow(cells) {
+      const a = cleanCell(cells[0] || '').trim();
+      if (!a) return false;
+      if (/^сводная\s+ведомость/i.test(a)) return true;
+      if (/^статистика\s+выгрузки/i.test(a)) return true;
+      if (/^сравнение\s+/i.test(a)) return true;
+      if (/^форма\s*[123]/i.test(a)) return true;
+      if (/^страница\s+\d+/i.test(a)) return true;
+      const nonEmpty = cells.filter((c) => cleanCell(c) !== '');
+      if (nonEmpty.length === 1 && a.length > 40 && num(a) === null && !/^\d{3,5}\s/.test(a)) {
+        if (/ведомост|спецификац|трудоемк|номенклатур|издели/i.test(a)) return true;
+      }
+      return false;
+    }
+
+    function isSkipDataRow(cells) {
+      if (!cells || !cells.some((c) => cleanCell(c) !== '')) return true;
+      if (isTotalRow(cells)) return true;
+      if (isTitleNoiseRow(cells)) return true;
+      return false;
+    }
+
+    function alignCellsToSchema(cells, schema) {
+      const keys = schema.keys || [];
+      let c = (cells || []).map((x) => (x == null ? '' : x));
+      while (c.length && cleanCell(c[0]) === '') c.shift();
+      while (c.length && cleanCell(c[c.length - 1]) === '') c.pop();
+      if (!c.length) return c;
+      if (c.length === keys.length) return c;
+
+      if (keys.length === 3 && keys[1] === 'min' && keys[2] === 'hour') {
+        if (c.length === 2) return [c[0], c[1], ''];
+        if (c.length === 1) return [c[0], '', ''];
+        if (c.length > 3) {
+          const text = c[0];
+          const nums = c.slice(1).filter((x) => num(x) !== null);
+          if (nums.length >= 2) return [text, nums[nums.length - 2], nums[nums.length - 1]];
+          if (nums.length === 1) return [text, nums[0], ''];
+          return c.slice(0, 3);
+        }
+      }
+
+      if (keys.length === 4 && keys[0] === 'name') {
+        if (c.length === 3) return [c[0], '', c[1], c[2]];
+        if (c.length === 2) return [c[0], '', c[1], ''];
+        if (c.length > 4) {
+          const text = c[0];
+          const nums = c.slice(1).filter((x) => num(x) !== null);
+          if (nums.length >= 3) return [text, nums[0], nums[1], nums[2]];
+          if (nums.length === 2) return [text, '', nums[0], nums[1]];
+          if (nums.length === 1) return [text, '', nums[0], ''];
+        }
+      }
+
+      if (keys.length === 3 && keys[1] === 'unit' && keys[2] === 'qty') {
+        if (c.length === 2) {
+          if (num(c[1]) !== null) return [c[0], '', c[1]];
+          return [c[0], c[1], ''];
+        }
+        if (c.length === 1) return [c[0], '', ''];
+        if (c.length > 3) return [c[0], c[1], c[c.length - 1]];
+      }
+
+      if (c.length > keys.length) return c.slice(0, keys.length);
+      while (c.length < keys.length) c.push('');
+      return c;
+    }
+
+    function pickClipboardPayload(cd) {
+      if (!cd) return '';
+      const text = cd.getData('text/plain') || cd.getData('text') || '';
+      const htm = cd.getData('text/html') || '';
+      const tabs = (text.match(/\t/g) || []).length;
+      const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+      if (tabs > 0 || lines.length > 1) {
+        if (tabs === 0 && lines.length <= 1 && htm && /<table[\s>]/i.test(htm)) return htm;
+        return text;
+      }
+      if (htm && /<table[\s>]/i.test(htm)) return htm;
+      return text || htm;
     }
 
     function mapHeaderToKeys(headerCells, schema) {
@@ -1294,9 +1379,8 @@
 
       const out = [];
       for (let i = start; i < grid.length; i++) {
-        const cells = grid[i];
-        if (isTotalRow(cells)) continue;
-        if (!cells.some((c) => cleanCell(c) !== '')) continue;
+        let cells = grid[i];
+        if (isSkipDataRow(cells)) continue;
 
         const row = emptyRowFor(tableKey);
         if (colMap) {
@@ -1305,13 +1389,12 @@
             if (k) row[k] = cell;
           });
         } else {
-          // позиционно: первые N столбцов = схема (как вставка в Excel с A1)
           const offset = options.startCol || 0;
+          let slice = alignCellsToSchema(cells.slice(offset), schema);
           keys.forEach((k, ki) => {
-            const cell = cells[ki + offset];
+            const cell = slice[ki];
             if (cell !== undefined) row[k] = cell;
           });
-          // если пришло больше столбцов, а startCol=0 и keys короче — уже записали
         }
 
         // нормализация чисел
@@ -1357,11 +1440,12 @@
         if (looksLikeHeader(g[0], schema)) g = g.slice(1);
 
         g.forEach((cells, li) => {
-          if (isTotalRow(cells)) return;
+          if (isSkipDataRow(cells)) return;
           const ri = startRow + li;
           while (rows.length <= ri) rows.push(emptyRowFor(tableKey));
-          cells.forEach((cell, ci) => {
-            const k = keys[startCol + ci];
+          const aligned = alignCellsToSchema(cells.slice(startCol), schema);
+          aligned.forEach((cell, ci) => {
+            const k = keys[ci];
             if (!k) return;
             let val = cell;
             if ((schema.numeric || []).includes(k)) val = normalizeNumericString(val);
@@ -1444,7 +1528,7 @@
 
       if (id === 'f1') {
         title.textContent = 'Форма 1 — операции';
-        note.textContent = 'Плоский список: Операции | н.мин. | н.ч. Все строки входят в «Итого». Если н.ч. пусто — из н.мин./60. Без иерархии и подкраски.';
+        note.textContent = 'Плоский список: Операции | н.мин. | н.ч. Вставка из 1С как у Ф2/Ф3 (Tab). Если н.ч. пусто — считается из н.мин./60. Все строки в «Итого».';
         body.innerHTML = pasteZoneHtml('f1', '0108 Слесарная\t1016,2\t16,9367\n8800 Сборка\t2264\t37,7333')
           + editorTableFromSchema('f1', state.f1);
       } else if (id === 'f2') {
@@ -1459,12 +1543,12 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Столбцы: Номенклатура | Ед. изм. | Количество. «Итого» без суммы количества (разные ед. изм.). Подкраска только «Участок…». Колонтитул «Страница N из M».';
+        note.textContent = 'Вставка из 1С как у Ф2/Ф3. «Участок…» без отступа, позиции с отступом. «Итого» без суммы кол-ва.';
         body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
         title.textContent = 'Статистика — две таблицы';
-        note.textContent = 'Вставляйте каждую таблицу отдельно (выгрузка / контрольные суммы).';
+        note.textContent = 'Две таблицы — вставляйте каждую отдельно (Ctrl+V). Шапка/Итого 1С отфильтруются, столбцы подгоняются как у Ф2/Ф3.';
         addBtn.classList.add('hidden');
         body.innerHTML = `
           <p class="note" style="margin:0 0 6px"><b>1) Статистика выгрузки</b></p>
@@ -1546,7 +1630,7 @@
         });
       } else if (id === 'cmp') {
         title.textContent = 'Сравнение спецификаций';
-        note.textContent = 'Пять столбцов: старый код | старое наим. | новый код | новое наим. | примечание.';
+        note.textContent = 'Пять столбцов: старый код | старое наим. | новый код | новое наим. | примечание. Вставка Ctrl+V из 1С — как у Ф2/Ф3.';
         body.innerHTML = pasteZoneHtml('cmp', 'A-1\tСтарое\tB-1\tНовое\tзамена')
           + editorTableFromSchema('cmp', state.cmp);
       }
@@ -1707,10 +1791,25 @@
       const s = String(name ?? '');
       if (!s.trim()) return 'row-empty';
       const t = s.trim();
-      // без \b — кириллица; «Участок №31…», «Участок№31»
       if (/^участок(?:\s|№|$)/i.test(t)) return 'row-parent';
       return 'row-child';
     }
+
+    function matHierarchyLevel(name) {
+      const t = String(name ?? '').trim();
+      if (!t) return 0;
+      if (/^участок(?:\s|№|$)/i.test(t)) return 0;
+      const sp = leadingSpaceLevel(name);
+      if (sp != null && sp >= 1) return Math.min(2, sp);
+      return 1;
+    }
+
+    function matHierRowClass(name) {
+      const t = String(name ?? '').trim();
+      if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
+      return 'hier-op row-child';
+    }
+
 
     function excelSignature(role, fio) {
       return `
@@ -1891,8 +1990,9 @@
           colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
           dataRows: rows.map((r) => {
-            const cls = matRowClass(r.name);
-            return `<tr class="${cls}"><td class="pre">${esc(r.name)}</td><td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
+            const lv = matHierarchyLevel(r.name);
+            const cls = matHierRowClass(r.name);
+            return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
           }),
           total: `<tr class="total"><td>Итого</td><td></td><td class="num"></td></tr>`, // количество не суммируем (разные ед. изм.)
           sigs: excelSignature('Начальник ТБПП', state.fioBpp),
@@ -2514,7 +2614,7 @@
           { cells: [`Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${product}`], style: 'title', mergeAcross: 2, height: 32 },
           { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
           { cells: ['Итого', '', sumQty != null && sumQty !== '' ? sumQty : ''], style: 'total', height: 16 },
-          ...data.map((r) => ({ cells: [r.name, r.unit, r.qty], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
+          ...data.map((r) => ({ cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
           { cells: ['', '', ''], height: 12 },
           { cells: ['Начальник ТБПП', '', fioBpp], style: 'sig', height: 16 },
         ],
@@ -3253,14 +3353,15 @@ ${sheets.join('\n')}
       if (!t || !t.matches || !t.matches('table.editor input')) return;
 
       const cd = e.clipboardData || window.clipboardData;
-      const text = cd.getData('text/plain') || cd.getData('text') || '';
-      const html = cd.getData('text/html') || '';
-      const multi = text.includes('\t') || text.includes('\n') || text.includes(';')
-        || (html && /<tr[\s>]/i.test(html));
+      const text = (cd && (cd.getData('text/plain') || cd.getData('text'))) || '';
+      const htm = (cd && cd.getData('text/html')) || '';
+      const multi = text.includes('	') || text.includes('
+') || text.includes(';')
+        || (htm && /<tr[\s>]/i.test(htm));
       if (!multi) return; // обычная вставка одного значения
 
       e.preventDefault();
-      const payload = (html && /<table[\s>]/i.test(html)) ? html : text;
+      const payload = pickClipboardPayload(cd) || text || htm;
       const tableKey = t.dataset.t || t.closest('table.editor')?.dataset.table || currentTableKey();
       const schema = SCHEMAS[tableKey];
       if (!schema) return;
