@@ -1849,9 +1849,25 @@
       const t = String(name ?? '').trim();
       if (lv === 0) {
         if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
-        return 'hier-product row-parent'; // сборка как «835-50-сб204 Бункер»
+        return 'hier-product row-parent';
       }
       return 'hier-op row-child';
+    }
+
+    /** Жёлтый только у узлов, под которыми есть вложенные (как 1С Excel) */
+    function matRowClassAt(rows, i) {
+      const name = rows[i]?.name;
+      const lv = matHierarchyLevel(name);
+      if (lv > 0) return 'hier-op row-child';
+      const t = String(name ?? '').trim();
+      if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
+      for (let j = i + 1; j < rows.length; j++) {
+        const n = rows[j]?.name;
+        if (!String(n ?? '').trim()) continue;
+        if (matHierarchyLevel(n) > lv) return 'hier-product row-parent';
+        break;
+      }
+      return 'hier-op'; // лист на корне — без жёлтого
     }
 
 
@@ -2033,9 +2049,9 @@
           tableClass: 'doc arial',
           colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
-          dataRows: rows.map((r) => {
+          dataRows: rows.map((r, i) => {
             const lv = matHierarchyLevel(r.name);
-            const cls = matHierRowClass(r.name);
+            const cls = matRowClassAt(rows, i);
             return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
           }),
           total: `<tr class="total"><td>Итого</td><td></td><td class="num"></td></tr>`, // количество не суммируем (разные ед. изм.)
