@@ -566,7 +566,7 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип + шапка слева; АО тусклое; «О запуске» слева под линией № */
+    /* Распоряжение: логотип + АО/завод (чёрный, мельче «РАСПОРЯЖЕНИЕ»); тема в 2 строки */
     .letter.rasp-doc {
       display: block;
     }
@@ -575,12 +575,12 @@
       flex-direction: column;
       align-items: center;
       text-align: center;
-      margin: 0 0 8mm;
+      margin: 0 0 6mm;
       gap: 1.5mm;
       width: 58mm;
       max-width: 100%;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
     }
     .rasp-logo {
       width: 16mm;
@@ -597,25 +597,25 @@
       box-sizing: border-box;
       padding: 0 1mm;
     }
-    /* АО / завод — тускло-серый, на ~2pt меньше основного */
+    /* АО / завод — чёрный, на ~2–3pt меньше «РАСПОРЯЖЕНИЕ» (11pt) */
     .rasp-org .org-line {
       margin: 0;
-      font-size: 8pt;
-      font-weight: 400;
-      color: #6a6a6a;
+      font-size: 9pt;
+      font-weight: 700;
+      color: #000;
       letter-spacing: 0.02em;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      word-break: normal;
+      overflow-wrap: normal;
     }
     .rasp-org .org-line.small {
-      font-size: 8pt;
-      color: #6a6a6a;
-      font-weight: 400;
+      font-size: 9pt;
+      color: #000;
+      font-weight: 700;
     }
     /* пустая строка над и под «РАСПОРЯЖЕНИЕ» */
     .rasp-org .doc-name {
-      margin: 1.15em 0; /* ≈ одна пустая строка сверху и снизу */
-      font-size: 13pt;
+      margin: 1.15em 0;
+      font-size: 12pt;
       font-weight: 700;
       color: #000;
       letter-spacing: 0.06em;
@@ -630,20 +630,26 @@
       white-space: normal;
       text-align: center;
     }
-    /* «О запуске…» — 2 строки, влево, сразу под линией № */
+    /* «О запуске…» — ровно 2 строки (перенос после «спецификаций»), влево, на всю ширину текста */
     .rasp-subject {
       text-align: left;
       font-weight: 700;
       font-size: 12pt;
       color: #000;
-      margin: 6px 0 0;
-      padding: 0 1mm;
+      margin: 8px 0 0;
+      padding: 0;
       line-height: 1.3;
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-      overflow-wrap: anywhere;
-      align-self: stretch;
+      width: auto;
+      max-width: none;
+      align-self: flex-start;
+      white-space: normal;
+    }
+    .rasp-subject .line1 {
+      white-space: nowrap; /* не рвать «О запуске в работу спецификаций» */
+      display: block;
+    }
+    .rasp-subject .line2 {
+      display: block;
     }
     /* Как в Word: одна строка «должность ……… ФИО» */
     .letter .word-sig {
@@ -1973,7 +1979,7 @@
                   <p class="doc-name">РАСПОРЯЖЕНИЕ</p>
                   <p class="doc-num">_______________&nbsp;&nbsp;№_______________</p>
                 </div>
-                <p class="rasp-subject">О запуске в работу спецификаций<br>изделий в 1С-ERP</p>
+                <p class="rasp-subject"><span class="line1">О запуске в работу спецификаций</span><span class="line2">изделий в 1С-ERP</span></p>
               </div>
               <p class="justify">
                 На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${esc(state.orderDate)} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:
