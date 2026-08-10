@@ -555,20 +555,21 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип слева; текст ПОД ним, ось совпадает с центром логотипа */
+    /* Распоряжение: колонка слева, логотип и текст по центру колонки — без transform, не вылезает */
+    .letter.rasp-doc {
+      display: block;
+    }
     .rasp-head {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
       text-align: center;
-      margin: 0 0 5mm;
-      gap: 2.5mm;
-      /* ширина колонки = логотип → align-items:center центрирует текст по логотипу */
-      width: 16mm;
-      align-self: flex-start;
-      /* чтобы длинные строки «АКЦИОНЕРНОЕ…» не обрезались и оставались по центру лого */
-      overflow: visible;
+      margin: 0 0 4mm;
+      gap: 2mm;
+      width: 55mm;          /* фиксированная колонка в левой части */
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;    /* не вылезать за рамку листа */
     }
     .rasp-logo {
       width: 16mm;
@@ -580,66 +581,47 @@
     }
     .rasp-org {
       text-align: center;
-      line-height: 1.2;
-      width: max-content;
-      max-width: 70mm;
-      /* расширяется в обе стороны от оси логотипа */
-      position: relative;
-      left: 50%;
-      transform: translateX(-50%);
+      line-height: 1.15;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0 1mm;
     }
     .rasp-org .org-line {
       margin: 0;
-      font-size: 10.5pt;
+      font-size: 10pt;
       font-weight: 700;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.01em;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
     .rasp-org .org-line.small {
-      font-size: 10.5pt;
+      font-size: 10pt;
     }
     .rasp-org .doc-name {
-      margin: 7px 0 4px;
-      font-size: 12.5pt;
+      margin: 6px 0 3px;
+      font-size: 12pt;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
       text-align: center;
     }
     .rasp-org .doc-num {
       margin: 0;
-      font-size: 11pt;
+      font-size: 10pt;
       font-weight: 400;
-      letter-spacing: 0.02em;
-      white-space: nowrap;
+      letter-spacing: 0;
+      white-space: normal;  /* не nowrap — иначе вылезает */
       text-align: center;
     }
-    /* «О запуске…» — под шапкой, по центру относительно того же блока (логотип) */
     .rasp-subject {
       text-align: center;
       font-weight: 700;
       font-size: 12pt;
       margin: 0 0 12px;
       line-height: 1.25;
-      /* та же ось, что у логотипа (левый край листа + 8mm = центр 16mm лого) */
-      width: max-content;
-      max-width: 70mm;
-      position: relative;
-      left: 8mm; /* центр лого 16mm */
-      transform: translateX(-50%);
-      align-self: flex-start;
-    }
-    .letter.rasp-doc {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .letter.rasp-doc > .justify,
-    .letter.rasp-doc > .products,
-    .letter.rasp-doc > .word-sig,
-    .letter.rasp-doc > .word-sig-gap,
-    .letter.rasp-doc > .word-sig-spacer {
-      width: 100%;
-      max-width: none;
-      align-self: stretch;
+      width: 55mm;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow-wrap: anywhere;
     }
     /* Как в Word: одна строка «должность ……… ФИО» */
     .letter .word-sig {
