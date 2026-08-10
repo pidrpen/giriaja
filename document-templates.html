@@ -1129,12 +1129,17 @@
      */
     function leadingSpaceLevel(text) {
       const s = String(text ?? '');
-      const m = s.match(/^[\s\u00a0\u2007\u202f\u3000]+/);
+      // 1С: пробелы, nbsp, tab в начале ячейки = уровень вложенности
+      const m = s.match(/^([\s\u00a0\u2007\u202f\u3000]+)/);
       if (!m) return null;
-      const n = m[0].replace(/\t/g, '  ').length;
+      let n = 0;
+      for (const ch of m[1]) {
+        if (ch === '\t') n += 4;
+        else n += 1;
+      }
+      if (n <= 0) return null;
       if (n >= 4) return 2;
-      if (n >= 1) return 1;
-      return 0;
+      return 1;
     }
 
     function f3HierarchyLevel(name) {
@@ -1284,11 +1289,22 @@
     function alignCellsToSchema(cells, schema) {
       const keys = schema.keys || [];
       let c = (cells || []).map((x) => (x == null ? '' : x));
-      while (c.length && cleanCell(c[0]) === '') c.shift();
-      while (c.length && cleanCell(c[c.length - 1]) === '') c.pop();
+      // срезать только ПОЛНОСТЬЮ пустые края (пробелы в name — иерархия, не трогаем)
+      while (c.length && String(c[0] ?? '').replace(/[\s\u00a0\u2007\u202f]/g, '') === '') c.shift();
+      while (c.length && String(c[c.length - 1] ?? '').replace(/[\s\u00a0\u2007\u202f]/g, '') === '') c.pop();
       if (!c.length) return c;
+
+      // Excel/1С: первая колонка — номер строки (22, 23, …)
+      if (c.length >= keys.length + 1) {
+        const a = cleanCell(c[0]).trim();
+        if (/^\d{1,5}$/.test(a) && num(c[1]) === null && cleanCell(c[1]).trim() !== '') {
+          c = c.slice(1);
+        }
+      }
+
       if (c.length === keys.length) return c;
 
+      // Ф1/Ф2: text + min (+ hour)
       if (keys.length === 3 && keys[1] === 'min' && keys[2] === 'hour') {
         if (c.length === 2) return [c[0], c[1], ''];
         if (c.length === 1) return [c[0], '', ''];
@@ -1301,6 +1317,7 @@
         }
       }
 
+      // Ф3
       if (keys.length === 4 && keys[0] === 'name') {
         if (c.length === 3) return [c[0], '', c[1], c[2]];
         if (c.length === 2) return [c[0], '', c[1], ''];
@@ -1313,13 +1330,29 @@
         }
       }
 
+      // Материалы: name | ед.изм | [пусто…] | qty  (часто 3–4 кол. из 1С)
       if (keys.length === 3 && keys[1] === 'unit' && keys[2] === 'qty') {
+        if (c.length === 1) return [c[0], '', ''];
         if (c.length === 2) {
+          // name + qty  или  name + unit
           if (num(c[1]) !== null) return [c[0], '', c[1]];
           return [c[0], c[1], ''];
         }
-        if (c.length === 1) return [c[0], '', ''];
-        if (c.length > 3) return [c[0], c[1], c[c.length - 1]];
+        if (c.length === 3) {
+          // name, unit, qty — классика
+          // но если c[1] число, а c[2] нет — name, qty, ?
+          if (num(c[1]) !== null && num(c[2]) === null) return [c[0], c[2], c[1]];
+          return [c[0], c[1], c[2]];
+        }
+        if (c.length >= 4) {
+          // name | unit | empty | qty  или name | unit | qty | extra
+          const text = c[0];
+          const unitCand = c[1];
+          const nums = c.slice(1).filter((x) => num(x) !== null);
+          const unit = (num(unitCand) === null) ? unitCand : '';
+          const qty = nums.length ? nums[nums.length - 1] : '';
+          return [text, unit, qty];
+        }
       }
 
       if (c.length > keys.length) return c.slice(0, keys.length);
@@ -1543,7 +1576,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Вставка из 1С как у Ф2/Ф3. «Участок…» без отступа, позиции с отступом. «Итого» без суммы кол-ва.';
+        note.textContent = 'Вставка из 1С/Excel: 3 столбца (номенклатура | ед. | кол-во). Иерархия по отступам в 1-й колонке (как в Excel). Сборка без отступа — жёлтая; вложенные — с отступом. «Итого» без суммы кол-ва.';
         body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
@@ -1795,18 +1828,29 @@
       return 'row-child';
     }
 
+    /**
+     * Материалы (эталон 1С→Excel): иерархия ТОЛЬКО по ведущим пробелам/табам.
+     * 0 = узел/сборка/участок без отступа (жёлтый), 1–2 = вложенные позиции.
+     * «Участок…» без отступа — level 0.
+     */
     function matHierarchyLevel(name) {
-      const t = String(name ?? '').trim();
-      if (!t) return 0;
-      if (/^участок(?:\s|№|$)/i.test(t)) return 0;
-      const sp = leadingSpaceLevel(name);
-      if (sp != null && sp >= 1) return Math.min(2, sp);
-      return 1;
+      const raw = String(name ?? '');
+      if (!raw.trim()) return 0;
+      const sp = leadingSpaceLevel(raw);
+      if (sp != null) {
+        if (sp >= 4) return 2;
+        if (sp >= 1) return 1;
+      }
+      return 0; // без отступа — родитель (сборка / участок / корень)
     }
 
     function matHierRowClass(name) {
+      const lv = matHierarchyLevel(name);
       const t = String(name ?? '').trim();
-      if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
+      if (lv === 0) {
+        if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
+        return 'hier-product row-parent'; // сборка как «835-50-сб204 Бункер»
+      }
       return 'hier-op row-child';
     }
 
