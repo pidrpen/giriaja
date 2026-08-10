@@ -555,27 +555,32 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип сверху по центру, под ним шапка АО → РАСПОРЯЖЕНИЕ → тема */
+    /* Распоряжение: шапка ВЛЕВО — логотип + текст АО; «О запуске…» тоже слева */
     .letter.rasp-doc { }
     .rasp-head {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      margin: 0 0 6mm;
-      gap: 3mm;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-start;
+      text-align: left;
+      margin: 0 0 5mm;
+      gap: 4mm;
+      max-width: 95mm; /* левая часть листа, не на всю ширину */
     }
     .rasp-logo {
-      width: 18mm;
+      width: 16mm;
       height: auto;
-      max-height: 18mm;
+      max-height: 16mm;
       object-fit: contain;
       display: block;
+      flex-shrink: 0;
+      margin-top: 1mm;
     }
     .rasp-org {
-      text-align: center;
+      text-align: left;
       line-height: 1.2;
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .rasp-org .org-line {
       margin: 0;
@@ -587,25 +592,28 @@
       font-size: 11pt;
     }
     .rasp-org .doc-name {
-      margin: 10px 0 6px;
-      font-size: 14pt;
+      margin: 8px 0 5px;
+      font-size: 13pt;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
+      text-align: left;
     }
     .rasp-org .doc-num {
-      margin: 0 0 2px;
+      margin: 0;
       font-size: 12pt;
       font-weight: 400;
       letter-spacing: 0.02em;
       white-space: nowrap;
+      text-align: left;
     }
-    /* «О запуске…» — сразу под блоком РАСПОРЯЖЕНИЕ / № */
+    /* «О запуске…» — левая часть, не по центру */
     .rasp-subject {
-      text-align: center;
+      text-align: left;
       font-weight: 700;
       font-size: 12pt;
-      margin: 8px 0 14px;
+      margin: 6px 0 12px;
       line-height: 1.25;
+      max-width: 95mm;
     }
     /* Как в Word: одна строка «должность ……… ФИО» */
     .letter .word-sig {
@@ -629,7 +637,7 @@
     }
     @media print {
       .rasp-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .rasp-logo { width: 18mm; max-height: 18mm; }
+      .rasp-logo { width: 16mm; max-height: 16mm; }
     }
 
     .hidden { display: none !important; }
