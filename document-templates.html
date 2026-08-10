@@ -1411,9 +1411,24 @@
       }
 
       const out = [];
+      // Материалы (1С): после узла-сборки идёт ПУСТАЯ строка — разделитель, её нельзя терять
+      const keepEmpty = (tableKey === 'mat');
       for (let i = start; i < grid.length; i++) {
         let cells = grid[i];
-        if (isSkipDataRow(cells)) continue;
+        const isEmptyLine = !cells || !cells.some((c) => {
+          // name с одними пробелами — не пустая (иерархия)
+          const s = String(c ?? '');
+          return s.replace(/[\s\u00a0\u2007\u202f]/g, '') !== '';
+        });
+
+        if (isEmptyLine) {
+          if (keepEmpty && out.length) {
+            // не копить пачку пустых в конце — только внутренние разделители
+            out.push(emptyRowFor(tableKey));
+          }
+          continue;
+        }
+        if (isTotalRow(cells) || isTitleNoiseRow(cells)) continue;
 
         const row = emptyRowFor(tableKey);
         if (colMap) {
@@ -1443,12 +1458,18 @@
           }
         }
 
-        // пустые строки-имена пропускаем, если все числовые пусты
         const hasText = keys.some((k) => !(schema.numeric || []).includes(k) && cleanCell(row[k]));
         const hasNum = (schema.numeric || []).some((k) => num(row[k]) !== null);
-        if (!hasText && !hasNum) continue;
+        if (!hasText && !hasNum) {
+          if (keepEmpty && out.length) out.push(emptyRowFor(tableKey));
+          continue;
+        }
 
         out.push(row);
+      }
+      // убрать хвостовые пустые
+      if (keepEmpty) {
+        while (out.length && keys.every((k) => !cleanCell(out[out.length - 1][k]))) out.pop();
       }
       return out;
     }
@@ -1576,7 +1597,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Вставка из 1С/Excel: 3 столбца (номенклатура | ед. | кол-во). Иерархия по отступам в 1-й колонке (как в Excel). Сборка без отступа — жёлтая; вложенные — с отступом. «Итого» без суммы кол-ва.';
+        note.textContent = 'Вставка из 1С: 3 столбца. После сборки 1С даёт пустую строку — сохраняем. Иерархия по отступам. Сборка с детьми — жёлтая. «Итого» без суммы кол-ва.';
         body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
@@ -1855,19 +1876,28 @@
     }
 
     /** Жёлтый только у узлов, под которыми есть вложенные (как 1С Excel) */
+    function matIsBlankRow(r) {
+      if (!r) return true;
+      const name = String(r.name ?? '');
+      const hasName = name.replace(/[\s\u00a0\u2007\u202f]/g, '') !== '';
+      return !hasName && num(r.qty) === null && !String(r.unit ?? '').trim();
+    }
+
     function matRowClassAt(rows, i) {
+      if (matIsBlankRow(rows[i])) return 'row-empty';
       const name = rows[i]?.name;
       const lv = matHierarchyLevel(name);
       if (lv > 0) return 'hier-op row-child';
       const t = String(name ?? '').trim();
       if (/^участок(?:\s|№|$)/i.test(t)) return 'hier-section row-parent';
+      // 1С: после сборки часто ПУСТАЯ строка, потом дети с отступом
       for (let j = i + 1; j < rows.length; j++) {
+        if (matIsBlankRow(rows[j])) continue;
         const n = rows[j]?.name;
-        if (!String(n ?? '').trim()) continue;
         if (matHierarchyLevel(n) > lv) return 'hier-product row-parent';
         break;
       }
-      return 'hier-op'; // лист на корне — без жёлтого
+      return 'hier-op';
     }
 
 
@@ -2050,6 +2080,9 @@
           colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
           dataRows: rows.map((r, i) => {
+            if (matIsBlankRow(r)) {
+              return `<tr class="row-empty"><td class="pre">&nbsp;</td><td class="num"></td><td class="num"></td></tr>`;
+            }
             const lv = matHierarchyLevel(r.name);
             const cls = matRowClassAt(rows, i);
             return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
@@ -2674,7 +2707,11 @@
           { cells: [`Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${product}`], style: 'title', mergeAcross: 2, height: 32 },
           { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
           { cells: ['Итого', '', sumQty != null && sumQty !== '' ? sumQty : ''], style: 'total', height: 16 },
-          ...data.map((r) => ({ cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: matRowClass(r.name) === 'row-parent' ? 'parent' : 'data', height: 14 })),
+          ...data.map((r, i) => {
+            if (matIsBlankRow(r)) return { cells: ['', '', ''], style: 'data', height: 10 };
+            const st = matRowClassAt(data, i).includes('parent') ? 'parent' : 'data';
+            return { cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: st, height: 14 };
+          }),
           { cells: ['', '', ''], height: 12 },
           { cells: ['Начальник ТБПП', '', fioBpp], style: 'sig', height: 16 },
         ],
