@@ -1199,43 +1199,62 @@
     }
 
     /* ---------- парсинг буфера 1С / Excel ---------- */
+    function isEmptyGridRow(row) {
+      if (!row || !row.length) return true;
+      return !row.some((c) => String(c ?? '').replace(/[\s\u00a0\u2007\u202f]/g, '') !== '');
+    }
+
     function parseGridText(text) {
       let raw = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      // HTML-таблица из 1С (иногда в text/html, иногда в text)
       if (/<table[\s>]/i.test(raw) || /<tr[\s>]/i.test(raw)) {
         return parseHtmlTable(raw);
       }
       const lines = raw.split('\n');
-      // убрать хвостовые пустые
-      while (lines.length && !cleanCell(lines[lines.length - 1])) lines.pop();
       if (!lines.length) return [];
 
-      // определить разделитель: таб (Excel/1С), ; (csv), | 
-      const sample = lines.slice(0, Math.min(8, lines.length)).join('\n');
+      // sample for delimiter: skip pure-empty lines
+      const sampleLines = lines.filter((l) => l.replace(/[\s\t]/g, '') !== '').slice(0, 8);
+      const sample = sampleLines.join('\n');
       let delim = '\t';
       const tabCount = (sample.match(/\t/g) || []).length;
       const semiCount = (sample.match(/;/g) || []).length;
       const pipeCount = (sample.match(/\|/g) || []).length;
       if (tabCount === 0 && semiCount > 0) delim = ';';
       else if (tabCount === 0 && pipeCount > 0 && pipeCount >= semiCount) delim = '|';
-      else if (tabCount === 0 && semiCount === 0) {
-        // несколько пробелов подряд (редко) — не трогаем, одна колонка
-        delim = null;
-      }
+      else if (tabCount === 0 && semiCount === 0) delim = null;
 
-      return lines.map((line) => {
+      const rows = lines.map((line) => {
+        // полностью пустая / только табы — маркер пустой строки 1С (разделитель иерархии)
+        if (line === '' || /^[\t ;|]*$/.test(line)) return [];
         if (delim === null) return [cleanCell(line)];
         return line.split(delim).map(cleanCell);
-      }).filter((row) => row.some((c) => c !== ''));
+      });
+
+      // убрать только ведущие/хвостовые пустые; ВНУТРЕННИЕ пустые — оставить (материалы 1С)
+      while (rows.length && isEmptyGridRow(rows[0])) rows.shift();
+      while (rows.length && isEmptyGridRow(rows[rows.length - 1])) rows.pop();
+      return rows;
     }
 
     function parseHtmlTable(html) {
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        const rows = [...doc.querySelectorAll('tr')];
-        return rows.map((tr) =>
-          [...tr.querySelectorAll('th,td')].map((td) => cleanCell(td.innerText || td.textContent))
-        ).filter((r) => r.some((c) => c !== ''));
+        const rows = [...doc.querySelectorAll('tr')].map((tr) => {
+          const cells = [...tr.querySelectorAll('th,td')].map((td) => {
+            // textContent лучше сохраняет nbsp; плюс padding-left из 1С → пробелы
+            let t = td.textContent || td.innerText || '';
+            const pad = parseInt(td.style && td.style.paddingLeft, 10);
+            if (pad && pad >= 8 && !/^[\s ]/.test(t)) {
+              const level = Math.min(2, Math.floor(pad / 12));
+              t = '    '.repeat(Math.max(1, level)) + t.replace(/^\s+/, '');
+            }
+            return cleanCell(t);
+          });
+          return cells;
+        });
+        while (rows.length && isEmptyGridRow(rows[0])) rows.shift();
+        while (rows.length && isEmptyGridRow(rows[rows.length - 1])) rows.pop();
+        return rows;
       } catch {
         return [];
       }
@@ -1415,11 +1434,7 @@
       const keepEmpty = (tableKey === 'mat');
       for (let i = start; i < grid.length; i++) {
         let cells = grid[i];
-        const isEmptyLine = !cells || !cells.some((c) => {
-          // name с одними пробелами — не пустая (иерархия)
-          const s = String(c ?? '');
-          return s.replace(/[\s\u00a0\u2007\u202f]/g, '') !== '';
-        });
+        const isEmptyLine = isEmptyGridRow(cells);
 
         if (isEmptyLine) {
           if (keepEmpty && out.length) {
@@ -1470,6 +1485,7 @@
       // убрать хвостовые пустые
       if (keepEmpty) {
         while (out.length && keys.every((k) => !cleanCell(out[out.length - 1][k]))) out.pop();
+        return normalizeMatHierarchy(out);
       }
       return out;
     }
@@ -1519,7 +1535,13 @@
       const parsed = gridToRows(grid, tableKey, { startCol: 0 });
       if (!parsed.length) return { ok: false, msg: 'Не удалось разобрать строки (проверьте столбцы)' };
       state[tableKey] = parsed;
-      return { ok: true, msg: `Загружено строк: ${parsed.length}` };
+      let msg = `Загружено строк: ${parsed.length}`;
+      if (tableKey === 'mat') {
+        const blanks = parsed.filter((r) => matIsBlankRow(r)).length;
+        const ind = parsed.filter((r) => !matIsBlankRow(r) && leadingSpaceLevel(r.name) != null).length;
+        msg += ` (пустых-разделителей: ${blanks}, с отступом: ${ind})`;
+      }
+      return { ok: true, msg };
     }
 
     /* ---------- tabs ---------- */
@@ -1899,6 +1921,37 @@
       }
       return 'hier-op';
     }
+
+    /**
+     * 1С Материалы: после узла (сборки) — пустая строка, затем вложенные.
+     * Если пробелы в имени сохранились — используем их.
+     * Если 1С/буфер срезал отступы — восстанавливаем по пустым разделителям.
+     */
+    function normalizeMatHierarchy(rows) {
+      if (!Array.isArray(rows) || !rows.length) return rows || [];
+      const list = rows.map((r) => ({ name: r.name ?? '', unit: r.unit ?? '', qty: r.qty ?? '' }));
+      const anyIndent = list.some((r) => !matIsBlankRow(r) && leadingSpaceLevel(r.name) != null);
+      if (anyIndent) return list;
+
+      // нет пробелов: parent + blank + children… (+ blank + …)
+      for (let i = 0; i < list.length; i++) {
+        if (matIsBlankRow(list[i])) continue;
+        // parent, если сразу после него (возможен только blank) есть blank, а потом данные
+        let j = i + 1;
+        if (j >= list.length || !matIsBlankRow(list[j])) continue;
+        // children after blank until next blank or next parent-with-blank
+        j++;
+        while (j < list.length && !matIsBlankRow(list[j])) {
+          // если эта строка сама parent (за ней blank) — стоп
+          if (j + 1 < list.length && matIsBlankRow(list[j + 1])) break;
+          const n = String(list[j].name ?? '').replace(/^\s+/, '');
+          if (n) list[j].name = '    ' + n;
+          j++;
+        }
+      }
+      return list;
+    }
+
 
 
     function excelSignature(role, fio) {
