@@ -3355,9 +3355,8 @@ ${sheets.join('\n')}
       const cd = e.clipboardData || window.clipboardData;
       const text = (cd && (cd.getData('text/plain') || cd.getData('text'))) || '';
       const htm = (cd && cd.getData('text/html')) || '';
-      const multi = text.includes('	') || text.includes('
-') || text.includes(';')
-        || (htm && /<tr[\s>]/i.test(htm));
+      const multi = text.includes('\t') || text.includes('\n') || text.includes(';')
+        || (htm && /<tr[\s>]*/i.test(htm));
       if (!multi) return; // обычная вставка одного значения
 
       e.preventDefault();
