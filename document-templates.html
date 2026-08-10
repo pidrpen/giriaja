@@ -487,12 +487,23 @@
     table.doc tr.row-parent td { background: var(--soft2); }
     table.doc tr.row-child td { background: #ffffff; }
     table.doc tr.row-empty td { background: #ffffff; }
-    /* многострочный текст: высота = по содержимому, отступы 1С сохраняются */
+    /* многострочный текст */
     table.doc td.pre {
       white-space: pre-wrap;
       word-break: break-word;
       overflow-wrap: anywhere;
       line-height: 1.12;
+    }
+    /* Ф2/Ф3: уровни иерархии (изделие → участок → операция) — видно без пробелов из 1С */
+    table.doc td.ind-0 { padding-left: 4px !important; }
+    table.doc td.ind-1 { padding-left: 1.5em !important; }
+    table.doc td.ind-2 { padding-left: 3em !important; }
+    table.doc tr.hier-product td { background: #f7f0d4; }
+    table.doc tr.hier-section td { background: #faf6e6; }
+    table.doc tr.hier-op td { background: #ffffff; }
+    table.editor input.col-hier {
+      white-space: pre-wrap;
+      font-family: "Times New Roman", Times, serif;
     }
     table.doc.arial { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; }
     table.doc.compact { font-size: 9pt; }
@@ -1104,6 +1115,64 @@
       return sumField(rows, key, { skip: (r) => !isF3OperationRow(r.name) });
     }
 
+    /**
+     * Иерархия Ф2/Ф3: отступы для видимости «что куда входит».
+     * 1С/телефон часто присылают текст БЕЗ ведущих пробелов — тогда
+     * уровень вычисляем по типу строки (код операции / «Участок» / изделие).
+     * 0 = изделие, 1 = участок, 2 = операция
+     */
+    function leadingSpaceLevel(text) {
+      const s = String(text ?? '');
+      const m = s.match(/^[\s\u00a0\u2007\u202f\u3000]+/);
+      if (!m) return null;
+      const n = m[0].replace(/\t/g, '  ').length;
+      if (n >= 4) return 2;
+      if (n >= 1) return 1;
+      return 0;
+    }
+
+    function f3HierarchyLevel(name) {
+      // сначала тип строки (код операции / участок / изделие) — надёжнее пробелов 1С
+      const t = String(name ?? '').trim();
+      if (!t) return 0;
+      if (isF3OperationRow(name)) return 2;
+      if (isF3SectionRow(name) || /^участок(?:\s|№|$)/i.test(t) || /^цех(?:\s|№|$)/i.test(t)) return 1;
+      // если 1С прислал только отступы без кода — fallback
+      const sp = leadingSpaceLevel(name);
+      if (sp != null) return Math.min(2, sp);
+      return 0;
+    }
+
+    function f2HierarchyLevel(unit) {
+      if (isF2SectionRow(unit)) return 0;
+      // операция; пробелы 1С только усиливают, не понижают
+      return 1;
+    }
+
+    function hierLabelHtml(text, level) {
+      const show = String(text ?? '').replace(/^\s+/, '');
+      const lv = Math.max(0, Math.min(2, Number(level) || 0));
+      return '<td class="pre ind-' + lv + '">' + esc(show) + '</td>';
+    }
+
+    function f3RowClass(name) {
+      const lv = f3HierarchyLevel(name);
+      if (lv === 0) return 'hier-product';
+      if (lv === 1) return 'hier-section';
+      return 'hier-op';
+    }
+
+    function f2RowClass(unit) {
+      return isF2SectionRow(unit) ? 'hier-section' : 'hier-op';
+    }
+
+    function hierExcelText(text, level) {
+      const show = String(text ?? '').replace(/^\s+/, '');
+      const lv = Math.max(0, Math.min(2, Number(level) || 0));
+      if (!show) return '';
+      return ('  '.repeat(lv)) + show;
+    }
+
     function productLabel(fallback = '(ввести номер изделия)') {
       return state.product.trim() || fallback;
     }
@@ -1349,7 +1418,10 @@
 
     function inputCell(i, key, val, tableKey, isNum) {
       const tAttr = tableKey ? ` data-t="${tableKey}"` : '';
-      const cls = isNum ? ' class="col-num"' : '';
+      const hier = (tableKey === 'f2' && key === 'unit') || (tableKey === 'f3' && key === 'name') || (tableKey === 'mat' && key === 'name');
+      let cls = '';
+      if (isNum) cls = ' class="col-num"';
+      else if (hier) cls = ' class="col-hier"';
       return `<td><input${cls} data-i="${i}" data-k="${key}"${tAttr} value="${esc(val)}" autocomplete="off" /></td>`;
     }
 
@@ -1371,12 +1443,12 @@
           + editorTableFromSchema('f1', state.f1);
       } else if (id === 'f2') {
         title.textContent = 'Форма 2 — подразделения / операции';
-        note.textContent = 'Столбцы: Подразделение/Операции | н.мин. | н.ч. Строки «Участок…» / «Цех…» — подытоги (видны в таблице), в «Итого» не входят. Подкраски нет. Вставка из 1С — в поле выше или Ctrl+V в ячейку.';
+        note.textContent = 'Столбцы: Подразделение/Операции | н.мин. | н.ч. «Участок…»/«Цех…» без отступа, операции с отступом (даже если 1С не прислал пробелы). Участки в «Итого» не входят.';
         body.innerHTML = pasteZoneHtml('f2', 'Участок №31 …\t928,5\t15,475\n0108 Слесарная\t284,8\t4,7467')
           + editorTableFromSchema('f2', state.f2);
       } else if (id === 'f3') {
         title.textContent = 'Форма 3 — номенклатура / работы';
-        note.textContent = 'Иерархия: изделие → участок → операция (код «0108 …»). В «Итого» только операции; изделия и участки — подытоги. Кол-во: шт для изделий/участков, н.мин для операций. Без подкраски. Подпись «Начальник БТН» под таблицей.';
+        note.textContent = 'Иерархия: изделие → участок → операция (отступы как в 1С/Excel). Тип строки определяется автоматически (код операции / «Участок» / изделие), пробелы из 1С не обязательны. В «Итого» только операции. Подпись «Начальник БТН».';
         body.innerHTML = pasteZoneHtml('f3', '830М-10-1 Фланец\t\t473,4\t7,89\nУчасток №32 …\t\t425,4\t7,09\n4110 Токарная\t308,4\t308,4\t5,14')
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
@@ -1775,8 +1847,11 @@
           tableClass: 'doc',
           colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
           thead: `<tr><th>Подразделение/Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
-          // без row-parent / подкраски — все строки одинаковые (эталон xlsx)
-          dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.unit)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
+          // иерархия: участок / операция — отступ + лёгкий фон (как в 1С)
+          dataRows: rows.map((r) => {
+            const lv = f2HierarchyLevel(r.unit);
+            return `<tr class="${f2RowClass(r.unit)}">${hierLabelHtml(r.unit, lv)}<td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`;
+          }),
           total: `<tr class="total"><td>Итого</td><td class="num">${esc(sumF2(rows,'min'))}</td><td class="num">${esc(sumF2(rows,'hour'))}</td></tr>`,
           sigs: '',
         };
@@ -1790,8 +1865,11 @@
           tableClass: 'doc compact',
           colgroup: '<col style="width:58%"><col style="width:14%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Изделие/Подразделение/Операция</th><th>Количество:<br>шт — для изделий/подразделений<br>н.мин — для операций</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
-          // без row-parent / подкраски — как в эталоне xlsx
-          dataRows: rows.map((r) => `<tr><td class="pre">${esc(r.name)}</td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`),
+          // иерархия: изделие → участок → операция (отступы + фон уровней)
+          dataRows: rows.map((r) => {
+            const lv = f3HierarchyLevel(r.name);
+            return `<tr class="${f3RowClass(r.name)}">${hierLabelHtml(r.name, lv)}<td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.min)}</td><td class="num">${fmt(r.hour)}</td></tr>`;
+          }),
           total: `<tr class="total"><td>Итого</td><td></td><td class="num">${esc(sumF3(rows,'min'))}</td><td class="num">${esc(sumF3(rows,'hour'))}</td></tr>`,
           sigs: excelSignature('Начальник БТН', state.fioBtn),
         };
@@ -2403,7 +2481,7 @@
           { cells: [`Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
           { cells: ['Подразделение/Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 22 },
           { cells: ['Итого', sumMin, sumHour], style: 'total', height: 16 },
-          ...rows.map((r) => ({ cells: [r.unit, r.min, r.hour], style: 'data', height: 14 })),
+          ...rows.map((r) => ({ cells: [hierExcelText(r.unit, f2HierarchyLevel(r.unit)), r.min, r.hour], style: 'data', height: 14 })),
         ],
       };
     }
@@ -2416,7 +2494,7 @@
           { cells: [`Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${product}`], style: 'title', mergeAcross: 3, height: 32 },
           { cells: ['Изделие/Подразделение/Операция', 'Количество: шт — для изделий/подразделений, н.мин — для операций', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 28 },
           { cells: ['Итого', '', sumMin, sumHour], style: 'total', height: 16 },
-          ...data.map((r) => ({ cells: [r.name, r.qty, r.min, r.hour], style: 'data', height: 14 })),
+          ...data.map((r) => ({ cells: [hierExcelText(r.name, f3HierarchyLevel(r.name)), r.qty, r.min, r.hour], style: 'data', height: 14 })),
           { cells: ['', '', '', ''], height: 12 },
           { cells: ['Начальник БТН', '', '', fioBtn], style: 'sig', height: 16 },
         ],
