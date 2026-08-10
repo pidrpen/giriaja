@@ -5,7 +5,9 @@
  * Styles: title | hdr | total | data | parent | sig | letter | letterwrap
  *
  * Order: title → header → «Итого» → data → blank → signature
- * Hierarchy: name with 2+ leading spaces → data (white); else parent (tinted)
+ * Форма 3: NO parent tint — all data rows plain (эталон xlsx).
+ * Материалы: name with 2+ leading spaces → data (white); else parent (tinted)
+ * Form 3 Итого: caller must pass sum of operations only (exclude изделие/участок).
  */
 
 /** True if name is a child/nested row (2+ leading spaces / indent from 1C). */
@@ -70,9 +72,10 @@ function exportMatrixF3({ product, rows, sumMin, sumHour, fioBtn }) {
     },
     // IMMEDIATELY after header
     { cells: ['Итого', '', sumMin, sumHour], style: 'total' },
+    // Form 3: no hierarchyStyle/parent highlight
     ...data.map((r) => ({
       cells: [r.name, r.qty, r.min, r.hour],
-      style: hierarchyStyle(r.name),
+      style: 'data',
     })),
     ...signatureRows(colCount, 'Начальник БТН', fioBtn),
   ];

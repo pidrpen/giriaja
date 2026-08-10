@@ -52,9 +52,13 @@ Pages (если включены): `https://pidrpen.github.io/giriaja/`
 2. **«Итого»**  
    - Сразу **под шапкой** таблицы, суммы по всем данным  
    - Не внизу таблицы  
+   - **Форма 1:** плоский список операций; все строки в «Итого» (эталон `(Форма 1).xlsx`).  
    - **Форма 2:** строки «Участок…» / «Цех…» — **подытоги**, в «Итого» **не входят**  
      (иначе двойной счёт; эталон `(Форма 2).xlsx`). Счёт: `sumF2` / `isF2SectionRow`.  
      Операции с ведущим отступом — не участок. **Без подкраски** (в отличие от mat).  
+   - **Форма 3:** 3 уровня — изделие → участок → операция (`0108 …`).  
+     В «Итого» **только операции** (`sumF3` / `isF3OperationRow`); изделия и участки — подытоги  
+     (эталон `(Форма 3).xlsx`). **Без подкраски** (не matRowClass).  
 
 3. **Материалы — заливка**  
    - Без отступа (красная строка) → `row-parent` / Excel `parent` (жёлтый)  
@@ -84,7 +88,7 @@ Pages (если включены): `https://pidrpen.github.io/giriaja/`
 
 8. **Образец данных**  
    - Кнопка «Образец данных» → `fillSampleData()` (изделие УМ-450.12.001 и т.д.)  
-   - **f2** — эталон иерархии участков + операций (830М-подобная структура)  
+   - **f1/f2/f3** — образцы по эталонам 830М-10-сб1 (f3 — первые 3 изделия)  
 
 9. **Сохранение**  
    - `localStorage` ключ `doc_templates_fill_v1` (включая `state.pack`)  
@@ -92,7 +96,7 @@ Pages (если включены): `https://pidrpen.github.io/giriaja/`
 ### Важные функции (ориентир по коду)
 ```
 SCHEMAS, parseGridText, applyPasteToTable
-isF2SectionRow, sumF2, sumField
+isF2SectionRow, sumF2, isF3OperationRow, sumF3, sumField
 buildDocSpec, buildDocPagesHtml, renderPreview
 DEFAULT_PACK, openPrintModal, executePrintPack
 recalcKitPages, countDocPages, naListah, listovForm
