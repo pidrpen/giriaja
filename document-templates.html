@@ -555,19 +555,20 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип слева; текст ПОД логотипом, по центру относительно логотипа */
+    /* Распоряжение: логотип слева; текст ПОД ним, ось совпадает с центром логотипа */
     .rasp-head {
       display: flex;
       flex-direction: column;
-      align-items: center; /* центр относительно логотипа */
+      align-items: center;
       justify-content: flex-start;
       text-align: center;
       margin: 0 0 5mm;
       gap: 2.5mm;
-      /* блок в левой части листа: ширина = логотип + небольшой запас под длинные строки */
-      width: max-content;
-      max-width: 72mm;
+      /* ширина колонки = логотип → align-items:center центрирует текст по логотипу */
+      width: 16mm;
       align-self: flex-start;
+      /* чтобы длинные строки «АКЦИОНЕРНОЕ…» не обрезались и оставались по центру лого */
+      overflow: visible;
     }
     .rasp-logo {
       width: 16mm;
@@ -580,7 +581,12 @@
     .rasp-org {
       text-align: center;
       line-height: 1.2;
-      width: 100%;
+      width: max-content;
+      max-width: 70mm;
+      /* расширяется в обе стороны от оси логотипа */
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
     }
     .rasp-org .org-line {
       margin: 0;
@@ -613,9 +619,13 @@
       font-size: 12pt;
       margin: 0 0 12px;
       line-height: 1.25;
+      /* та же ось, что у логотипа (левый край листа + 8mm = центр 16mm лого) */
       width: max-content;
-      max-width: 72mm;
-      align-self: flex-start; /* блок слева на листе */
+      max-width: 70mm;
+      position: relative;
+      left: 8mm; /* центр лого 16mm */
+      transform: translateX(-50%);
+      align-self: flex-start;
     }
     .letter.rasp-doc {
       display: flex;
