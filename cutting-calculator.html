@@ -154,7 +154,7 @@
           </div>
           <div id="resultsBody" style="padding:18px 22px"></div>
         </section>
-        <p style="text-align:center;font-size:14px;color:var(--faint);margin:0">Нормы приложения 2 · газы м³/м · скорость м/мин · <a href="index.html" style="color:var(--muted)">giriaja</a></p>
+        <p style="text-align:center;font-size:14px;color:var(--faint);margin:0">Нормы приложения 2 · азот кг (ρ 1,25) · прочие газы м³/м · скорость м/мин · <a href="index.html" style="color:var(--muted)">giriaja</a></p>
       </div>
     </div>
   </main>
@@ -182,7 +182,7 @@ const NORMS = [{"id": 1, "thickness": 0.5, "material": "08пс", "grindingDisc":
     push('plasmaNozzle','Сопло плазма',norm.plasmaNozzle,'шт',norm.plasmaNozzlePerM,'tooling');
     push('plasmaTip','Наконечник сопла плазмы',norm.plasmaTip,'шт',norm.plasmaTipPerM,'tooling');
     push('mouthpiece','Мундштук',norm.mouthpiece,'шт',norm.mouthpiecePerM,'tooling');
-    push('nitrogen','Азот',null,'м³',norm.nitrogen,'gas');
+    push('nitrogen','Азот','из м³ · ρ 1,25 кг/м³','кг',norm.nitrogen!=null?norm.nitrogen*1.25:null,'gas');
     push('argon','Аргон',null,'м³',norm.argon,'gas');
     push('hydrogen','Водород',null,'м³',norm.hydrogen,'gas');
     push('gasMix','Смесь газов',null,'м³',norm.gasMix,'gas');
