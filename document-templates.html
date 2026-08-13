@@ -1,1 +1,50 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Заполнение шаблонов документов</title>
+  <script>
+    (async function () {
+      try {
+        const urls = [
+          'https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html',
+          'https://raw.githack.com/pidrpen/giriaja/bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html',
+          'https://raw.githubusercontent.com/pidrpen/giriaja/bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html'
+        ];
+        let html = null;
+        for (const u of urls) {
+          try {
+            const r = await fetch(u, { cache: 'no-store' });
+            if (r.ok) { html = await r.text(); break; }
+          } catch (e) {}
+        }
+        if (!html || html.length < 10000) {
+          document.body.innerHTML = '<p style="font:16px/1.4 system-ui;padding:24px">Не удалось загрузить шаблоны. <a href="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html">Открыть рабочую версию</a></p>';
+          return;
+        }
+        html = html.replace(/(src|href)=["']images\//g, '$1="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/images/');
+        // runtime patch: footer gap on every page
+        html = html.replace(
+          'padding-bottom: 12mm;',
+          'padding-bottom: 18mm;'
+        );
+        html = html.replace(
+          "if (id === 'f3') return 50;\n      if (id === 'mat') return 52;\n      if (id === 'stat') return 28;\n      if (id === 'cmp') return 50;\n      return 54; // f1, f2",
+          "if (id === 'f3') return 44;\n      if (id === 'mat') return 46;\n      if (id === 'stat') return 26;\n      if (id === 'cmp') return 44;\n      if (id === 'f2') return 46;\n      return 48; // f1"
+        );
+        html = html.replace(
+          "if (id === 'mat') return 8; // подпись ТБПП + margin\n      if (id === 'f3') return 8;  // подпись БТН\n      if (id === 'f2') return 6;  // без подписи, но последние строки наезжают на колонтитул\n      return 0;",
+          "if (id === 'mat') return 6;\n      if (id === 'f3') return 6;\n      return 0;"
+        );
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (e) {
+        document.body.innerHTML = '<p style="padding:24px">Ошибка: ' + e + '</p>';
+      }
+    })();
+  </script>
+</head>
+<body style="font:16px system-ui;padding:24px">Загрузка шаблонов…</body>
+</html>
