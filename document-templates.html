@@ -2008,6 +2008,7 @@
     function sigReserveRowsFor(id) {
       if (id === 'mat') return 8; // подпись ТБПП + margin
       if (id === 'f3') return 8;  // подпись БТН
+      if (id === 'f2') return 6;  // без подписи, но последние строки наезжают на колонтитул
       return 0;
     }
 
@@ -2028,10 +2029,9 @@
           out.push(list.slice(i, i + ps));
           i += ps;
         } else if (rem > lm) {
-          // почти полный последний лист — откусываем хвост на следующий лист с подписью
-          const take = rem - lm;
-          out.push(list.slice(i, i + take));
-          i += take;
+          // заполняем текущий лист до lastMax, хвост — на следующий (с подписью / зазором до footer)
+          out.push(list.slice(i, i + lm));
+          i += lm;
         } else {
           out.push(list.slice(i));
           break;
@@ -2089,10 +2089,10 @@
         let pages = Math.max(1, Math.ceil(filled / rpp));
         const reserve = sigReserveRowsFor(id);
         if (reserve > 0) {
-          // если последний лист данных «плотный» — подпись уезжает на отдельный лист
-          const lastLen = filled % rpp === 0 ? rpp : (filled % rpp);
+          // та же нарезка, что в печати: плотный последний лист → ещё один
           const lastMax = Math.max(1, rpp - reserve);
-          if (lastLen > lastMax) pages += 1;
+          const dummy = new Array(filled).fill(0);
+          pages = chunkRowsLastReserve(dummy, rpp, lastMax).length;
         }
         return pages;
       }
@@ -2423,18 +2423,20 @@
 
       const rpp = rowsPerPageFor(id);
       const hasSigHtml = !!(spec.sigs && String(spec.sigs).trim());
-      const reserve = hasSigHtml ? sigReserveRowsFor(id) : 0;
+      // запас на последнем листе: подпись (mat/f3) или зазор до колонтитула (f2)
+      const reserve = sigReserveRowsFor(id);
       const lastMax = reserve > 0 ? Math.max(1, rpp - reserve) : rpp;
       let useChunks;
-      if (isPrint || spec.dataRows.length > rpp) {
+      if (reserve > 0 && (isPrint || spec.dataRows.length > lastMax)) {
+        useChunks = chunkRowsLastReserve(spec.dataRows, rpp, lastMax);
+      } else if (isPrint || spec.dataRows.length > rpp) {
         useChunks = chunkRows(spec.dataRows, rpp);
       } else {
         useChunks = [spec.dataRows];
       }
-      // Если последний лист данных заполнен плотно — подпись на отдельном листе
-      // (иначе «Начальник ТБПП/БТН» сливается с колонтитулом).
+      // Если после нарезки последний лист всё ещё плотный и есть подпись — отдельный лист
       const lastDataLen = (useChunks[useChunks.length - 1] || []).length;
-      const sigOnOwnPage = reserve > 0 && lastDataLen > lastMax;
+      const sigOnOwnPage = hasSigHtml && lastDataLen > lastMax;
       const totalPages = Math.max(1, useChunks.length + (sigOnOwnPage ? 1 : 0));
 
       const pagesHtml = useChunks.map((chunk, idx) => {
