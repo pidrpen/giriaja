@@ -109,8 +109,8 @@
           <select id="material" style="margin-bottom:18px"></select>
           <div style="font-size:14px;font-weight:700;color:var(--muted);margin-bottom:8px">Толщина, мм</div>
           <div id="thicknesses" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px"></div>
-          <label style="display:block;font-size:14px;font-weight:700;color:var(--muted);margin-bottom:6px">Длина реза, метры</label>
-          <input id="length" type="number" min="0.01" step="0.1" value="10" style="font-size:18px" />
+          <label style="display:block;font-size:14px;font-weight:700;color:var(--muted);margin-bottom:6px">Длина реза, мм</label>
+          <input id="length" type="number" min="1" step="1" value="10000" style="font-size:18px" />
           <div id="quickLen" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div>
         </section>
 
@@ -212,11 +212,12 @@ const NORMS = [{"id": 1, "thickness": 0.5, "material": "08пс", "grindingDisc":
     pushGas('propane','Пропан',norm.propane,GAS_RHO.propane);
     const timeMin=norm.speed!=null&&norm.speed>0?lengthM/norm.speed:null;
     const incomplete=!norm.equipment||(String(norm.equipment).toLowerCase().includes('гидро')&&norm.speed==null);
-    return {norm,lengthM,timeMin,lines,incomplete};
+    return {norm,lengthM,lengthMm:lengthM*1000,timeMin,lines,incomplete};
   }
 
   function render(){
-    const lengthM=parseFloat(String(document.getElementById('length').value).replace(',','.'))||0;
+    const lengthMm=parseFloat(String(document.getElementById('length').value).replace(',','.'))||0;
+    const lengthM=lengthMm/1000;
     const result=calc(material,thickness,lengthM);
     const equipCard=document.getElementById('equipCard');
     if(!result){
@@ -251,7 +252,7 @@ const NORMS = [{"id": 1, "thickness": 0.5, "material": "08пс", "grindingDisc":
         <div class="tabular" style="font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-.02em">${result.lines.length}</div>
         <div style="font-size:14px;color:var(--muted);margin-top:4px;font-weight:600">оснастка ${tooling} · газы ${gas}</div>
       </div>`;
-    document.getElementById('resultSub').textContent=`${material} · ${thickness} мм · ${fmt(result.lengthM,2)} м реза`;
+    document.getElementById('resultSub').textContent=`${material} · ${thickness} мм · ${fmt(result.lengthMm,0)} мм реза`;
     const groups=[['tooling','Оснастка и расходники'],['gas','Газы'],['aux','Вспомогательные']];
     let html='';
     for(const [g,title] of groups){
@@ -304,17 +305,17 @@ const NORMS = [{"id": 1, "thickness": 0.5, "material": "08пс", "grindingDisc":
     sel.onchange=()=>setMaterial(sel.value);
     material=mats.includes('ст3')?'ст3':mats[0]; thickness=thicknesses(material)[0];
     document.getElementById('length').addEventListener('input',render);
-    [1,5,10,25,50,100].forEach(v=>{ const b=document.createElement('button'); b.type='button'; b.className='pill'; b.textContent=v+' м'; b.onclick=()=>{document.getElementById('length').value=v;render()}; document.getElementById('quickLen').appendChild(b); });
+    [1000,2500,5000,10000,25000,50000].forEach(v=>{ const b=document.createElement('button'); b.type='button'; b.className='pill'; b.textContent=v.toLocaleString('ru-RU')+' мм'; b.onclick=()=>{document.getElementById('length').value=v;render()}; document.getElementById('quickLen').appendChild(b); });
     document.getElementById('btnCopy').onclick=async()=>{
       const r=window.__lastResult; if(!r) return;
-      const lines=[`Расчёт резки: ${material} ${thickness} мм, L=${r.lengthM} м`,`Оборудование: ${r.norm.equipment||'—'}`,`Скорость: ${r.norm.speed??'—'} м/мин`,`Время: ${fmtTime(r.timeMin||0)}`,'',...r.lines.map(lineText)];
+      const lines=[`Расчёт резки: ${material} ${thickness} мм, L=${fmt(r.lengthMm,0)} мм`,`Оборудование: ${r.norm.equipment||'—'}`,`Скорость: ${r.norm.speed??'—'} м/мин`,`Время: ${fmtTime(r.timeMin||0)}`,'',...r.lines.map(lineText)];
       try{ await navigator.clipboard.writeText(lines.join('\n')); document.getElementById('btnCopy').innerHTML='<i class="fa-solid fa-check"></i> Готово'; setTimeout(()=>{document.getElementById('btnCopy').innerHTML='<i class="fa-regular fa-copy"></i> Копировать'},1500);}catch(e){}
     };
     document.getElementById('btnCsv').onclick=()=>{
       const r=window.__lastResult; if(!r) return;
-      const rows=[['Параметр','Значение'],['Материал',material],['Толщина, мм',String(thickness)],['Длина реза, м',String(r.lengthM)],['Оборудование',r.norm.equipment||''],['Тип резки',equipKind(r.norm.equipment)],['Скорость, м/мин',r.norm.speed!=null?String(r.norm.speed):''],['Время резки, мин',r.timeMin!=null?String(r.timeMin):''],[],['Позиция','Деталь/марка','Ед.','Норма на метр','Расход','Ед. (кг)','Норма кг','Расход кг'],...r.lines.map(l=>l.group==='gas'?[l.label,l.detail||'','м³',String(l.ratePerMVol),String(l.quantityVol),'кг',String(l.ratePerM),String(l.quantity)]:[l.label,l.detail||'',l.unit,String(l.ratePerM),String(l.quantity),'','',''])];
+      const rows=[['Параметр','Значение'],['Материал',material],['Толщина, мм',String(thickness)],['Длина реза, мм',String(r.lengthMm)],['Оборудование',r.norm.equipment||''],['Тип резки',equipKind(r.norm.equipment)],['Скорость, м/мин',r.norm.speed!=null?String(r.norm.speed):''],['Время резки, мин',r.timeMin!=null?String(r.timeMin):''],[],['Позиция','Деталь/марка','Ед.','Норма на метр','Расход','Ед. (кг)','Норма кг','Расход кг'],...r.lines.map(l=>l.group==='gas'?[l.label,l.detail||'','м³',String(l.ratePerMVol),String(l.quantityVol),'кг',String(l.ratePerM),String(l.quantity)]:[l.label,l.detail||'',l.unit,String(l.ratePerM),String(l.quantity),'','',''])];
       const csv=rows.map(row=>row.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n');
-      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'})); a.download=`raschet-rezki-${material}-${thickness}mm-${r.lengthM}m.csv`; a.click();
+      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'})); a.download=`raschet-rezki-${material}-${thickness}mm-${r.lengthMm}mm.csv`; a.click();
     };
     setMaterial(material);
   }
