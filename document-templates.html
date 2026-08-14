@@ -7,10 +7,11 @@
   <script>
     (async function () {
       try {
+        const REF = 'bbf4ffd9f37814bec72c46eea883f31c9793a21c';
         const urls = [
-          'https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html',
-          'https://raw.githack.com/pidrpen/giriaja/bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html',
-          'https://raw.githubusercontent.com/pidrpen/giriaja/bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html'
+          'https://cdn.jsdelivr.net/gh/pidrpen/giriaja@' + REF + '/document-templates.html',
+          'https://raw.githack.com/pidrpen/giriaja/' + REF + '/document-templates.html',
+          'https://raw.githubusercontent.com/pidrpen/giriaja/' + REF + '/document-templates.html'
         ];
         let html = null;
         for (const u of urls) {
@@ -20,15 +21,14 @@
           } catch (e) {}
         }
         if (!html || html.length < 10000) {
-          document.body.innerHTML = '<p style="font:16px/1.4 system-ui;padding:24px">Не удалось загрузить шаблоны. <a href="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/document-templates.html">Открыть рабочую версию</a></p>';
+          document.body.innerHTML = '<p style="font:16px/1.4 system-ui;padding:24px">Не удалось загрузить шаблоны. <a href="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@' + REF + '/document-templates.html">Открыть рабочую версию</a></p>';
           return;
         }
-        html = html.replace(/(src|href)=["']images\//g, '$1="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@bbf4ffd9f37814bec72c46eea883f31c9793a21c/images/');
-        // runtime patch: footer gap on every page
-        html = html.replace(
-          'padding-bottom: 12mm;',
-          'padding-bottom: 18mm;'
-        );
+        html = html.replace(/(src|href)=["']images\//g, '$1="https://cdn.jsdelivr.net/gh/pidrpen/giriaja@' + REF + '/images/');
+
+        // --- footer gap on every page ---
+        html = html.replace('padding-bottom: 12mm;', 'padding-bottom: 18mm;');
+        html = html.replace('padding-bottom: 28mm;', 'padding-bottom: 30mm;');
         html = html.replace(
           "if (id === 'f3') return 50;\n      if (id === 'mat') return 52;\n      if (id === 'stat') return 28;\n      if (id === 'cmp') return 50;\n      return 54; // f1, f2",
           "if (id === 'f3') return 44;\n      if (id === 'mat') return 46;\n      if (id === 'stat') return 26;\n      if (id === 'cmp') return 44;\n      if (id === 'f2') return 46;\n      return 48; // f1"
@@ -37,6 +37,37 @@
           "if (id === 'mat') return 8; // подпись ТБПП + margin\n      if (id === 'f3') return 8;  // подпись БТН\n      if (id === 'f2') return 6;  // без подписи, но последние строки наезжают на колонтитул\n      return 0;",
           "if (id === 'mat') return 6;\n      if (id === 'f3') return 6;\n      return 0;"
         );
+        html = html.replace(
+          "const hasSigHtml = !!(spec.sigs && String(spec.sigs).trim());\n      // запас на последнем листе: подпись (mat/f3) или зазор до колонтитула (f2)\n      const reserve = sigReserveRowsFor(id);",
+          "const hasSigHtml = !!(spec.sigs && String(spec.sigs).trim());\n      const reserve = hasSigHtml ? sigReserveRowsFor(id) : 0;"
+        );
+
+        // --- Сравнение: новые колонки ---
+        html = html.replace(
+          "cmp: [{ oldCode: '', oldName: '', newCode: '', newName: '', note: '' }],",
+          "cmp: [{ name: '', packNew: '', packOld: '', qtyNew: '', qtyOld: '' }],"
+        );
+        html = html.replace(
+          "keys: ['oldCode', 'oldName', 'newCode', 'newName', 'note'],\n        headers: ['Старый код', 'Старое наименование', 'Новый код', 'Новое наименование', 'Примечание'],\n        numeric: [],\n        aliases: {\n          oldCode: ['старый код', 'код стар'],\n          oldName: ['старое', 'стар наим'],\n          newCode: ['новый код', 'код нов'],\n          newName: ['новое', 'нов наим'],\n          note: ['примеч', 'коммент'],\n        },",
+          "keys: ['name', 'packNew', 'packOld', 'qtyNew', 'qtyOld'],\n        headers: ['Номенклатура', 'Упаковка новой', 'Упаковка старой', 'Количество новой', 'Количество старой'],\n        numeric: ['qtyNew', 'qtyOld'],\n        aliases: {\n          name: ['номенклатур', 'наименован', 'материал', 'позиция'],\n          packNew: ['упаковка нов', 'уп. нов', 'упак нов'],\n          packOld: ['упаковка стар', 'уп. стар', 'упак стар'],\n          qtyNew: ['количество нов', 'кол-во нов', 'кол нов'],\n          qtyOld: ['количество стар', 'кол-во стар', 'кол стар'],\n        },"
+        );
+        html = html.replace(
+          "note.textContent = 'Пять столбцов: старый код | старое наим. | новый код | новое наим. | примечание. Вставка Ctrl+V из 1С — как у Ф2/Ф3.';\n        body.innerHTML = pasteZoneHtml('cmp', 'A-1\\tСтарое\\tB-1\\tНовое\\tзамена')",
+          "note.textContent = 'Столбцы: Номенклатура | Упаковка новой | Упаковка старой | Количество новой | Количество старой. Вставка Ctrl+V из 1С — как у Ф2/Ф3.';\n        body.innerHTML = pasteZoneHtml('cmp', 'Болт М10\\tкор\\tкор\\t100\\t80')"
+        );
+        html = html.replace(
+          "colgroup: '',\n          thead: `<tr><th>Старый код</th><th>Старое наименование</th><th>Новый код</th><th>Новое наименование</th><th>Примечание</th></tr>`,\n          dataRows: state.cmp.map((r) => `<tr><td>${esc(r.oldCode)}</td><td>${esc(r.oldName)}</td><td>${esc(r.newCode)}</td><td>${esc(r.newName)}</td><td>${esc(r.note)}</td></tr>`),",
+          "colgroup: '<col style=\"width:40%\"><col style=\"width:15%\"><col style=\"width:15%\"><col style=\"width:15%\"><col style=\"width:15%\">',\n          thead: `<tr><th>Номенклатура</th><th>Упаковка<br>новой</th><th>Упаковка<br>старой</th><th>Количество<br>новой</th><th>Количество<br>старой</th></tr>`,\n          dataRows: state.cmp.map((r) => `<tr><td class=\"pre\">${esc(r.name)}</td><td class=\"num\">${esc(r.packNew)}</td><td class=\"num\">${esc(r.packOld)}</td><td class=\"num\">${fmt(r.qtyNew)}</td><td class=\"num\">${fmt(r.qtyOld)}</td></tr>`),"
+        );
+        html = html.replace(
+          "sheetName: 'Сравнение', colCount: 5, colWidths: [80, 160, 80, 160, 120],\n        rows: [\n          { cells: [`Сравнение старой и новой спецификации ${product}`], style: 'title', mergeAcross: 4, height: 28 },\n          { cells: ['Старый код', 'Старое наименование', 'Новый код', 'Новое наименование', 'Примечание'], style: 'hdr', height: 20 },\n          ...(rows || []).map((r) => ({ cells: [r.oldCode, r.oldName, r.newCode, r.newName, r.note], style: 'data', height: 14 })),",
+          "sheetName: 'Сравнение', colCount: 5, colWidths: [220, 70, 70, 70, 70],\n        rows: [\n          { cells: [`Сравнение старой и новой спецификации ${product}`], style: 'title', mergeAcross: 4, height: 28 },\n          { cells: ['Номенклатура', 'Упаковка новой', 'Упаковка старой', 'Количество новой', 'Количество старой'], style: 'hdr', height: 28 },\n          ...(rows || []).map((r) => ({ cells: [r.name, r.packNew, r.packOld, r.qtyNew, r.qtyOld], style: 'data', height: 14 })),"
+        );
+        html = html.replace(
+          "state.cmp = [\n        { oldCode: 'А-12.01', oldName: 'Втулка старая', newCode: 'УМ-450.12.031', newName: 'Втулка направляющая', note: 'замена кода' },\n        { oldCode: 'А-12.08', oldName: 'Крышка', newCode: 'УМ-450.12.040', newName: 'Крышка корпуса', note: '' },\n        { oldCode: '—', oldName: '—', newCode: 'УМ-450.12.055', newName: 'Прокладка', note: 'новая позиция' },\n      ];",
+          "state.cmp = [\n        { name: 'Болт М10×30 ГОСТ 7798', packNew: 'кор', packOld: 'кор', qtyNew: '100', qtyOld: '80' },\n        { name: 'Гайка М10 ГОСТ 5915', packNew: 'кор', packOld: 'пач', qtyNew: '100', qtyOld: '100' },\n        { name: 'Шайба 10 ГОСТ 11371', packNew: 'пач', packOld: 'пач', qtyNew: '200', qtyOld: '150' },\n      ];"
+        );
+
         document.open();
         document.write(html);
         document.close();
