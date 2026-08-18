@@ -791,6 +791,17 @@ function latinAccuracyClass(value = "") {
   return value.replace("А", "A").replace("В", "B").replace("С", "C");
 }
 
+function latinTolerance(value = "") {
+  const letters: Record<string, string> = {
+    А: "A",
+    В: "B",
+    С: "C",
+    Е: "E",
+    Н: "H",
+  };
+  return value.replace(/[АВСЕН]/g, (letter) => letters[letter] ?? letter);
+}
+
 function parseDesignation(value: string, productHint?: ProductType, knownGost = "") {
   const normalized = value
     .toUpperCase()
@@ -941,17 +952,70 @@ function formatStrength(item: FastenerStandard, code: string) {
   return code;
 }
 
-function coatingText(code: string, system: "ISO" | "DIN") {
-  if (code === "019") {
-    return system === "ISO"
-      ? "ISO 4042: Zn, хроматированное, не менее 9 мкм"
-      : "ближайшее старое обозначение A3C — 8 мкм; 9 мкм задать отдельно";
+function coatingSpecification(code: string, system: "ISO" | "DIN") {
+  const coatingStandard = system === "ISO" ? "ISO 4042" : "DIN EN ISO 4042";
+
+  if (code === "016") {
+    return {
+      designation: `Zn, хроматированное, ≥6 мкм по ${coatingStandard}`,
+      note: "Покрытие 016 перенесено явно: цинк, хроматирование, минимальная толщина 6 мкм.",
+    };
   }
-  if (code === "016") return `${system === "ISO" ? "ISO 4042: " : ""}Zn, хроматированное, 6 мкм`;
-  if (code === "029") return "Cd, хроматированное, 9 мкм · согласовать отдельно";
-  return code
-    ? `покрытие ГОСТ ${code} · требуется отдельный перевод`
-    : "покрытие не задано";
+  if (code === "019") {
+    return {
+      designation: `Zn, хроматированное, ≥9 мкм по ${coatingStandard}`,
+      note: system === "ISO"
+        ? "Покрытие 019 перенесено явно: цинк, хроматирование, минимальная толщина 9 мкм."
+        : "Для 9 мкм дана явная запись по DIN EN ISO 4042: старое DIN-обозначение A3C задаёт 8 мкм и не является точным аналогом.",
+    };
+  }
+  if (code === "029") {
+    return {
+      designation: `Cd, хроматированное, ≥9 мкм по ${coatingStandard}, по согласованию`,
+      note: "Покрытие 029 содержит кадмий: применимость и ограничения нужно согласовать с заказчиком.",
+    };
+  }
+  if (code) {
+    return {
+      designation: `покрытие ГОСТ ${code} — международная запись требует согласования`,
+      note: `Для кода покрытия ${code} не подставлен неподтверждённый ISO/DIN-код.`,
+    };
+  }
+  return {
+    designation: "покрытие не задано",
+    note: "В исходном обозначении нет покрытия; сайт не считает деталь автоматически непокрытой.",
+  };
+}
+
+function washerHardness(parsed: ParsedDesignation) {
+  if (parsed.propertyClass) {
+    const value = parsed.propertyClass.toUpperCase().replace(/\s*HV$/, "");
+    return { designation: `${value} HV`, inferred: false };
+  }
+
+  const lowCarbonSteel = parsed.materialGroup === "01" || /^08(?:КП|ПС)?$/i.test(parsed.materialGrade);
+  if (lowCarbonSteel) return { designation: "200 HV", inferred: true };
+
+  return { designation: "класс твёрдости не задан", inferred: false };
+}
+
+function designationNote(item: FastenerStandard, parsed: ParsedDesignation, system: "ISO" | "DIN") {
+  const notes = [coatingSpecification(parsed.coating, system).note];
+
+  if (productOf(item) === "washer") {
+    const hardness = washerHardness(parsed);
+    if (hardness.inferred) {
+      notes.push("200 HV предварительно выбрано по стали 08кп / группе 01; перед заказом подтвердите требуемую твёрдость.");
+    } else if (!parsed.propertyClass) {
+      notes.push("Для шайбы нужно задать класс твёрдости, например 200 HV или 300 HV.");
+    }
+  }
+
+  if (parsed.materialGrade) {
+    notes.push(`Исходный материал ${parsed.materialGrade.toLowerCase()} не переименован в международную марку без отдельной таблицы эквивалентов.`);
+  }
+
+  return notes.join(" ");
 }
 
 function selectIso(item: FastenerStandard, parsed: ParsedDesignation) {
@@ -1017,14 +1081,21 @@ function buildDesignations(item: FastenerStandard, targets: string[], parsed: Pa
   const product = productOf(item);
   const diameter = parsed.diameter.replace(".", ",");
   const secondDimension = parsed.pitch.replace(".", ",");
+  const tolerance = latinTolerance(parsed.tolerance);
   const size = product === "washer"
     ? (parsed.washerSize || diameter || "размер…").replace(".", ",")
     : parsed.diameter
-      ? `M${diameter}${secondDimension ? `×${secondDimension}` : ""}`
+      ? `M${diameter}${secondDimension ? `×${secondDimension}` : ""}${tolerance ? `-${tolerance}` : ""}`
       : parsed.pipeThread ? `G${parsed.pipeThread}` : "размер…";
   const strengthValue = formatStrength(item, parsed.propertyClass);
-  const strength = strengthValue && product !== "washer" ? `-${strengthValue}` : "";
-  return targets.map((target) => `${productNouns[product]} ${size}${strength} ${target}`);
+  const property = product === "washer"
+    ? washerHardness(parsed).designation
+    : strengthValue ? `класс ${strengthValue}` : "класс прочности не задан";
+  const accuracy = parsed.accuracyClass ? `класс точности ${parsed.accuracyClass}` : "";
+  const coating = coatingSpecification(parsed.coating, system).designation;
+  const properties = [property, accuracy, coating].filter(Boolean).join(", ");
+
+  return targets.map((target) => `${productNouns[product]} ${size}, ${properties} — ${target}`);
 }
 
 function StandardCard({ item }: { item: FastenerStandard }) {
@@ -1119,8 +1190,10 @@ export default function Home() {
 
   async function copyResult() {
     const resultText = [
-      `ISO: ${isoOutput.join(" / ")}; ${coatingText(parsed.coating, "ISO")}`,
-      `DIN: ${dinOutput.join(" / ")}; ${coatingText(parsed.coating, "DIN")}`,
+      `ISO: ${isoOutput.join(" / ")}`,
+      `Примечание ISO: ${matchedStandard ? designationNote(matchedStandard, parsed, "ISO") : "—"}`,
+      `DIN: ${dinOutput.join(" / ")}`,
+      `Примечание DIN: ${matchedStandard ? designationNote(matchedStandard, parsed, "DIN") : "—"}`,
     ].join("\n");
     try {
       await navigator.clipboard.writeText(resultText);
@@ -1231,12 +1304,12 @@ export default function Home() {
               <div className="designation-card iso-result">
                 <span className="designation-system">ISO</span>
                 {isoOutput.map((line) => <strong key={line}>{line}</strong>)}
-                <small>{coatingText(parsed.coating, "ISO")}</small>
+                <small>{matchedStandard ? designationNote(matchedStandard, parsed, "ISO") : "Введите обозначение по ГОСТ."}</small>
               </div>
               <div className="designation-card din-result">
                 <span className="designation-system">DIN</span>
                 {dinOutput.map((line) => <strong key={line}>{line}</strong>)}
-                <small>{coatingText(parsed.coating, "DIN")}</small>
+                <small>{matchedStandard ? designationNote(matchedStandard, parsed, "DIN") : "Введите обозначение по ГОСТ."}</small>
               </div>
             </div>
             {matchedStandard ? (
