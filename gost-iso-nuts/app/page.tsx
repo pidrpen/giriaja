@@ -1090,12 +1090,12 @@ function buildDesignations(item: FastenerStandard, targets: string[], parsed: Pa
   const strengthValue = formatStrength(item, parsed.propertyClass);
   const property = product === "washer"
     ? washerHardness(parsed).designation
-    : strengthValue ? `класс ${strengthValue}` : "класс прочности не задан";
+    : strengthValue || "класс прочности не задан";
   const accuracy = parsed.accuracyClass ? `класс точности ${parsed.accuracyClass}` : "";
   const coating = coatingSpecification(parsed.coating, system).designation;
-  const properties = [property, accuracy, coating].filter(Boolean).join(", ");
+  const designationParts = [size, property, accuracy, coating].filter(Boolean);
 
-  return targets.map((target) => `${productNouns[product]} ${size}, ${properties} — ${target}`);
+  return targets.map((target) => `${productNouns[product]} ${target} — ${designationParts.join(" — ")}`);
 }
 
 function StandardCard({ item }: { item: FastenerStandard }) {
@@ -1297,7 +1297,7 @@ export default function Home() {
 
           <div className={`result-panel ${matchedStandard?.match ?? "empty"}`}>
             <div className="result-topline">
-              <span className="result-label">Конкретные обозначения</span>
+              <span className="result-label">Эталонные обозначения</span>
               {matchedStandard && <span className={`status-pill ${matchedStandard.match}`}>{matchLabels[matchedStandard.match]}</span>}
             </div>
             <div className="designation-results">
