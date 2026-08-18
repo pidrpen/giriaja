@@ -1,4 +1,34 @@
-# vinext-starter
+# ГОСТ → ISO / DIN — подбор крепежа
+
+Локальная версия справочника гаек, шайб и винтов. Работает без базы данных и внешних API.
+
+## Быстрый запуск на Windows
+
+1. Установите [Node.js 22 LTS](https://nodejs.org/).
+2. Скачайте репозиторий и откройте папку `gost-iso-nuts`.
+3. Дважды нажмите `start-local.bat`.
+4. Откройте адрес, который появится в окне терминала — обычно `http://localhost:5173`.
+
+При первом запуске зависимости установятся автоматически. Окно терминала должно оставаться открытым, пока вы пользуетесь сайтом.
+
+## Запуск через терминал
+
+```bash
+cd gost-iso-nuts
+npm install
+npm run dev
+```
+
+Затем откройте `http://localhost:5173`.
+
+## Сборка
+
+```bash
+npm run build
+npm start
+```
+
+## Техническая основа
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
