@@ -1118,10 +1118,22 @@ export default function Home() {
   }
 
   async function copyResult() {
-    await navigator.clipboard.writeText([
+    const resultText = [
       `ISO: ${isoOutput.join(" / ")}; ${coatingText(parsed.coating, "ISO")}`,
       `DIN: ${dinOutput.join(" / ")}; ${coatingText(parsed.coating, "DIN")}`,
-    ].join("\n"));
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(resultText);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = resultText;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
