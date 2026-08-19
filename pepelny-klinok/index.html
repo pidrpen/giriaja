@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Пепельный Клинок</title>
+  <link rel="stylesheet" href="css/game.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" width="384" height="216"></canvas>
+    <div id="overlay">
+      <div id="hud" class="hidden">
+        <div id="bars">
+          <div class="bar hp">
+            <div class="bar-fill" id="hpFill"></div>
+            <span id="hpText">110</span>
+          </div>
+          <div class="bar stam">
+            <div class="bar-fill" id="stamFill"></div>
+          </div>
+        </div>
+        <div id="items">
+          <img src="assets/game/item_flask.png" alt="" />
+          <span id="flaskCount">3</span>
+          <img id="relicIcon" class="hidden" src="assets/game/item_relic.png" alt="" />
+          <span id="killHud">0</span>
+        </div>
+        <div id="comboHud" class="hidden">x2</div>
+        <div id="questBox">
+          <div id="questTitle">Задание</div>
+          <div id="questBody">Поговори со старейшиной.</div>
+        </div>
+        <div id="prompt" class="hidden"></div>
+      </div>
+
+      <div id="titleScreen" class="screen">
+        <a class="hub-link" href="../index.html">← Королевский Зал</a>
+        <div class="title-glow"></div>
+        <div class="title-mark">DARK FANTASY</div>
+        <h1>ПЕПЕЛЬНЫЙ<br />КЛИНОК</h1>
+        <p class="tagline">Долина-мясорубка. Клинок не знает покоя.</p>
+        <button id="btnStart" type="button">Начать путь</button>
+        <ul class="controls">
+          <li><b>WASD / стрелки</b> — ход</li>
+          <li><b>Пробел / J / ЛКМ</b> — удар</li>
+          <li><b>Shift / K</b> — уклонение</li>
+          <li><b>E</b> — говорить / открыть</li>
+          <li><b>Q / 1</b> — фляга</li>
+        </ul>
+      </div>
+
+      <div id="dialog" class="hidden">
+        <div class="dlg-name" id="dlgName"></div>
+        <div class="dlg-text" id="dlgText"></div>
+        <div class="dlg-choices" id="dlgChoices"></div>
+        <div class="dlg-hint">E / Enter — далее</div>
+      </div>
+
+      <div id="pauseScreen" class="screen hidden">
+        <h2>Пауза</h2>
+        <p>Клинок ждёт.</p>
+        <button id="btnResume" type="button">Вернуться</button>
+      </div>
+
+      <div id="deadScreen" class="screen hidden">
+        <h2>Ты пал</h2>
+        <p>Пепел примет тебя снова у костра.</p>
+        <button id="btnRevive" type="button">Восстать</button>
+      </div>
+
+      <div id="endScreen" class="screen hidden">
+        <h2>Ночь стала тише</h2>
+        <p id="endText"></p>
+        <button id="btnAgain" type="button">Ещё раз</button>
+      </div>
+
+      <div id="toast" class="hidden"></div>
+    </div>
+  </div>
+  <script src="js/game.js"></script>
+</body>
+</html>
