@@ -49,9 +49,13 @@
   const heroHeavy = [];
   const heroThrust = [];
   const heroSpin = [];
+  const heroWalkF = [];
+  const heroWalkB = [];
   const skelWalk = [];
   const ghoulWalk = [];
+  const wraithWalk = [];
   let heroHurt = null;
+  let flashScreen = 0;
   const stains = [];
   const ghosts = [];
   const rings = [];
@@ -202,6 +206,15 @@
       );
       jobs.push(
         loadImage(`assets/game/hero_spin_${i}.png`).then((im) => (heroSpin[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/hero_walkf_${i}.png`).then((im) => (heroWalkF[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/hero_walkb_${i}.png`).then((im) => (heroWalkB[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/wraith_walk_${i}.png`).then((im) => (wraithWalk[i] = im))
       );
     }
     jobs.push(loadImage("assets/game/hero_hurt.png").then((im) => (heroHurt = im)));
@@ -418,8 +431,8 @@
         scale: 0.72,
         hw: 12,
         hh: 8,
-        walk: null,
         idle: "wraith_idle",
+        walk: wraithWalk,
         quest: "lord",
         boss: true,
       },
@@ -628,6 +641,10 @@
       atkStep: -1,
       atkDur: 0.4,
       queued: null,
+      chargeT: 0,
+      cdWhirl: 0,
+      cdDash: 0,
+      cdHeavy: 0,
       dodgeT: 0,
       dodgeCd: 0,
       invuln: 0,
@@ -982,14 +999,39 @@
     return heroAtk;
   }
 
+  function faceNearestEnemy() {
+    let best = null;
+    let bestD = 78;
+    for (const e of entities) {
+      if (e.kind !== "enemy" || e.dead || e.asleep) continue;
+      const d = dist(player, e);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    if (!best) return;
+    const dx = best.x - player.x;
+    const dy = best.y - player.y;
+    if (Math.abs(dx) > Math.abs(dy) * 0.85) player.face = dx < 0 ? "left" : "right";
+    else player.face = dy < 0 ? "up" : "down";
+  }
+
   function launchAttack(kind) {
     const def = ATKS[kind];
     if (!def) return;
+    if (kind === "whirl" && player.cdWhirl > 0) return false;
+    if (kind === "thrust" && player.cdDash > 0) return false;
+    if (kind === "heavy" && player.cdHeavy > 0) return false;
     if (def.stam && player.stam < def.stam) {
       if (kind !== "slash") toast("Мало сил");
       return false;
     }
     if (def.stam) player.stam -= def.stam;
+    if (kind === "whirl") player.cdWhirl = 4.2;
+    if (kind === "thrust") player.cdDash = 1.6;
+    if (kind === "heavy") player.cdHeavy = 1.35;
+    faceNearestEnemy();
     player.state = "attack";
     player.atkKind = kind;
     player.atkT = 0;
@@ -1101,6 +1143,9 @@
     const def = ATKS[player.atkKind] || ATKS.slash;
     if (combat.furyT > 0) dmg = (dmg * 1.45) | 0;
     else if (combat.combo >= 6) dmg = (dmg * 1.22) | 0;
+    const crit = Math.random() < (combat.furyT > 0 ? 0.22 : 0.1);
+    if (crit) dmg = (dmg * 1.65) | 0;
+    const exec = e.hp > 0 && e.hp - dmg <= 0;
     e.hp -= dmg;
     e.flash = 0.14;
     e.stun = stun || def.stun;
@@ -1111,7 +1156,12 @@
     burst(e.x, e.y - 12, def.color, 8, 40);
     burst(e.x, e.y - 10, "#7a1218", 14, 56);
     stains.push({ x: e.x, y: e.y + 2, life: 2.4, max: 2.4, size: 3 + ((Math.random() * 3) | 0) });
-    floater(e.x, e.y - 28, String(dmg), combat.furyT > 0 ? "#e8a040" : "#e8d0c0");
+    floater(e.x, e.y - 28, crit ? dmg + "!" : String(dmg), crit ? "#ffe060" : combat.furyT > 0 ? "#e8a040" : "#e8d0c0");
+    if (exec) {
+      flashScreen = 0.09;
+      cam.shake = Math.max(cam.shake, 14);
+      burst(e.x, e.y - 12, "#fff0e0", 16, 80);
+    }
     sfx("hit");
     cam.shake = def.shake;
     cam.punchX = fx * 3;
@@ -1225,6 +1275,10 @@
     player.invuln = Math.max(0, player.invuln - dt);
     player.flash = Math.max(0, player.flash - dt);
     player.stam = Math.min(100, player.stam + 26 * dt);
+    player.cdWhirl = Math.max(0, player.cdWhirl - dt);
+    player.cdDash = Math.max(0, player.cdDash - dt);
+    player.cdHeavy = Math.max(0, player.cdHeavy - dt);
+    flashScreen = Math.max(0, flashScreen - dt);
     combat.comboT = Math.max(0, combat.comboT - dt);
     if (combat.comboT <= 0 && combat.combo > 0) combat.combo = 0;
     combat.furyT = Math.max(0, combat.furyT - dt);
@@ -1522,9 +1576,15 @@
       return { im: heroHurt, flip: player.face === "left" };
     }
     if (player.face === "up") {
+      if (player.state === "walk" || player.state === "dodge") {
+        return { im: heroWalkB[((player.anim | 0) % 8 + 8) % 8] || img.hero_idle_back, flip: false };
+      }
       return { im: img.hero_idle_back, flip: false };
     }
     if (player.face === "down") {
+      if (player.state === "walk" || player.state === "dodge") {
+        return { im: heroWalkF[((player.anim | 0) % 8 + 8) % 8] || img.hero_idle_front, flip: false };
+      }
       return { im: img.hero_idle_front, flip: false };
     }
     if (player.state === "walk" || player.state === "dodge") {
@@ -1704,6 +1764,14 @@
     ctx.globalAlpha = 1;
 
     drawDarkness();
+    if (flashScreen > 0) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = clamp(flashScreen / 0.09, 0, 0.45);
+      ctx.fillStyle = "#ffe8d0";
+      ctx.fillRect(0, 0, VW, VH);
+      ctx.restore();
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
@@ -1771,6 +1839,13 @@
         comboHud.classList.add("hidden");
       }
     }
+    const setCd = (id, v, max) => {
+      const el = document.getElementById(id);
+      if (el) el.style.height = (max ? clamp(v / max, 0, 1) * 100 : 0) + "%";
+    };
+    setCd("cdH", player.cdHeavy, 1.35);
+    setCd("cdF", player.cdWhirl, 4.2);
+    setCd("cdR", player.cdDash, 1.6);
   }
 
   function tick(dt) {

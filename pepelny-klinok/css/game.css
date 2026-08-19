@@ -110,6 +110,38 @@ html, body {
 
 #killHud::before { content: "⚔ "; }
 
+#skills {
+  position: absolute;
+  left: 8px;
+  bottom: 10px;
+  display: flex;
+  gap: 4px;
+}
+.sk {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #6a4038;
+  background: #140c10;
+  position: relative;
+  overflow: hidden;
+}
+.sk span {
+  display: block;
+  font-size: 6px;
+  text-align: center;
+  line-height: 18px;
+  color: #e8d0c0;
+}
+.sk b {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  background: rgba(80, 16, 20, 0.72);
+  pointer-events: none;
+}
+
 #comboHud {
   position: absolute;
   left: 50%;
