@@ -45,14 +45,31 @@
   const img = {};
   const heroWalk = [];
   const heroAtk = [];
+  const heroOver = [];
+  const heroHeavy = [];
+  const heroThrust = [];
+  const heroSpin = [];
   const skelWalk = [];
   const ghoulWalk = [];
+  let heroHurt = null;
+  const stains = [];
+  const ghosts = [];
+  const rings = [];
+
+  const ATKS = {
+    slash: { spd: 17, hit0: 2, hit1: 5, dmg: 1, kb: 8, stun: 0.14, stam: 0, stop: 0.05, shake: 4, color: "#f0e0c8", shape: "arc" },
+    over: { spd: 13, hit0: 3, hit1: 6, dmg: 1.4, kb: 14, stun: 0.32, stam: 0, stop: 0.09, shake: 8, color: "#e8b050", shape: "smash" },
+    spin: { spd: 16, hit0: 1, hit1: 6, dmg: 1.3, kb: 11, stun: 0.2, stam: 8, stop: 0.06, shake: 6, color: "#c8b8ff", shape: "ring", around: true },
+    heavy: { spd: 11, hit0: 3, hit1: 6, dmg: 2.25, kb: 20, stun: 0.45, stam: 26, stop: 0.12, shake: 12, color: "#ff5038", shape: "shock" },
+    thrust: { spd: 18, hit0: 2, hit1: 5, dmg: 1.55, kb: 16, stun: 0.22, stam: 18, stop: 0.07, shake: 7, color: "#f0d8a0", shape: "thrust", dash: 165 },
+    whirl: { spd: 14, hit0: 0, hit1: 7, dmg: 0.72, kb: 7, stun: 0.1, stam: 40, stop: 0.02, shake: 5, color: "#b090ff", shape: "ring", around: true, loop: 0.78 },
+  };
 
   let mode = "title";
   let last = 0;
 
 
-  const cam = { x: 0, y: 0, shake: 0 };
+  const cam = { x: 0, y: 0, shake: 0, punchX: 0, punchY: 0 };
   let hitstop = 0;
   let toastT = 0;
 
@@ -174,7 +191,20 @@
       jobs.push(
         loadImage(`assets/game/ghoul_walk_${i}.png`).then((im) => (ghoulWalk[i] = im))
       );
+      jobs.push(
+        loadImage(`assets/game/hero_over_${i}.png`).then((im) => (heroOver[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/hero_heavy_${i}.png`).then((im) => (heroHeavy[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/hero_thrust_${i}.png`).then((im) => (heroThrust[i] = im))
+      );
+      jobs.push(
+        loadImage(`assets/game/hero_spin_${i}.png`).then((im) => (heroSpin[i] = im))
+      );
     }
+    jobs.push(loadImage("assets/game/hero_hurt.png").then((im) => (heroHurt = im)));
     await Promise.all(jobs);
   }
 
@@ -594,6 +624,10 @@
       state: "idle",
       anim: 0,
       atkT: 0,
+      atkKind: "slash",
+      atkStep: -1,
+      atkDur: 0.4,
+      queued: null,
       dodgeT: 0,
       dodgeCd: 0,
       invuln: 0,
@@ -634,6 +668,9 @@
     combat.furyT = 0;
     particles.length = 0;
     floaters.length = 0;
+    stains.length = 0;
+    ghosts.length = 0;
+    rings.length = 0;
     buildMap();
     updateQuestHud();
   }
@@ -937,12 +974,76 @@
     burst(player.x, player.y - 16, "#c45c58", 10, 30);
   }
 
-  function startAttack() {
-    if (player.state === "attack" || player.state === "dodge" || player.state === "dead") return;
+  function framesFor(kind) {
+    if (kind === "over") return heroOver;
+    if (kind === "heavy") return heroHeavy;
+    if (kind === "thrust" || kind === "dash") return heroThrust;
+    if (kind === "spin" || kind === "whirl") return heroSpin;
+    return heroAtk;
+  }
+
+  function launchAttack(kind) {
+    const def = ATKS[kind];
+    if (!def) return;
+    if (def.stam && player.stam < def.stam) {
+      if (kind !== "slash") toast("Мало сил");
+      return false;
+    }
+    if (def.stam) player.stam -= def.stam;
     player.state = "attack";
+    player.atkKind = kind;
     player.atkT = 0;
+    player.atkDur = def.loop || 8 / def.spd;
     player.hitList = new Set();
-    sfx("slash");
+    player.hitPulse = 0;
+    player.queued = null;
+    if (def.dash) {
+      const [fx, fy] = facingVec();
+      player.dodgeDx = fx;
+      player.dodgeDy = fy;
+      player.invuln = Math.max(player.invuln, 0.18);
+    }
+    if (kind === "whirl") player.invuln = Math.max(player.invuln, 0.2);
+    sfx(kind === "heavy" || kind === "whirl" ? "fury" : "slash");
+    return true;
+  }
+
+  function startLight() {
+    if (player.state === "dead" || player.state === "dodge") return;
+    if (player.state === "attack") {
+      if (player.atkT > player.atkDur * 0.42) player.queued = "light";
+      return;
+    }
+    const next = combat.comboT > 0.05 ? (player.atkStep + 1) % 3 : 0;
+    player.atkStep = next;
+    const kinds = ["slash", "over", "spin"];
+    launchAttack(kinds[next]);
+  }
+
+  function startAttack() {
+    startLight();
+  }
+
+  function startHeavy() {
+    if (player.state === "dead" || player.state === "dodge") return;
+    if (player.state === "attack") {
+      if (player.atkT > player.atkDur * 0.4) player.queued = "heavy";
+      return;
+    }
+    player.atkStep = -1;
+    launchAttack("heavy");
+  }
+
+  function startWhirl() {
+    if (player.state === "dead" || player.state === "dodge" || player.state === "attack") return;
+    player.atkStep = -1;
+    launchAttack("whirl");
+  }
+
+  function startDashStrike() {
+    if (player.state === "dead" || player.state === "dodge" || player.state === "attack") return;
+    player.atkStep = -1;
+    launchAttack("thrust");
   }
 
   function startDodge(ax, ay) {
@@ -975,13 +1076,19 @@
   }
 
   function attackHitbox() {
+    const def = ATKS[player.atkKind] || ATKS.slash;
     const [fx, fy] = facingVec();
-    const wide = combat.combo >= 4 || combat.furyT > 0;
+    const fury = combat.furyT > 0;
+    if (def.around) {
+      const r = fury ? 38 : 32;
+      return { x: player.x, y: player.y - 8, w: r * 2, h: r * 2, around: true, r };
+    }
+    const reach = (def.shape === "shock" ? 26 : def.shape === "thrust" ? 28 : 20) + (fury ? 6 : 0);
     return {
-      x: player.x + fx * (wide ? 22 : 18),
-      y: player.y + fy * 10 - 8,
-      w: fy === 0 ? (wide ? 42 : 32) : wide ? 24 : 18,
-      h: fy === 0 ? (wide ? 24 : 20) : wide ? 30 : 24,
+      x: player.x + fx * reach,
+      y: player.y + fy * 12 - 8,
+      w: fy === 0 ? (def.shape === "shock" ? 48 : 36) : 22,
+      h: fy === 0 ? 24 : (def.shape === "smash" ? 34 : 28),
     };
   }
 
@@ -989,31 +1096,42 @@
     return Math.abs(ax - bx) < (aw + bw) / 2 && Math.abs(ay - by) < (ah + bh) / 2;
   }
 
-  function hurtEnemy(e, dmg, kb) {
+  function hurtEnemy(e, dmg, kb, stun) {
     if (e.dead || e.asleep) return;
-    if (combat.furyT > 0) dmg = (dmg * 1.4) | 0;
-    else if (combat.combo >= 6) dmg = (dmg * 1.2) | 0;
+    const def = ATKS[player.atkKind] || ATKS.slash;
+    if (combat.furyT > 0) dmg = (dmg * 1.45) | 0;
+    else if (combat.combo >= 6) dmg = (dmg * 1.22) | 0;
     e.hp -= dmg;
-    e.flash = 0.1;
-    e.stun = 0.12;
+    e.flash = 0.14;
+    e.stun = stun || def.stun;
+    e.wind = 0;
     e.ai = "chase";
     const [fx, fy] = facingVec();
-    moveEnt(e, fx * kb * 0.55, fy * kb * 0.55);
-    burst(e.x, e.y - 12, "#8a1a22", 10, 48);
+    moveEnt(e, fx * kb * 0.7, fy * kb * 0.7);
+    burst(e.x, e.y - 12, def.color, 8, 40);
+    burst(e.x, e.y - 10, "#7a1218", 14, 56);
+    stains.push({ x: e.x, y: e.y + 2, life: 2.4, max: 2.4, size: 3 + ((Math.random() * 3) | 0) });
     floater(e.x, e.y - 28, String(dmg), combat.furyT > 0 ? "#e8a040" : "#e8d0c0");
     sfx("hit");
-    cam.shake = combat.combo >= 5 ? 5 : 3;
-    hitstop = combat.combo >= 8 ? 0.03 : 0.038;
+    cam.shake = def.shake;
+    cam.punchX = fx * 3;
+    cam.punchY = fy * 2;
+    hitstop = def.stop;
     combat.combo += 1;
-    combat.comboT = 1.35;
+    combat.comboT = 1.45;
     if (combat.combo === 5 || combat.combo === 10 || combat.combo === 15) sfx("combo");
+    if (def.shape === "shock") {
+      rings.push({ x: e.x, y: e.y - 6, r: 6, max: 28, life: 0.28, color: def.color });
+    }
     if (e.hp <= 0) killEnemy(e);
   }
 
   function killEnemy(e) {
     e.dead = true;
     e.hp = 0;
-    burst(e.x, e.y - 10, e.boss ? "#4ad0e8" : "#8a1a22", 22, 58);
+    burst(e.x, e.y - 10, e.boss ? "#4ad0e8" : "#8a1a22", 28, 70);
+    burst(e.x, e.y - 8, "#3a0808", 10, 30);
+    stains.push({ x: e.x, y: e.y + 3, life: 3.2, max: 3.2, size: 5 });
     sfx("death");
     combat.kills++;
     if (combat.furyT > 0) {
@@ -1122,6 +1240,7 @@
 
     if (player.state === "dodge") {
       player.dodgeT -= dt;
+      player.anim += dt * 18;
       moveEnt(player, player.dodgeDx * 210 * dt, player.dodgeDy * 210 * dt);
       if (player.dodgeT <= 0) player.state = "idle";
       return;
@@ -1135,6 +1254,12 @@
       if (player.state === "dodge") return;
     }
 
+    if (just.has("KeyF")) startWhirl();
+    if (just.has("KeyR") || just.has("KeyL")) {
+      if (just.has("KeyR")) startDashStrike();
+      else startHeavy();
+    }
+    if (just.has("Mouse2")) startHeavy();
     if (
       keys.has("Space") ||
       keys.has("KeyJ") ||
@@ -1143,26 +1268,56 @@
       just.has("KeyJ") ||
       just.has("Mouse")
     ) {
-      startAttack();
+      startLight();
     }
 
     if (player.state === "attack") {
+      if (
+        player.atkT > player.atkDur * 0.5 &&
+        (just.has("ShiftLeft") || just.has("ShiftRight") || just.has("KeyK"))
+      ) {
+        player.state = "idle";
+        startDodge(ax, ay);
+        if (player.state === "dodge") return;
+      }
+      const def = ATKS[player.atkKind] || ATKS.slash;
       player.atkT += dt;
-      const atkSpd = combat.furyT > 0 ? 20 : combat.combo >= 6 ? 18 : 16;
+      const atkSpd = def.spd + (combat.furyT > 0 ? 3 : 0);
       const frame = Math.min(7, (player.atkT * atkSpd) | 0);
-      if (frame >= 2 && frame <= 5) {
+      if (def.dash && player.atkT < 0.14) {
+        moveEnt(player, player.dodgeDx * def.dash * dt, player.dodgeDy * def.dash * dt);
+        ghosts.push({ x: player.x, y: player.y, t: 0.12, flip: player.face === "left", im: framesFor(player.atkKind)[frame] });
+      }
+      if (player.atkKind === "whirl") {
+        ghosts.push({ x: player.x, y: player.y, t: 0.08, flip: false, im: heroSpin[frame] });
+        player.hitPulse += dt;
+        if (player.hitPulse > 0.16) {
+          player.hitPulse = 0;
+          player.hitList = new Set();
+        }
+      }
+      if (frame >= def.hit0 && frame <= def.hit1) {
         const hb = attackHitbox();
         for (const e of entities) {
           if (e.kind !== "enemy" || e.dead || e.asleep) continue;
           if (player.hitList.has(e)) continue;
-          if (aabbHit(hb.x, hb.y, hb.w, hb.h, e.x, e.y - 8, e.hw * 2 + 4, e.hh * 2 + 12)) {
+          const hit = hb.around
+            ? dist({ x: e.x, y: e.y - 8 }, hb) < hb.r
+            : aabbHit(hb.x, hb.y, hb.w, hb.h, e.x, e.y - 8, e.hw * 2 + 4, e.hh * 2 + 12);
+          if (hit) {
             player.hitList.add(e);
-            const dmg = player.dmg + ((Math.random() * 6) | 0);
-            hurtEnemy(e, dmg, 7);
+            const dmg = Math.max(1, (player.dmg * def.dmg + Math.random() * 6) | 0);
+            hurtEnemy(e, dmg, def.kb, def.stun);
           }
         }
       }
-      if (player.atkT >= 8 / atkSpd) player.state = "idle";
+      if (player.atkT >= player.atkDur) {
+        const q = player.queued;
+        player.queued = null;
+        player.state = "idle";
+        if (q === "light") startLight();
+        else if (q === "heavy") startHeavy();
+      }
       return;
     }
 
@@ -1303,6 +1458,19 @@
       toastT -= dt;
       if (toastT <= 0) toastEl.classList.add("hidden");
     }
+    for (let i = stains.length - 1; i >= 0; i--) {
+      stains[i].life -= dt;
+      if (stains[i].life <= 0) stains.splice(i, 1);
+    }
+    for (let i = ghosts.length - 1; i >= 0; i--) {
+      ghosts[i].t -= dt;
+      if (ghosts[i].t <= 0) ghosts.splice(i, 1);
+    }
+    for (let i = rings.length - 1; i >= 0; i--) {
+      rings[i].life -= dt;
+      rings[i].r += 70 * dt;
+      if (rings[i].life <= 0) rings.splice(i, 1);
+    }
   }
 
   function updateCam(dt) {
@@ -1314,6 +1482,8 @@
     cam.x = clamp(cam.x, 0, WORLD_W - VW);
     cam.y = clamp(cam.y, 0, WORLD_H - VH);
     cam.shake = Math.max(0, cam.shake - dt * 18);
+    cam.punchX *= Math.max(0, 1 - dt * 14);
+    cam.punchY *= Math.max(0, 1 - dt * 14);
   }
 
   function drawTile(t, x, y) {
@@ -1343,8 +1513,13 @@
 
   function spriteForPlayer() {
     if (player.state === "attack") {
-      const f = Math.min(7, (player.atkT * 14) | 0);
-      return { im: heroAtk[f], flip: player.face === "left" };
+      const def = ATKS[player.atkKind] || ATKS.slash;
+      const f = Math.min(7, (player.atkT * def.spd) | 0);
+      const arr = framesFor(player.atkKind);
+      return { im: arr[f] || heroAtk[f], flip: player.face === "left" && player.atkKind !== "whirl" };
+    }
+    if (player.flash > 0.05 && heroHurt && player.face !== "down" && player.face !== "up") {
+      return { im: heroHurt, flip: player.face === "left" };
     }
     if (player.face === "up") {
       return { im: img.hero_idle_back, flip: false };
@@ -1352,7 +1527,7 @@
     if (player.face === "down") {
       return { im: img.hero_idle_front, flip: false };
     }
-    if (player.state === "walk") {
+    if (player.state === "walk" || player.state === "dodge") {
       const f = heroWalk[((player.anim | 0) % 8 + 8) % 8];
       return { im: f, flip: player.face === "left" };
     }
@@ -1393,6 +1568,8 @@
       sx = (Math.random() - 0.5) * cam.shake;
       sy = (Math.random() - 0.5) * cam.shake;
     }
+    sx += cam.punchX;
+    sy += cam.punchY;
     ctx.setTransform(1, 0, 0, 1, sx, sy);
     ctx.clearRect(-8, -8, VW + 16, VH + 16);
 
@@ -1405,6 +1582,18 @@
         drawTile(map[ty][tx], Math.round(tx * T - cam.x), Math.round(ty * T - cam.y));
       }
     }
+    for (const s of stains) {
+      ctx.globalAlpha = clamp(s.life / s.max, 0, 0.55);
+      ctx.fillStyle = "#3a080c";
+      ctx.fillRect((s.x - cam.x - s.size / 2) | 0, (s.y - cam.y - 1) | 0, s.size, (s.size * 0.55) | 1);
+    }
+    ctx.globalAlpha = 1;
+    for (const g of ghosts) {
+      if (!g.im) continue;
+      ctx.globalAlpha = clamp(g.t / 0.12, 0, 0.35);
+      drawSprite(g.im, g.x, g.y, player.scale, g.flip, 0, 0);
+    }
+    ctx.globalAlpha = 1;
 
     const drawList = [];
     for (const e of entities) {
@@ -1420,20 +1609,32 @@
         const bob = e.state === "walk" && (e.face === "up" || e.face === "down")
           ? Math.sin(e.anim * 1.6) * 1.2
           : 0;
-        drawSprite(sp.im, e.x, e.y, e.scale, sp.flip, e.flash, bob);
+        const sc = e.scale * (e.atkKind === "heavy" && e.state === "attack" ? 1.08 : 1);
+        drawSprite(sp.im, e.x, e.y, sc, sp.flip, e.flash, bob);
         if (e.state === "attack") {
-          const atkSpd = combat.furyT > 0 ? 20 : combat.combo >= 6 ? 18 : 16;
-      const f = Math.min(7, (e.atkT * atkSpd) | 0);
-          if (f >= 3 && f <= 5) {
+          const def = ATKS[e.atkKind] || ATKS.slash;
+          const f = Math.min(7, (e.atkT * def.spd) | 0);
+          if (f >= def.hit0 && f <= def.hit1) {
             const [fx, fy] = facingVec();
-            ctx.save();
-            ctx.globalAlpha = 0.45;
-            ctx.strokeStyle = "#f0e0c8";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            const ax = e.x - cam.x + fx * 8;
+            const ax = e.x - cam.x + fx * 10;
             const ay = e.y - cam.y - 14;
-            ctx.arc(ax, ay, 16, fy === 0 ? (fx > 0 ? -0.8 : Math.PI - 0.4) : -0.2, fy === 0 ? (fx > 0 ? 0.6 : Math.PI + 0.8) : 1.2);
+            ctx.save();
+            ctx.globalAlpha = 0.55;
+            ctx.strokeStyle = def.color;
+            ctx.lineWidth = def.shape === "shock" ? 3 : 2;
+            ctx.beginPath();
+            if (def.shape === "ring" || def.around) {
+              ctx.arc(e.x - cam.x, e.y - cam.y - 8, 18 + f, 0, Math.PI * 2);
+            } else if (def.shape === "smash") {
+              ctx.moveTo(ax - 10, ay - 16);
+              ctx.lineTo(ax, ay + 8);
+              ctx.lineTo(ax + 10, ay - 16);
+            } else if (def.shape === "thrust") {
+              ctx.moveTo(e.x - cam.x, e.y - cam.y - 12);
+              ctx.lineTo(ax + fx * 18, ay + fy * 12);
+            } else {
+              ctx.arc(ax, ay, 18, fy === 0 ? (fx > 0 ? -0.9 : Math.PI - 0.5) : -0.3, fy === 0 ? (fx > 0 ? 0.7 : Math.PI + 0.9) : 1.3);
+            }
             ctx.stroke();
             ctx.restore();
           }
@@ -1445,6 +1646,8 @@
         let flip = e.face < 0;
         if (e.walk && e.ai === "chase") {
           im = e.walk[((e.anim | 0) % 8 + 8) % 8];
+        } else if (e.walk && e.ai === "attack") {
+          im = e.walk[5 + ((e.wind * 6) | 0) % 3];
         }
         const bob = e.boss ? Math.sin(performance.now() / 400) * 1.5 : 0;
         const sc = e.scale * (e.ai === "attack" ? 1.04 : 1);
@@ -1487,6 +1690,16 @@
       ctx.fillStyle = f.color;
       ctx.font = "7px 'Press Start 2P', monospace";
       ctx.fillText(f.text, (f.x - cam.x - 4) | 0, (f.y - cam.y) | 0);
+    }
+    ctx.globalAlpha = 1;
+
+    for (const r of rings) {
+      ctx.globalAlpha = clamp(r.life / 0.28, 0, 0.5);
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(r.x - cam.x, r.y - cam.y, r.r, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
@@ -1620,11 +1833,17 @@
       }
     });
     window.addEventListener("keyup", (e) => keys.delete(e.code));
-    canvas.addEventListener("mousedown", () => {
+    canvas.addEventListener("mousedown", (ev) => {
+      if (ev.button === 2) {
+        just.add("Mouse2");
+        if (mode === "play" && !dialog) startHeavy();
+        return;
+      }
       keys.add("Mouse");
       just.add("Mouse");
-      if (mode === "play" && !dialog) startAttack();
+      if (mode === "play" && !dialog) startLight();
     });
+    canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
     window.addEventListener("mouseup", () => {
       keys.delete("Mouse");
     });
