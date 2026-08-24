@@ -1,321 +1,257 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Королевский Зал • dastrbob-hub</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap');
-
-        :root {
-            --bg: #120e0a;
-            --surface: #1f1812;
-            --surface-2: #2a2118;
-            --border: #4a3728;
-            --gold: #c9a227;
-            --gold-soft: #d4af37;
-            --cream: #e8d5b7;
-            --muted: #9a7b55;
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201, 162, 39, 0.12), transparent),
-                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(30, 60, 90, 0.15), transparent),
-                var(--bg);
-            color: var(--cream);
-            min-height: 100vh;
-        }
-
-        .title-font { font-family: 'Playfair Display', Georgia, serif; }
-        .section-title { font-family: 'Cinzel', serif; }
-
-        .game-card {
-            background: linear-gradient(165deg, var(--surface-2) 0%, var(--surface) 100%);
-            border: 1px solid var(--border);
-            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .game-card:hover {
-            transform: translateY(-6px);
-            border-color: var(--gold);
-            box-shadow: 0 24px 40px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(201, 162, 39, 0.15);
-        }
-
-        .card-visual {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card-visual::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(18, 14, 10, 0.55), transparent 55%);
-            pointer-events: none;
-        }
-
-        .badge {
-            letter-spacing: 0.12em;
-            font-size: 10px;
-            font-weight: 700;
-        }
-
-        .nav-blur {
-            background: rgba(18, 14, 10, 0.85);
-            backdrop-filter: blur(12px);
-        }
-
-        .hero-glow {
-            text-shadow: 0 0 40px rgba(201, 162, 39, 0.25);
-        }
-
-        .divider-line {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--border), transparent);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Королевский Зал</title>
+  <meta name="description" content="Каталог игр и инструментов giriaja: морской бой, Пепельный Клинок, документы, TIFF и резка — в браузере, без установки." />
+  <meta name="theme-color" content="#0a0b0d" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0b0d'/%3E%3Cpath fill='%23efeae3' d='M6 30V15A10 10 0 0 1 26 15v15h-6V15a4 4 0 0 0-8 0v15H6z'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0b0d;
+      --surface: #121418;
+      --fg: #efeae3;
+      --muted: #8c877e;
+      --accent: #9aa7b5;
+      --border: #23262c;
+      --font: "Outfit", system-ui, sans-serif;
+      --display: "Fraunces", Georgia, serif;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-font-smoothing: antialiased; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; color: inherit; }
+    h1, h2, h3 { text-wrap: balance; margin: 0; font-family: var(--display); font-weight: 500; }
+    p { text-wrap: pretty; margin: 0; }
+    .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem; }
+    header {
+      position: sticky; top: 0; z-index: 40;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in oklab, var(--bg) 90%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.75rem 0; }
+    .brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+    .mark { width: 2.25rem; height: 2.25rem; border-radius: 0.5rem; background: var(--surface); display: grid; place-items: center; flex-shrink: 0; }
+    .mark svg { width: 1.25rem; height: 1.25rem; }
+    .brand h2 { font-size: 1.125rem; line-height: 1.15; }
+    .kicker { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+    .filters { display: flex; flex: 1; justify-content: flex-end; gap: 0.25rem; }
+    @media (min-width: 640px) { .filters { justify-content: center; } }
+    .filters button {
+      min-height: 44px; padding: 0 1rem; border: 0; border-radius: 999px;
+      background: transparent; color: var(--muted); cursor: pointer;
+    }
+    .filters button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+    .gh {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      min-height: 44px; padding: 0 0.85rem; border-radius: 999px;
+      border: 1px solid var(--border); color: var(--muted);
+    }
+    .hero { position: relative; isolation: isolate; overflow: hidden; }
+    .hero img { width: 100%; height: min(78vh, 720px); object-fit: cover; display: block; }
+    .hero-shade { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg), color-mix(in oklab, var(--bg) 55%, transparent) 45%, color-mix(in oklab, var(--bg) 20%, transparent)); }
+    .hero-copy { position: absolute; inset: 0; display: flex; align-items: flex-end; }
+    .hero-copy .wrap { padding-bottom: 3.5rem; }
+    .hero .eyebrow { font-size: 0.75rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
+    .hero h1 { font-size: clamp(2.75rem, 8vw, 4.5rem); line-height: 0.95; letter-spacing: -0.03em; }
+    .hero p { max-width: 36rem; margin-top: 1.25rem; font-size: 1.125rem; line-height: 1.55; color: color-mix(in oklab, var(--fg) 85%, transparent); }
+    main { padding: 2.5rem 0 4rem; }
+    .toolbar { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2.5rem; }
+    @media (min-width: 640px) { .toolbar { flex-direction: row; align-items: flex-end; justify-content: space-between; } }
+    .search { position: relative; width: 100%; max-width: 20rem; }
+    .search input {
+      width: 100%; height: 44px; padding: 0 1rem 0 2.5rem;
+      border-radius: 0.75rem; border: 1px solid var(--border);
+      background: var(--surface); outline: none;
+    }
+    .search svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); opacity: 0.6; }
+    section.block { margin-bottom: 3.5rem; }
+    .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .sec-head .num { font-family: ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.2em; color: var(--accent); }
+    .sec-head h2 { font-size: clamp(1.75rem, 3vw, 2.25rem); }
+    .sec-head span { color: var(--muted); font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 640px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      .card.featured { grid-column: span 2; }
+    }
+    @media (min-width: 1024px) {
+      .tools-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .card {
+      position: relative;
+      display: block;
+      overflow: hidden;
+      border-radius: 1rem;
+      background: var(--surface);
+    }
+    .card img { width: 100%; height: 18rem; object-fit: cover; display: block; transition: transform 200ms ease-out; }
+    @media (min-width: 640px) { .card.featured img { height: 28rem; } }
+    .card:hover img { transform: scale(1.05); }
+    .shade { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg), color-mix(in oklab, var(--bg) 40%, transparent) 45%, transparent); }
+    .card-body { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 1.25rem; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .num { font-family: ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.16em; color: color-mix(in oklab, var(--fg) 80%, transparent); }
+    .badge { border: 1px solid color-mix(in oklab, var(--fg) 20%, transparent); background: color-mix(in oklab, var(--bg) 50%, transparent); border-radius: 999px; padding: 0.25rem 0.65rem; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    .card h3 { font-size: 1.5rem; line-height: 1.15; margin-bottom: 0.5rem; }
+    .card .blurb { font-size: 0.9rem; line-height: 1.5; color: color-mix(in oklab, var(--fg) 80%, transparent); max-width: 28rem; }
+    .card .meta { margin-top: 0.75rem; font-size: 0.75rem; color: var(--muted); }
+    .empty { border: 1px solid var(--border); background: var(--surface); border-radius: 1rem; padding: 4rem 1.25rem; text-align: center; color: var(--muted); }
+    footer { border-top: 1px solid var(--border); }
+    .foot { display: flex; flex-direction: column; gap: 0.75rem; padding: 2rem 0; color: var(--muted); font-size: 0.9rem; }
+    @media (min-width: 640px) { .foot { flex-direction: row; justify-content: space-between; align-items: center; } }
+    .hidden { display: none !important; }
+    @media (prefers-reduced-motion: reduce) {
+      .card img { transition: none; }
+      .card:hover img { transform: none; }
+    }
+  </style>
 </head>
 <body>
-    <nav class="border-b border-[#4a3728] nav-blur sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-x-3">
-                <div class="w-10 h-10 bg-[#c9a227] rounded-2xl flex items-center justify-center shadow-lg shadow-amber-900/30">
-                    <i class="fa-solid fa-chess-king text-[#120e0a] text-xl"></i>
-                </div>
-                <div>
-                    <span class="title-font text-2xl tracking-wide font-bold text-[#c9a227]">Королевский Зал</span>
-                    <div class="text-[10px] tracking-[0.2em] text-[#9a7b55] uppercase -mt-0.5">pidrpen · giriaja</div>
-                </div>
-            </div>
-            <a href="https://github.com/pidrpen/giriaja" class="flex items-center gap-x-2 text-sm text-[#d4c3a3] hover:text-[#c9a227] transition-colors px-3 py-2 rounded-xl hover:bg-[#2a2118]">
-                <i class="fa-brands fa-github text-lg"></i>
-                <span class="hidden sm:inline">GitHub</span>
-            </a>
+  <header>
+    <div class="wrap bar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path fill="#efeae3" d="M6 30V15A10 10 0 0 1 26 15v15h-6V15a4 4 0 0 0-8 0v15H6z"/></svg>
+        </span>
+        <div>
+          <h2>Королевский Зал</h2>
+          <p class="kicker">giriaja · архив</p>
         </div>
-    </nav>
+      </div>
+      <nav class="filters" aria-label="Разделы">
+        <button type="button" data-filter="all" aria-pressed="true">Все</button>
+        <button type="button" data-filter="game" aria-pressed="false">Игры</button>
+        <button type="button" data-filter="tool" aria-pressed="false">Инструменты</button>
+      </nav>
+      <a class="gh" href="https://github.com/pidrpen/giriaja">GitHub</a>
+    </div>
+  </header>
 
-    <main class="max-w-6xl mx-auto px-6 pt-14 pb-10">
-        <!-- Hero -->
-        <header class="text-center mb-16">
-            <div class="inline-flex items-center gap-x-2 px-4 py-1.5 bg-[#1f1812] border border-[#4a3728] rounded-full text-sm mb-6">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#c9a227] animate-pulse"></span>
-                <span class="tracking-[0.2em] text-[11px] font-medium text-[#9a7b55]">БРАУЗЕР • БЕЗ УСТАНОВКИ</span>
-            </div>
-            <h1 class="title-font text-5xl sm:text-6xl md:text-7xl tracking-tighter font-bold text-[#c9a227] mb-4 hero-glow">
-                Королевский Зал
-            </h1>
-            <p class="max-w-lg mx-auto text-[#d4c3a3] text-lg leading-relaxed">
-                Морские дуэли, дарк-фэнтези и утилиты для документов — всё в браузере
-            </p>
-        </header>
+  <section class="hero">
+    <img src="hub/hero.jpg" alt="" />
+    <div class="hero-shade"></div>
+    <div class="hero-copy">
+      <div class="wrap">
+        <p class="eyebrow">Браузер · без установки · 10 проектов</p>
+        <h1>Королевский Зал</h1>
+        <p>Морские дуэли, дарк-фэнтези и цех документов — всё открывается в браузере.</p>
+      </div>
+    </div>
+  </section>
 
-        <!-- Games -->
-        <section class="mb-14">
-            <div class="flex items-end justify-between mb-6 px-1">
-                <div>
-                    <h2 class="section-title text-3xl text-[#c9a227] tracking-wider">Игры</h2>
-                    <p class="text-[#9a7b55] mt-1 text-sm">Дуэли, пиксельная бойня и браузер без установки</p>
-                </div>
-            </div>
+  <main id="catalog">
+    <div class="wrap">
+      <div class="toolbar">
+        <div>
+          <p class="kicker">Каталог</p>
+          <p id="count" class="kicker" style="margin-top:0.35rem;letter-spacing:0">10 из 10</p>
+        </div>
+        <label class="search">
+          <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Поиск</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+          <input id="q" type="search" placeholder="Найти проект" />
+        </label>
+      </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl">
-                <!-- Морская Битва -->
-                <a href="battleship.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#0d2137] via-[#1a2a3a] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-7xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">⚓</div>
-                        <div class="absolute top-4 right-4 badge bg-cyan-600/90 text-white px-3 py-1 rounded-full z-10">P2P</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Морская Битва</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Классический морской бой 10×10. WebRTC P2P, авторасстановка флота, чат и смена тем.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-users"></i> 2 игрока</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Без сервера</span>
-                        </div>
-                    </div>
-                </a>
+      <section class="block" data-section="game">
+        <div class="sec-head">
+          <div>
+            <p class="num">01</p>
+            <h2>Игры</h2>
+          </div>
+          <span>Дуэли и пиксельная бойня</span>
+        </div>
+        <div class="grid" id="games"></div>
+      </section>
 
-                <!-- Морской бой ПРО (если есть battleship2) -->
-                <a href="battleship2.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#0a1a2e] via-[#132238] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-7xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">⚔</div>
-                        <div class="absolute top-4 right-4 badge bg-blue-600/90 text-white px-3 py-1 rounded-full z-10">ФЛОТ-50</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">ФЛОТ-50 · ПРО</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Эпическая война 50×50: 20 кораблей, ОД, залпы, торпеды, радар, способности. WebRTC P2P + canvas.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-users"></i> 2 игрока</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Залпы · радар · ОД</span>
-                        </div>
-                    </div>
-                </a>
+      <section class="block" data-section="tool">
+        <div class="sec-head">
+          <div>
+            <p class="num">02</p>
+            <h2>Инструменты</h2>
+          </div>
+          <span>Документы, TIFF, резка</span>
+        </div>
+        <div class="grid tools-grid" id="tools"></div>
+      </section>
 
-                <!-- Пепельный Клинок -->
-                <a href="pepelny-klinok/" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#2a0c12] via-[#1a080c] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-7xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">🗡️</div>
-                        <div class="absolute top-4 right-4 badge bg-red-800/90 text-white px-3 py-1 rounded-full z-10">PIXEL</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Пепельный Клинок</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">2D пиксельный дарк-фэнтези. Мечник, квесты и мясорубка: орды гулей, жнецов и босс Владыка Праха.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-skull"></i> 1 игрок</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>WASD · клинок · орды</span>
-                        </div>
-                    </div>
-                </a>
-            </div>
-        </section>
+      <p id="empty" class="empty hidden">Ничего не нашлось. Сбросьте фильтр или запрос.</p>
+    </div>
+  </main>
 
-        <div class="divider-line mb-14"></div>
+  <footer>
+    <div class="wrap foot">
+      <p>pidrpen / giriaja</p>
+      <a href="https://github.com/pidrpen/giriaja">Репозиторий на GitHub</a>
+    </div>
+  </footer>
 
-        <!-- Tools -->
-        <section class="mb-10">
-            <div class="flex items-end justify-between mb-6 px-1">
-                <div>
-                    <h2 class="section-title text-3xl text-[#c9a227] tracking-wider">Инструменты</h2>
-                    <p class="text-[#9a7b55] mt-1 text-sm">Документы, TIFF, резка и изображения</p>
-                </div>
-            </div>
+  <script>
+    const ENTRIES = [
+      { kind: "game", featured: true, href: "pepelny-klinok/", image: "hub/klinok.jpg", badge: "Пиксель", title: "Пепельный Клинок", blurb: "Пиксельный дарк-фэнтези: мечник, квесты и орды гулей. Босс — Владыка Праха.", meta: "1 игрок · WASD · клинок" },
+      { kind: "game", href: "battleship2.html", image: "hub/fleet50.jpg", badge: "P2P", title: "Флот-50 · Про", blurb: "Война 50×50: двадцать кораблей, очки действия, залпы, торпеды и радар. WebRTC без сервера.", meta: "2 игрока · залпы · радар" },
+      { kind: "game", href: "battleship.html", image: "hub/battleship.jpg", badge: "P2P", title: "Морская битва", blurb: "Классический морской бой 10×10. Авторасстановка флота, чат и смена тем.", meta: "2 игрока · без сервера" },
+      { kind: "tool", href: "document-templates.html", image: "hub/docs.jpg", badge: "1С", title: "Шаблоны документов", blurb: "Формы из 1С: ведомости, статистика, комплект, распоряжение. Печать A4 и Excel.", meta: "Формы 1–3 · печать" },
+      { kind: "tool", href: "gost-iso-nuts.html", image: "hub/fasteners.jpg", badge: "ГОСТ", title: "Крепёж ГОСТ → ISO / DIN", blurb: "Гайки, шайбы и винты: разбор обозначения и подбор ближайшего аналога.", meta: "70 стандартов · аналог" },
+      { kind: "tool", href: "ocr-spec.html", image: "hub/ocr.jpg", badge: "OCR", title: "Скрин → спецификация", blurb: "OCR со скрина: обозначение и наименование, правка таблицы, выгрузка в Excel.", meta: "Ctrl+V · ГОСТ" },
+      { kind: "tool", href: "ops-clipboard.html", image: "hub/clipboard.jpg", badge: "Copy", title: "Буфер операций", blurb: "Слоты для текста и таблиц, которые копируешь снова и снова. Помнит после перезагрузки.", meta: "localStorage · 1 клик" },
+      { kind: "tool", href: "tiff-a4-a3.html", image: "hub/tiff-sort.jpg", badge: "A4 / A3", title: "TIFF-сортировщик A4/A3", blurb: "Раскладывает TIFF, JPG и PNG по ориентации. Экспорт групп в PDF под формат оригинала.", meta: "Автосортировка · PDF" },
+      { kind: "tool", href: "tiff_merger.html", image: "hub/tiff-merge.jpg", badge: "Merger", title: "TIFF-объединение", blurb: "Склейка TIFF и картинок в многостраничный файл. Перетаскивание страниц, TIFF и PDF.", meta: "Многостраничный · drag & drop" },
+      { kind: "tool", href: "cutting-calculator.html", image: "hub/cutting.jpg", badge: "Резка", title: "Расчётник резки", blurb: "Нормы расхода на лазер, плазму и газ. Марка, толщина, длина реза, выгрузка CSV.", meta: "125 норм · лазер · плазма" }
+    ];
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl">
-                <!-- Шаблоны документов -->
-                <a href="document-templates.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#1a2a1f] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📋</div>
-                        <div class="absolute top-4 right-4 badge bg-teal-700/90 text-white px-3 py-1 rounded-full z-10">1С · PRINT</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Шаблоны документов</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Заполнение форм из 1С: ведомости, статистика, комплект, распоряжение. Печать A4 с колонтитулами и выгрузка в Excel.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-file-lines"></i> Формы 1–3</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Excel · печать</span>
-                        </div>
-                    </div>
-                </a>
+    let filter = "all";
+    let query = "";
 
-                <!-- Подбор крепежа ГОСТ → ISO / DIN -->
-                <a href="gost-iso-nuts.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#2b2418] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">🔩</div>
-                        <div class="absolute top-4 right-4 badge bg-amber-700/90 text-white px-3 py-1 rounded-full z-10">ГОСТ · ISO · DIN</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Крепёж ГОСТ → ISO / DIN</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Гайки, шайбы и винты: умный разбор полного обозначения и подбор ближайших ISO и DIN.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-screwdriver-wrench"></i> 70 стандартов</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Подбор аналога</span>
-                        </div>
-                    </div>
-                </a>
+    function card(e, i) {
+      const n = String(i + 1).padStart(2, "0");
+      return `<a class="card${e.featured ? " featured" : ""}" href="${e.href}">
+        <img src="${e.image}" alt="" />
+        <div class="shade"></div>
+        <div class="card-body">
+          <div class="top"><span class="num">${n}</span><span class="badge">${e.badge}</span></div>
+          <div>
+            <h3>${e.title}</h3>
+            <p class="blurb">${e.blurb}</p>
+            <p class="meta">${e.meta}</p>
+          </div>
+        </div>
+      </a>`;
+    }
 
-                                                <!-- OCR спецификация -->
-                <a href="ocr-spec.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#1a2838] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">🔍</div>
-                        <div class="absolute top-4 right-4 badge bg-sky-700/90 text-white px-3 py-1 rounded-full z-10">OCR</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Скрин → спецификация</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">OCR со скрина (печать/рукопись «на удачу»): Обозначение / Наименование → правка таблицы → Excel.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-camera"></i> Ctrl+V</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>ГОСТ → наимен.</span>
-                        </div>
-                    </div>
-                </a>
+    function render() {
+      const q = query.trim().toLowerCase();
+      const vis = ENTRIES.filter((e) => {
+        if (filter !== "all" && e.kind !== filter) return false;
+        if (!q) return true;
+        return (e.title + e.blurb + e.badge + e.meta).toLowerCase().includes(q);
+      });
+      const games = vis.filter((e) => e.kind === "game");
+      const tools = vis.filter((e) => e.kind === "tool");
+      document.getElementById("games").innerHTML = games.map((e, i) => card(e, i)).join("");
+      document.getElementById("tools").innerHTML = tools.map((e, i) => card(e, i)).join("");
+      document.querySelector('[data-section="game"]').classList.toggle("hidden", filter === "tool" || games.length === 0);
+      document.querySelector('[data-section="tool"]').classList.toggle("hidden", filter === "game" || tools.length === 0);
+      document.getElementById("empty").classList.toggle("hidden", vis.length > 0);
+      document.getElementById("count").textContent = vis.length + " из " + ENTRIES.length + (q ? " · «" + query + "»" : "");
+    }
 
-                <!-- Буфер операций -->
-                <a href="ops-clipboard.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#1a2230] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📎</div>
-                        <div class="absolute top-4 right-4 badge bg-indigo-700/90 text-white px-3 py-1 rounded-full z-10">COPY</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Буфер операций</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Слоты для текста/таблиц, которые копируешь из раза в раз. Одна кнопка — в буфер, помнит после перезагрузки.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-clipboard"></i> localStorage</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>1 клик copy</span>
-                        </div>
-                    </div>
-                </a>
-
-<!-- TIFF Сортировщик -->
-                <a href="tiff-a4-a3.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#2a2520] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📐</div>
-                        <div class="absolute top-4 right-4 badge bg-emerald-700/90 text-white px-3 py-1 rounded-full z-10">A4 / A3</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">TIFF Сортировщик A4/A3</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Сортировка TIFF/JPG/PNG по ориентации. Экспорт групп в PDF с размером страницы под оригинал.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-sort"></i> Автосортировка</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>PDF-экспорт</span>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- TIFF Merger -->
-                <a href="tiff_merger.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#2a2118] via-[#1f1812] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">📜</div>
-                        <div class="absolute top-4 right-4 badge bg-amber-700/90 text-white px-3 py-1 rounded-full z-10">MERGER</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">TIFF Объединение</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Склейка нескольких TIFF и изображений в один многостраничный файл. Перетаскивание страниц, TIFF и PDF.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-layer-group"></i> Многостраничный</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Drag & drop</span>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Расчётник резки -->
-                <a href="cutting-calculator.html" class="game-card block rounded-3xl overflow-hidden h-full flex flex-col group">
-                    <div class="card-visual h-48 bg-gradient-to-br from-[#0d2137] via-[#1a2430] to-[#120e0a] flex items-center justify-center border-b border-[#4a3728]">
-                        <div class="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-300">⚙️</div>
-                        <div class="absolute top-4 right-4 badge bg-blue-700/90 text-white px-3 py-1 rounded-full z-10">РЕЗКА</div>
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col">
-                        <h3 class="text-2xl font-semibold tracking-tight mb-2 text-[#c9a227] group-hover:text-[#d4af37] transition-colors">Расчётник резки</h3>
-                        <p class="text-[#d4c3a3] text-sm leading-relaxed flex-1">Нормы расхода материалов и газов: лазер, плазма, газовая резка. Выбор марки/толщины, длина реза, CSV.</p>
-                        <div class="mt-5 flex items-center gap-3 text-[11px] text-[#9a7b55]">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-calculator"></i> 125 норм</span>
-                            <span class="w-1 h-1 rounded-full bg-[#4a3728]"></span>
-                            <span>Лазер · плазма · газ</span>
-                        </div>
-                    </div>
-                </a>
-
-            </div>
-        </section>
-    </main>
-
-    <footer class="max-w-6xl mx-auto px-6 py-10 text-center text-sm text-[#9a7b55] border-t border-[#4a3728]/60">
-        <a href="https://github.com/pidrpen/giriaja" class="hover:text-[#c9a227] transition-colors">Репозиторий на GitHub</a>
-        <div class="mt-3 text-xs tracking-wide">pidrpen/giriaja · 2026</div>
-    </footer>
+    document.querySelectorAll("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        filter = btn.getAttribute("data-filter");
+        document.querySelectorAll("[data-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        render();
+      });
+    });
+    document.getElementById("q").addEventListener("input", (e) => { query = e.target.value; render(); });
+    render();
+  </script>
 </body>
 </html>
