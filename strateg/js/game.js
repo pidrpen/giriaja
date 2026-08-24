@@ -654,26 +654,32 @@
       job.t = (job.t || 0) + dt;
       if (job.t >= HARVEST_TIME) {
         job.t = 0;
-        if (job.node.hp > 0) {
-          job.node.hp--;
+        if (nodeLive(job.node) && job.node.hp > 0) {
           const res = job.node.kind === "gold" ? "gold" : "wood";
+          job.node.hp--;
           job.carry = res;
           u.carry = res;
           if (job.node.hp <= 0) depleteNode(job.node);
           beep(res === "gold" ? 240 : 180, 0.05, "square");
+          job.phase = "toHall";
+          pathToHall(u);
+        } else if (job.carry || u.carry) {
+          job.phase = "toHall";
+          pathToHall(u);
+        } else {
+          u.job = null;
         }
-        job.phase = "toHall";
-        pathToHall(u);
       }
       return;
     }
     if (job.phase === "toHall") {
       if (nearHallDoor(u)) {
         u.path = [];
-        if (job.carry === "wood" || u.carry === "wood") {
+        const got = job.carry || u.carry;
+        if (got === "wood") {
           wood += WOOD_PAY;
           beep(420, 0.05);
-        } else if (job.carry === "gold" || u.carry === "gold") {
+        } else if (got === "gold") {
           gold += GOLD_PAY;
           beep(560, 0.05);
         }
@@ -1108,39 +1114,27 @@
 
   function issueRightClick(wx, wy) {
     const workers = selected.filter((s) => s.kind === "worker");
-    if (workers.length) {
-      const node = pickNodeAt(wx, wy);
-      if (node && nodeLive(node)) {
-        workers.forEach((u, i) => {
-          u.job = {
-            type: "gather",
-            node,
-            phase: "toNode",
-            carry: u.carry || null,
-            t: 0,
-          };
-          pathToNode(u, node, i);
-        });
-        pings.push({
-          x: node.x,
-          y: node.y,
-          t: 0.45,
-          color: node.kind === "gold" ? "#ffe46a" : "#7dff6a",
-        });
-        beep(node.kind === "gold" ? 520 : 640, 0.04);
-      } else {
-        const cols = Math.min(workers.length, 5);
-        workers.forEach((u, i) => {
-          u.job = null;
-          const col = i % 5;
-          const row = (i / 5) | 0;
-          orderMove(u, wx + (col - (cols - 1) / 2) * 14, wy + row * 12);
-        });
-        pings.push({ x: wx, y: wy, t: 0.45, color: "#7dff6a" });
-        beep(640, 0.04);
-      }
-    } else if (selected.filter((s) => s.kind && s.kind !== "hall").length) {
-      const troops = selected.filter((s) => s.kind && s.kind !== "hall");
+    const troops = selected.filter((s) => s.kind && s.kind !== "hall");
+    const node = pickNodeAt(wx, wy);
+    if (workers.length && node && nodeLive(node)) {
+      workers.forEach((u, i) => {
+        u.job = {
+          type: "gather",
+          node,
+          phase: "toNode",
+          carry: u.carry || null,
+          t: 0,
+        };
+        pathToNode(u, node, i);
+      });
+      pings.push({
+        x: node.x,
+        y: node.y,
+        t: 0.45,
+        color: node.kind === "gold" ? "#ffe46a" : "#7dff6a",
+      });
+      beep(node.kind === "gold" ? 520 : 640, 0.04);
+    } else if (troops.length) {
       const cols = Math.min(troops.length, 5);
       troops.forEach((u, i) => {
         u.job = null;
