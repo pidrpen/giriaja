@@ -4,8 +4,8 @@
   globalThis.__STRATEG_STARTED = true;
 
   const TILE = 16;
-  const MAP_W = 72;
-  const MAP_H = 72;
+  const MAP_W = 96;
+  const MAP_H = 96;
   const HALL_W = 5;
   const HALL_H = 4;
   const WORKER_COST = 50;
@@ -13,8 +13,8 @@
   const WORKER_CAP = 50;
   const POP_HALL = 6;
   const POP_HOUSE = 5;
-  const START_GOLD = 250;
-  const START_WOOD = 120;
+  const START_GOLD = 280;
+  const START_WOOD = 140;
   const HARVEST_TIME = 1.2;
   const WOOD_PAY = 8;
   const GOLD_PAY = 10;
@@ -22,10 +22,12 @@
   const UNIT_R = 6;
   const CELL = 24;
   const UNIT_SPEC = {
-    worker: { gold: 50, wood: 0, time: 5, speed: 52, name: "Рабочий", sheet: "worker", hp: 30, dmg: 4, range: 16, cd: 1.15 },
-    militia: { gold: 40, wood: 25, time: 7, speed: 46, name: "Ополченец", sheet: "militia", hp: 62, dmg: 9, range: 18, cd: 0.95 },
-    archer: { gold: 45, wood: 35, time: 8, speed: 48, name: "Лучник", sheet: "archer", hp: 42, dmg: 8, range: 88, cd: 1.22 },
-    grunt: { gold: 0, wood: 0, time: 8, speed: 44, name: "Орк", sheet: "grunt", hp: 58, dmg: 9, range: 18, cd: 1.0 },
+    worker: { gold: 50, wood: 0, time: 5, speed: 52, name: "Рабочий", sheet: "worker", hp: 30, dmg: 4, range: 16, cd: 1.15, sight: 6 },
+    militia: { gold: 40, wood: 25, time: 7, speed: 46, name: "Ополченец", sheet: "militia", hp: 62, dmg: 9, range: 18, cd: 0.95, sight: 7 },
+    archer: { gold: 45, wood: 35, time: 8, speed: 48, name: "Лучник", sheet: "archer", hp: 42, dmg: 8, range: 88, cd: 1.22, sight: 9 },
+    rider: { gold: 80, wood: 40, time: 10, speed: 70, name: "Всадник", sheet: "rider", hp: 95, dmg: 13, range: 20, cd: 1.05, sight: 8 },
+    grunt: { gold: 0, wood: 0, time: 8, speed: 44, name: "Орк", sheet: "grunt", hp: 58, dmg: 9, range: 18, cd: 1.0, sight: 6 },
+    peon: { gold: 0, wood: 0, time: 5, speed: 50, name: "Батрак", sheet: "peon", hp: 28, dmg: 3, range: 16, cd: 1.2, sight: 6 },
   };
   const BAR_W = 5;
   const BAR_H = 3;
@@ -57,6 +59,16 @@
       name: "Казармы",
       img: "barracks",
     },
+    tower: {
+      gold: 70,
+      wood: 80,
+      tw: 2,
+      th: 2,
+      time: 10,
+      max: 6,
+      name: "Башня",
+      img: "tower",
+    },
   };
   const LIFT_STEP = 8;
   const LIFT_LEVELS = 4;
@@ -80,11 +92,15 @@
     btnArcher: document.getElementById("btn-archer"),
     btnBarracks: document.getElementById("btn-barracks"),
     btnHouse: document.getElementById("btn-house"),
+    btnTower: document.getElementById("btn-tower"),
+    btnRider: document.getElementById("btn-rider"),
     wrapWorker: document.getElementById("wrap-worker"),
     wrapHouse: document.getElementById("wrap-house"),
     wrapBarracks: document.getElementById("wrap-barracks"),
+    wrapTower: document.getElementById("wrap-tower"),
     wrapMilitia: document.getElementById("wrap-militia"),
     wrapArcher: document.getElementById("wrap-archer"),
+    wrapRider: document.getElementById("wrap-rider"),
     toasts: document.getElementById("toasts"),
     boot: document.getElementById("boot"),
     bootMsg: document.getElementById("boot-msg"),
@@ -113,6 +129,8 @@
   let trainedOnce = false;
   let gameOver = null;
   let raidT = 0;
+  let enemyGold = 80;
+  let fog, seen;
   const seed = (Math.random() * 1e9) | 0;
 
   function loadImg(src) {
@@ -292,7 +310,9 @@
   function bldgImg(b) {
     if (b.kind === "barracks") return imgs.barracks;
     if (b.kind === "house") return imgs.house;
+    if (b.kind === "tower") return imgs.tower;
     if (b.kind === "orc_hall") return imgs.orcHall;
+    if (b.kind === "orc_barracks") return imgs.orcBarracks;
     return imgs.hall;
   }
 
@@ -344,8 +364,17 @@
 
   function bldgHpFor(kind) {
     if (kind === "house") return 90;
-    if (kind === "barracks") return 240;
+    if (kind === "barracks" || kind === "orc_barracks") return 240;
+    if (kind === "tower") return 200;
     return 450;
+  }
+
+  function bldgSight(b) {
+    if (b.kind === "tower") return 13;
+    if (b.kind === "hall") return 10;
+    if (b.kind === "barracks") return 7;
+    if (b.kind === "house") return 5;
+    return 6;
   }
 
   function armBldg(b, team) {
@@ -561,12 +590,14 @@
     }
 
     const hills = [
-      [36 + hash(1, 2) * 8, 12 + hash(3, 4) * 6, 11, 0.72],
-      [56 + hash(5, 6) * 6, 24 + hash(7, 8) * 8, 13, 0.85],
-      [18 + hash(9, 1) * 6, 46 + hash(2, 8) * 8, 12, 0.7],
-      [50 + hash(4, 5) * 8, 52 + hash(6, 7) * 6, 10, 0.64],
-      [8 + hash(8, 3) * 5, 28 + hash(1, 9) * 8, 9, 0.55],
-      [42 + hash(2, 6) * 6, 34 + hash(9, 4) * 6, 8, 0.4],
+      [48, 18, 12, 0.72],
+      [78, 34, 14, 0.85],
+      [22, 62, 12, 0.7],
+      [70, 82, 11, 0.64],
+      [10, 38, 9, 0.55],
+      [52, 50, 9, 0.4],
+      [88, 14, 8, 0.5],
+      [40, 88, 10, 0.6],
     ];
     for (const [cx, cy, r, a] of hills) stampBump(cx, cy, r, a);
     stampBump(28 + hash(3, 7) * 6, 22, 9, -0.38);
@@ -575,8 +606,8 @@
 
     hall = {
       kind: "hall",
-      tx: 14,
-      ty: 13,
+      tx: 16,
+      ty: 16,
       tw: HALL_W,
       th: HALL_H,
       queue: [],
@@ -623,8 +654,8 @@
 
     enemyHall = {
       kind: "orc_hall",
-      tx: 50,
-      ty: 48,
+      tx: 74,
+      ty: 70,
       tw: HALL_W,
       th: HALL_H,
       queue: [],
@@ -637,13 +668,30 @@
     buildings.push(enemyHall);
     const ed = bldgDoor(enemyHall);
     enemyHall.rally = { x: ed.x, y: ed.y + 28 };
-    for (let y = enemyHall.ty - 2; y < enemyHall.ty + HALL_H + 6; y++) {
-      for (let x = enemyHall.tx - 2; x < enemyHall.tx + HALL_W + 4; x++) {
+    for (let y = enemyHall.ty - 2; y < enemyHall.ty + HALL_H + 8; y++) {
+      for (let x = enemyHall.tx - 2; x < enemyHall.tx + HALL_W + 6; x++) {
         if (y < 0 || x < 0 || y >= MAP_H || x >= MAP_W) continue;
         elev[y][x] = 1;
         height[y][x] = 1 / LIFT_LEVELS;
       }
     }
+
+    const orcBar = {
+      kind: "orc_barracks",
+      tx: enemyHall.tx,
+      ty: enemyHall.ty + HALL_H + 2,
+      tw: 5,
+      th: 3,
+      queue: [],
+      done: true,
+    };
+    orcBar.x = orcBar.tx * TILE + (5 * TILE) / 2;
+    orcBar.y = orcBar.ty * TILE + 3 * TILE;
+    armBldg(orcBar, 1);
+    occupyBldg(orcBar, true);
+    const obd = bldgDoor(orcBar);
+    orcBar.rally = { x: obd.x, y: obd.y + 24 };
+    buildings.push(orcBar);
 
     const d0 = doorPos();
     rally = { x: d0.x, y: d0.y + 36 };
@@ -652,6 +700,7 @@
     nodes = [];
     placeProps();
     placeNodes();
+    initFog();
     prerenderTerrain();
   }
 
@@ -815,20 +864,25 @@
 
   function placeNodes() {
     placeGoldMine(hall.tx + HALL_W + 9, hall.ty + 2, 90);
-    placeGoldMine(52, 16, 110);
-    placeGoldMine(10, 50, 100);
-    placeGoldMine(56, 52, 90);
+    placeGoldMine(hall.tx + 28, hall.ty + 22, 110);
+    placeGoldMine(48, 48, 120);
+    placeGoldMine(12, 70, 100);
+    placeGoldMine(enemyHall.tx - 9, enemyHall.ty + 1, 90);
+    placeGoldMine(enemyHall.tx - 6, enemyHall.ty + 16, 100);
+    placeGoldMine(84, 22, 90);
 
     const groves = [
       { tx: hall.tx + 2, ty: hall.ty + HALL_H + 11, n: 16, r: 3.6 },
       { tx: hall.tx - 6, ty: hall.ty + 5, n: 10, r: 2.8 },
-      { tx: 34, ty: 10, n: 16, r: 4.2 },
-      { tx: 58, ty: 22, n: 14, r: 3.8 },
-      { tx: 8, ty: 36, n: 15, r: 4 },
-      { tx: 24, ty: 54, n: 18, r: 4.5 },
-      { tx: 48, ty: 46, n: 16, r: 4 },
-      { tx: 62, ty: 58, n: 12, r: 3.4 },
-      { tx: 40, ty: 28, n: 11, r: 3.2 },
+      { tx: 42, ty: 14, n: 16, r: 4.2 },
+      { tx: 70, ty: 28, n: 14, r: 3.8 },
+      { tx: 10, ty: 44, n: 15, r: 4 },
+      { tx: 30, ty: 72, n: 18, r: 4.5 },
+      { tx: 58, ty: 58, n: 16, r: 4 },
+      { tx: 86, ty: 80, n: 12, r: 3.4 },
+      { tx: 50, ty: 36, n: 11, r: 3.2 },
+      { tx: 78, ty: 50, n: 14, r: 3.6 },
+      { tx: enemyHall.tx + 6, ty: enemyHall.ty + HALL_H + 8, n: 14, r: 3.4 },
     ];
     for (const g of groves) {
       const spots = scatterTiles(g.tx, g.ty, g.r, g.n, (tx, ty) => {
@@ -854,6 +908,60 @@
 
   function nodeLive(n) {
     return n && n.hp > 0 && (n.kind === "tree" || n.kind === "gold");
+  }
+
+  function visAt(wx, wy) {
+    const tx = clamp((wx / TILE) | 0, 0, MAP_W - 1);
+    const ty = clamp((wy / TILE) | 0, 0, MAP_H - 1);
+    return fog && fog[ty] ? fog[ty][tx] : 2;
+  }
+
+  function revealDisk(wx, wy, rTiles) {
+    const cx = (wx / TILE) | 0;
+    const cy = (wy / TILE) | 0;
+    const r2 = rTiles * rTiles;
+    for (let ty = cy - rTiles; ty <= cy + rTiles; ty++) {
+      if (ty < 0 || ty >= MAP_H) continue;
+      for (let tx = cx - rTiles; tx <= cx + rTiles; tx++) {
+        if (tx < 0 || tx >= MAP_W) continue;
+        const dx = tx - cx;
+        const dy = ty - cy;
+        if (dx * dx + dy * dy <= r2) {
+          fog[ty][tx] = 2;
+          seen[ty][tx] = 1;
+        }
+      }
+    }
+  }
+
+  function initFog() {
+    fog = [];
+    seen = [];
+    for (let y = 0; y < MAP_H; y++) {
+      fog[y] = [];
+      seen[y] = [];
+      for (let x = 0; x < MAP_W; x++) {
+        fog[y][x] = 0;
+        seen[y][x] = 0;
+      }
+    }
+    updateFog();
+  }
+
+  function updateFog() {
+    if (!fog) return;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) fog[y][x] = seen[y][x] ? 1 : 0;
+    }
+    for (const u of units) {
+      if ((u.team || 0) !== 0) continue;
+      const spec = UNIT_SPEC[u.kind];
+      revealDisk(u.x, u.y, (spec && spec.sight) || 6);
+    }
+    for (const b of buildings) {
+      if ((b.team || 0) !== 0 || !b.done) continue;
+      revealDisk(b.x, b.y, bldgSight(b));
+    }
   }
 
   function nodeSpriteSize(n) {
@@ -922,8 +1030,14 @@
     orderMove(u, best.x, best.y);
   }
 
+  function homeHall(u) {
+    return (u.team || 0) === 1 ? enemyHall : hall;
+  }
+
   function pathToHall(u) {
-    const d = doorPos();
+    const h = homeHall(u);
+    if (!h) return;
+    const d = bldgDoor(h);
     orderMove(u, d.x, d.y);
   }
 
@@ -937,9 +1051,11 @@
   }
 
   function nearHallDoor(u) {
-    const d = doorPos();
+    const h = homeHall(u);
+    if (!h) return false;
+    const d = bldgDoor(h);
     if (Math.hypot(u.x - d.x, u.y - d.y) < 16) return true;
-    const f = hallFoot();
+    const f = bldgFoot(h);
     return (
       u.y >= f.y + f.h - 4 &&
       u.y <= f.y + f.h + 22 &&
@@ -1038,10 +1154,12 @@
         u.path = [];
         const got = job.carry || u.carry;
         if (got === "wood") {
-          wood += WOOD_PAY;
+          if ((u.team || 0) === 1) enemyGold += WOOD_PAY;
+          else wood += WOOD_PAY;
           beep(420, 0.05);
         } else if (got === "gold") {
-          gold += GOLD_PAY;
+          if ((u.team || 0) === 1) enemyGold += GOLD_PAY;
+          else gold += GOLD_PAY;
           beep(560, 0.05);
         }
         job.carry = null;
@@ -1340,7 +1458,7 @@
 
   function spawnUnit(kind, slot, fromBldg, team) {
     const spec = UNIT_SPEC[kind] || UNIT_SPEC.worker;
-    team = team || 0;
+    team = team || (fromBldg && fromBldg.team) || 0;
     if (team === 0 && playerCount() >= popCap()) {
       toast("Лимит населения", true);
       return null;
@@ -1434,7 +1552,7 @@
   function pickFoeAt(wx, wy) {
     for (let i = units.length - 1; i >= 0; i--) {
       const u = units[i];
-      if ((u.team || 0) === 0 || u.hp <= 0) continue;
+      if ((u.team || 0) === 0 || u.hp <= 0 || visAt(u.x, u.y) < 2) continue;
       if (wx >= u.x - 10 && wx <= u.x + 10 && wy >= u.y - 22 && wy <= u.y + 4) return u;
     }
     for (let i = buildings.length - 1; i >= 0; i--) {
@@ -1564,7 +1682,7 @@
           }
         }
       } else if (!job || (job.type !== "gather" && job.type !== "build")) {
-        if (u.kind === "worker") continue;
+        if (u.kind === "worker" || u.kind === "peon") continue;
         const foe = nearestFoe(u, 70);
         if (foe) attackTarget(u, foe);
       }
@@ -1585,23 +1703,80 @@
     }
   }
 
+  function nearestMine(u) {
+    let best = null;
+    let bestD = 1e9;
+    for (const n of nodes) {
+      if (!nodeLive(n) || n.kind !== "gold") continue;
+      const d = Math.hypot(n.x - u.x, n.y - u.y);
+      if (d < bestD) {
+        bestD = d;
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  function updateTowers(dt) {
+    if (gameOver) return;
+    for (const b of buildings) {
+      if (b.kind !== "tower" || !b.done || b.hp <= 0) continue;
+      b.atkCd = (b.atkCd || 0) - dt;
+      const fake = { x: b.x, y: b.y - 18, team: b.team || 0, kind: "tower" };
+      const foe = nearestFoe(fake, 102);
+      if (!foe) continue;
+      if ((b.team || 0) === 0 && visAt(foe.x, foe.y) < 2) continue;
+      if (b.atkCd <= 0) {
+        b.atkCd = 1.05;
+        shots.push({
+          x: b.x,
+          y: b.y - 42,
+          tx: foe.x,
+          ty: foe.y - 10,
+          from: fake,
+          target: foe,
+          dmg: 11,
+          spd: 220,
+        });
+      }
+    }
+  }
+
   function updateEnemy(dt) {
     if (gameOver || !enemyHall || enemyHall.hp <= 0) return;
     raidT += dt;
-    if (raidT > 32) {
-      const nGrunt = units.filter((u) => u.kind === "grunt").length;
-      if (nGrunt < 8 && ((raidT / 18) | 0) !== (((raidT - dt) / 18) | 0)) {
-        const g = spawnUnit("grunt", nGrunt, enemyHall, 1);
-        if (g) attackTarget(g, hall);
-        if (nGrunt === 3) toast("Орки идут в набег!");
-      }
-    }
     for (const u of units) {
       if ((u.team || 0) !== 1) continue;
+      if (u.kind === "peon") {
+        if (!u.job) {
+          const mine = nearestMine(u);
+          if (mine) {
+            u.job = { type: "gather", node: mine, phase: "toNode", carry: null, t: 0 };
+            pathToNode(u, mine, 0);
+          }
+        }
+        continue;
+      }
       if (u.job && u.job.type === "attack") continue;
-      const close = nearestFoe(u, 64);
+      const close = nearestFoe(u, 70);
       if (close) attackTarget(u, close);
-      else if (raidT > 32) attackTarget(u, hall);
+    }
+    const nGrunt = units.filter((u) => u.kind === "grunt").length;
+    const bar = buildings.find((b) => b.kind === "orc_barracks" && b.done && b.hp > 0);
+    if (bar && nGrunt + (bar.queue ? bar.queue.length : 0) < 12 && enemyGold >= 40 && bar.queue.length < 3) {
+      enemyGold -= 40;
+      bar.queue.push({ t: 0, dur: 8, kind: "grunt" });
+    }
+    if (raidT > 42 && ((raidT / 24) | 0) !== (((raidT - dt) / 24) | 0)) {
+      let sent = 0;
+      for (const u of units) {
+        if (u.kind !== "grunt") continue;
+        if (nearestFoe(u, 56)) continue;
+        attackTarget(u, hall);
+        sent++;
+        if (sent >= 4) break;
+      }
+      if (sent) toast("Орки идут в набег!");
     }
   }
 
@@ -1742,15 +1917,17 @@
           if (o.job && o.job.type === "build" && o.job.building === b) o.job = null;
         }
       }
-      if (b.kind !== "barracks" || !b.done || !b.queue.length) continue;
+      if ((b.kind !== "barracks" && b.kind !== "orc_barracks") || !b.done || !b.queue.length) continue;
       const q = b.queue[0];
       q.t += dt;
       if (q.t >= q.dur) {
         const kind = q.kind || "militia";
         b.queue.shift();
         spawnUnit(kind, units.length, b);
-        toast((UNIT_SPEC[kind] || UNIT_SPEC.militia).name + " вышел из казарм");
-        beep(520, 0.07);
+        if ((b.team || 0) === 0) {
+          toast((UNIT_SPEC[kind] || UNIT_SPEC.militia).name + " вышел из казарм");
+          beep(520, 0.07);
+        }
       }
     }
   }
@@ -1965,7 +2142,7 @@
     drawBldg(hall);
   }
 
-  function drawBldg(b) {
+  function drawBldg(b, vis) {
     const r = bldgSpriteRect(b);
     const f = bldgFoot(b);
     const lift = visLift(b.x, b.y);
@@ -1983,7 +2160,7 @@
     }
     const im = bldgImg(b);
     if (im) {
-      ctx.globalAlpha = b.done === false ? 0.45 + Math.min(0.5, (b.progress || 0) / (b.buildTime || BAR_TIME)) : 1;
+      ctx.globalAlpha = b.done === false ? 0.45 + Math.min(0.5, (b.progress || 0) / (b.buildTime || BAR_TIME)) : vis === 1 ? 0.45 : 1;
       ctx.drawImage(im, sx, sy);
       ctx.globalAlpha = 1;
     }
@@ -2036,12 +2213,26 @@
     ctx.drawImage(terrain, -cam.x | 0, (-cam.y - TERRAIN_PAD) | 0);
 
     const drawables = [];
-    for (const p of props) drawables.push({ y: p.y, fn: () => drawProp(p) });
-    for (const n of nodes) drawables.push({ y: n.y, fn: () => drawNode(n) });
-    for (const b of buildings) drawables.push({ y: b.y, fn: () => drawBldg(b) });
-    for (const u of units) drawables.push({ y: u.y, fn: () => drawWorker(u) });
+    for (const p of props) {
+      if (visAt(p.x, p.y) === 0) continue;
+      drawables.push({ y: p.y, fn: () => drawProp(p) });
+    }
+    for (const n of nodes) {
+      if (visAt(n.x, n.y) === 0) continue;
+      drawables.push({ y: n.y, fn: () => drawNode(n) });
+    }
+    for (const b of buildings) {
+      const v = visAt(b.x, b.y);
+      if ((b.team || 0) === 1 && v === 0) continue;
+      drawables.push({ y: b.y, fn: () => drawBldg(b, v) });
+    }
+    for (const u of units) {
+      if ((u.team || 0) === 1 && visAt(u.x, u.y) < 2) continue;
+      drawables.push({ y: u.y, fn: () => drawWorker(u) });
+    }
     drawables.sort((a, b) => a.y - b.y);
     for (const d of drawables) d.fn();
+    drawFog();
 
     for (const s of shots) {
       const lift = visLift(s.x, s.y);
@@ -2131,6 +2322,29 @@
     }
   }
 
+  function drawFog() {
+    if (!fog) return;
+    const x0 = clamp((cam.x / TILE) | 0, 0, MAP_W - 1);
+    const y0 = clamp((cam.y / TILE) | 0, 0, MAP_H - 1);
+    const x1 = clamp((((cam.x + canvas.width) / TILE) | 0) + 1, 0, MAP_W);
+    const y1 = clamp((((cam.y + canvas.height) / TILE) | 0) + 2, 0, MAP_H);
+    for (let ty = y0; ty < y1; ty++) {
+      for (let tx = x0; tx < x1; tx++) {
+        const v = fog[ty][tx];
+        if (v === 2) continue;
+        const lift = (elev[ty][tx] || 0) * LIFT_STEP;
+        const sx = (tx * TILE - cam.x) | 0;
+        const sy = (ty * TILE - lift - cam.y) | 0;
+        if (v === 0) {
+          ctx.fillStyle = "#0c0806";
+          ctx.fillRect(sx, sy, TILE, TILE + lift);
+        } else {
+          ctx.fillStyle = "rgba(10,6,4,0.48)";
+          ctx.fillRect(sx, sy, TILE, TILE);
+        }
+      }
+    }
+  }
   function drawMinimap() {
     mctx.imageSmoothingEnabled = false;
     mctx.drawImage(miniTerrain, 0, 0, mini.width, mini.height);
@@ -2139,20 +2353,23 @@
     mctx.fillStyle = "#c47848";
     const f = hallFoot();
     mctx.fillRect(f.x * sx, f.y * sy, f.w * sx, f.h * sy);
-    if (enemyHall && enemyHall.hp > 0) {
+    if (enemyHall && enemyHall.hp > 0 && visAt(enemyHall.x, enemyHall.y) >= 1) {
       const ef = bldgFoot(enemyHall);
       mctx.fillStyle = "#3a5a28";
       mctx.fillRect(ef.x * sx, ef.y * sy, ef.w * sx, ef.h * sy);
     }
     for (const b of buildings) {
-      if (b.kind === "hall") continue;
+      if (b.kind === "hall" || b.kind === "orc_hall") continue;
+      if ((b.team || 0) === 1 && visAt(b.x, b.y) < 1) continue;
       const bf = bldgFoot(b);
-      if (b.kind === "barracks") mctx.fillStyle = b.done ? "#8b2a2a" : "#5a3820";
+      if (b.kind === "barracks" || b.kind === "orc_barracks") mctx.fillStyle = b.done ? "#8b2a2a" : "#5a3820";
       else if (b.kind === "house") mctx.fillStyle = b.done ? "#c4a06a" : "#6a5230";
+      else if (b.kind === "tower") mctx.fillStyle = b.done ? "#8a7a68" : "#5a5040";
       else continue;
       mctx.fillRect(bf.x * sx, bf.y * sy, Math.max(2, bf.w * sx), Math.max(2, bf.h * sy));
     }
     for (const n of nodes) {
+      if (visAt(n.x, n.y) === 0) continue;
       if (n.kind === "tree") {
         mctx.fillStyle = "#163818";
         mctx.fillRect((n.x * sx) | 0, (n.y * sy) | 0, 2, 2);
@@ -2163,10 +2380,21 @@
         mctx.fillRect((n.tx * TILE * sx) | 0, (n.ty * TILE * sy) | 0, Math.max(3, tw), Math.max(3, th));
       }
     }
-    mctx.fillStyle = "#ffe46a";
     for (const u of units) {
+      if ((u.team || 0) === 1 && visAt(u.x, u.y) < 2) continue;
       mctx.fillStyle = (u.team || 0) === 1 ? "#c44c3a" : "#ffe46a";
       mctx.fillRect((u.x * sx) | 0, (u.y * sy) | 0, 2, 2);
+    }
+    if (fog) {
+      const tw = Math.max(1, (TILE * sx) | 0);
+      for (let ty = 0; ty < MAP_H; ty++) {
+        for (let tx = 0; tx < MAP_W; tx++) {
+          const v = fog[ty][tx];
+          if (v === 2) continue;
+          mctx.fillStyle = v === 0 ? "#0c0806" : "rgba(8,4,2,0.55)";
+          mctx.fillRect((tx * TILE * sx) | 0, (ty * TILE * sy) | 0, tw + 1, tw + 1);
+        }
+      }
     }
     mctx.strokeStyle = "#f4f0d8";
     mctx.lineWidth = 1;
@@ -2198,6 +2426,16 @@
       ui.btnArcher.disabled =
         !barReady || popFull || barFull || gold < UNIT_SPEC.archer.gold || wood < UNIT_SPEC.archer.wood;
     }
+    if (ui.btnRider) {
+      ui.btnRider.disabled =
+        !barReady || popFull || barFull || gold < UNIT_SPEC.rider.gold || wood < UNIT_SPEC.rider.wood;
+    }
+    if (ui.btnTower) {
+      ui.btnTower.disabled =
+        gold < BUILD_SPEC.tower.gold ||
+        wood < BUILD_SPEC.tower.wood ||
+        buildings.filter((b) => b.kind === "tower").length >= BUILD_SPEC.tower.max;
+    }
     if (ui.btnBarracks) {
       ui.btnBarracks.disabled =
         gold < BUILD_SPEC.barracks.gold ||
@@ -2213,22 +2451,26 @@
     ui.btn.classList.toggle("pulse", selected.includes(hall) && !trainedOnce);
     if (ui.btnBarracks) ui.btnBarracks.classList.toggle("pulse", placeMode === "barracks");
     if (ui.btnHouse) ui.btnHouse.classList.toggle("pulse", placeMode === "house");
+    if (ui.btnTower) ui.btnTower.classList.toggle("pulse", placeMode === "tower");
 
     const troops = selected.filter((s) => isUnit(s));
     const workers = troops.filter((s) => s.kind === "worker");
     const hallSel = selected.includes(hall);
     const barSel = !!bar;
     const houseSel = selected.find((s) => s.kind === "house");
+    const towerSel = selected.find((s) => s.kind === "tower");
     const workerSel = workers.length > 0 && workers.length === troops.length;
     showWrap(ui.wrapWorker, hallSel);
     showWrap(ui.wrapHouse, hallSel || workerSel);
     showWrap(ui.wrapBarracks, hallSel || workerSel);
+    showWrap(ui.wrapTower, hallSel || workerSel);
     showWrap(ui.wrapMilitia, barSel && bar.done);
     showWrap(ui.wrapArcher, barSel && bar.done);
+    showWrap(ui.wrapRider, barSel && bar.done);
 
     if (hallSel) {
       ui.title.textContent = "Городской совет";
-      ui.sub.textContent = "1 — рабочий (50з). F — хижина (+5 населения). B — казармы. ПКМ — точка сбора.";
+      ui.sub.textContent = "1 — рабочий. F — хижина. B — казармы. T — башня. ПКМ — точка сбора.";
       ui.portrait.src = "assets/buildings/townhall.png";
       ui.portrait.style.display = "block";
     } else if (houseSel && !houseSel.done) {
@@ -2244,6 +2486,19 @@
       ui.sub.textContent = "Даёт +5 к населению.";
       ui.portrait.src = "assets/buildings/house.png";
       ui.portrait.style.display = "block";
+    } else if (towerSel && !towerSel.done) {
+      ui.title.textContent = "Башня (стройка)";
+      ui.sub.textContent =
+        "Готово на " +
+        Math.min(100, (((towerSel.progress || 0) / (towerSel.buildTime || 10)) * 100) | 0) +
+        "%. Пришлите рабочих ПКМ.";
+      ui.portrait.src = "assets/buildings/tower.png";
+      ui.portrait.style.display = "block";
+    } else if (towerSel) {
+      ui.title.textContent = "Башня";
+      ui.sub.textContent = "Сама стреляет по оркам. Даёт обзор.";
+      ui.portrait.src = "assets/buildings/tower.png";
+      ui.portrait.style.display = "block";
     } else if (barSel && !bar.done) {
       ui.title.textContent = "Казармы (стройка)";
       ui.sub.textContent =
@@ -2252,12 +2507,12 @@
       ui.portrait.style.display = "block";
     } else if (barSel) {
       ui.title.textContent = "Казармы";
-      ui.sub.textContent = "2 — ополченец (40з 25д). 3 — лучник (45з 35д). ПКМ — точка сбора.";
+      ui.sub.textContent = "2 — ополченец. 3 — лучник. 4 — всадник. ПКМ — точка сбора.";
       ui.portrait.src = "assets/buildings/barracks.png";
       ui.portrait.style.display = "block";
     } else if (workerSel) {
       ui.title.textContent = workers.length > 1 ? "Рабочие × " + workers.length : "Рабочий";
-      ui.sub.textContent = "ПКМ по лесу/шахте — собирать. F — хижина. B — казармы.";
+      ui.sub.textContent = "ПКМ по лесу/шахте — собирать. F — хижина. B — казармы. T — башня.";
       ui.portrait.src = "assets/ui/btn_worker.png";
       ui.portrait.style.display = "block";
     } else if (troops.length) {
@@ -2265,11 +2520,12 @@
       const spec = UNIT_SPEC[k];
       ui.title.textContent = troops.length > 1 ? "Отряд × " + troops.length : spec ? spec.name : k;
       ui.sub.textContent = "ПКМ по земле — идти.";
-      ui.portrait.src = k === "archer" ? "assets/ui/btn_archer.png" : "assets/ui/btn_militia.png";
+      ui.portrait.src =
+        k === "archer" ? "assets/ui/btn_archer.png" : k === "rider" ? "assets/ui/btn_rider.png" : "assets/ui/btn_militia.png";
       ui.portrait.style.display = "block";
     } else {
       ui.title.textContent = "Ничего не выбрано";
-      ui.sub.textContent = "Хижины дают население. На юго-востоке лагерь орков — уничтожьте его.";
+      ui.sub.textContent = "Туман войны. Найдите орочий лагерь на юго-востоке и снесите зал.";
       ui.portrait.style.display = "none";
     }
 
@@ -2434,7 +2690,9 @@
       updateHall(dt);
       updateUnits(dt);
       updateCombat(dt);
+      updateTowers(dt);
       updateEnemy(dt);
+      updateFog();
     }
     for (const p of pings) p.t -= dt;
     pings = pings.filter((p) => p.t > 0);
@@ -2468,6 +2726,7 @@
     bindTrain(ui.btn, "worker");
     bindTrain(ui.btnMilitia, "militia");
     bindTrain(ui.btnArcher, "archer");
+    bindTrain(ui.btnRider, "rider");
     if (ui.btnBarracks) {
       ui.btnBarracks.addEventListener("click", () => {
         ensureAudio();
@@ -2489,6 +2748,18 @@
           syncUi();
         } else {
           enterPlace("house");
+        }
+      });
+    }
+    if (ui.btnTower) {
+      ui.btnTower.addEventListener("click", () => {
+        ensureAudio();
+        if (placeMode === "tower") {
+          placeMode = null;
+          canvas.style.cursor = "crosshair";
+          syncUi();
+        } else {
+          enterPlace("tower");
         }
       });
     }
@@ -2525,6 +2796,12 @@
       if (e.code === "KeyF") {
         enterPlace("house");
       }
+      if (e.code === "KeyT") {
+        enterPlace("tower");
+      }
+      if (e.code === "Digit4") {
+        trainUnit("rider");
+      }
       if (e.code === "Digit1" || e.code === "KeyR") {
         trainUnit("worker");
       }
@@ -2551,6 +2828,8 @@
         houseIm,
         goldMineIm,
         orcHallIm,
+        orcBarIm,
+        towerIm,
         workerIm,
         hillock,
         rock0,
@@ -2565,6 +2844,8 @@
         loadImgOpt("assets/buildings/house.png"),
         loadImgOpt("assets/buildings/goldmine.png"),
         loadImgOpt("assets/buildings/orc_hall.png"),
+        loadImgOpt("assets/buildings/orc_barracks.png"),
+        loadImgOpt("assets/buildings/tower.png"),
         loadImg("assets/units/worker.png"),
         loadImg("assets/props/hillock.png"),
         loadImg("assets/props/rock_0.png"),
@@ -2579,10 +2860,14 @@
       imgs.house = houseIm;
       imgs.goldMine = goldMineIm;
       imgs.orcHall = orcHallIm;
+      imgs.orcBarracks = orcBarIm;
+      imgs.tower = towerIm;
       imgs.worker = workerIm;
       imgs.militia = (await loadImgOpt("assets/units/militia.png")) || workerIm;
       imgs.archer = (await loadImgOpt("assets/units/archer.png")) || workerIm;
       imgs.grunt = (await loadImgOpt("assets/units/grunt.png")) || imgs.militia;
+      imgs.rider = (await loadImgOpt("assets/units/rider.png")) || imgs.militia;
+      imgs.peon = (await loadImgOpt("assets/units/peon.png")) || imgs.worker;
       imgs.hillock = hillock;
       imgs.rock0 = rock0;
       imgs.rock1 = rock1;
@@ -2615,6 +2900,7 @@
     selected = [];
     generateWorld();
     for (let i = 0; i < 3; i++) spawnUnit("grunt", i, enemyHall, 1);
+    for (let i = 0; i < 4; i++) spawnUnit("peon", i, enemyHall, 1);
     resize();
     centerOn(hall.x, hall.y - 20);
     bind();
@@ -2676,6 +2962,15 @@
       },
       enemyPos() {
         return enemyHall ? { x: enemyHall.x, y: enemyHall.y, hp: enemyHall.hp } : null;
+      },
+      revealAll() {
+        if (!fog) return;
+        for (let y = 0; y < MAP_H; y++) {
+          for (let x = 0; x < MAP_W; x++) {
+            fog[y][x] = 2;
+            seen[y][x] = 1;
+          }
+        }
       },
       forceRaid() {
         raidT = 40;
