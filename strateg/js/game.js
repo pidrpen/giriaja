@@ -30,6 +30,9 @@
   const BAR_WOOD = 50;
   const BAR_TIME = 12;
   const BAR_MAX = 4;
+  const LIFT_STEP = 8;
+  const LIFT_LEVELS = 4;
+  const TERRAIN_PAD = LIFT_STEP * LIFT_LEVELS;
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -66,7 +69,7 @@
   let cam = { x: 0, y: 0 };
   let gold = START_GOLD;
   let wood = START_WOOD;
-  let height, blocked, yard, terrain, miniTerrain;
+  let height, elev, blocked, yard, terrain, miniTerrain;
   let hall, units, props, nodes, selected, rally, buildings;
   let placeMode = null;
   let box = null;
@@ -394,7 +397,7 @@
   function visLift(wx, wy) {
     const tx = clamp((wx / TILE) | 0, 0, MAP_W - 1);
     const ty = clamp((wy / TILE) | 0, 0, MAP_H - 1);
-    return height[ty][tx] * 8;
+    return (elev[ty][tx] || 0) * LIFT_STEP;
   }
 
   function inHud(clientY) {
@@ -431,20 +434,46 @@
 
   function generateWorld() {
     height = [];
+    elev = [];
     blocked = [];
     yard = [];
     for (let y = 0; y < MAP_H; y++) {
       height[y] = [];
+      elev[y] = [];
       blocked[y] = [];
       yard[y] = [];
       for (let x = 0; x < MAP_W; x++) {
-        let n = fbm(x * 0.07, y * 0.07);
-        n = 0.42 + (n - 0.5) * 0.72;
-        height[y][x] = clamp(n, 0.08, 0.92);
+        let n = fbm(x * 0.045, y * 0.045);
+        n = 0.32 + (n - 0.5) * 0.38;
+        height[y][x] = n;
         blocked[y][x] = false;
         yard[y][x] = false;
       }
     }
+
+    function stampBump(cx, cy, radius, amount) {
+      for (let y = 0; y < MAP_H; y++) {
+        for (let x = 0; x < MAP_W; x++) {
+          const d = Math.hypot(x - cx, y - cy) / radius;
+          if (d >= 1) continue;
+          const w = (1 - d) * (1 - d * d);
+          height[y][x] += amount * w;
+        }
+      }
+    }
+
+    const hills = [
+      [36 + hash(1, 2) * 8, 12 + hash(3, 4) * 6, 11, 0.72],
+      [56 + hash(5, 6) * 6, 24 + hash(7, 8) * 8, 13, 0.85],
+      [18 + hash(9, 1) * 6, 46 + hash(2, 8) * 8, 12, 0.7],
+      [50 + hash(4, 5) * 8, 52 + hash(6, 7) * 6, 10, 0.64],
+      [8 + hash(8, 3) * 5, 28 + hash(1, 9) * 8, 9, 0.55],
+      [42 + hash(2, 6) * 6, 34 + hash(9, 4) * 6, 8, 0.4],
+    ];
+    for (const [cx, cy, r, a] of hills) stampBump(cx, cy, r, a);
+    stampBump(28 + hash(3, 7) * 6, 22, 9, -0.38);
+    stampBump(62, 8 + hash(4, 1) * 5, 7, -0.28);
+    stampBump(12, 58, 8, -0.22);
 
     hall = {
       kind: "hall",
@@ -464,10 +493,20 @@
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const d = Math.hypot(x - cx, y - cy);
-        if (d < 4.5) {
-          const t = (1 - d / 4.5) ** 1.4;
-          height[y][x] = lerp(height[y][x], 0.42, t * 0.75);
+        if (d < 7) {
+          const t = (1 - d / 7) ** 1.2;
+          height[y][x] = lerp(height[y][x], 0.28, t);
         }
+        height[y][x] = clamp(height[y][x], 0, 1);
+        elev[y][x] = clamp(Math.round(height[y][x] * LIFT_LEVELS), 0, LIFT_LEVELS);
+        height[y][x] = elev[y][x] / LIFT_LEVELS;
+      }
+    }
+    for (let y = hall.ty - 2; y < hall.ty + HALL_H + 4; y++) {
+      for (let x = hall.tx - 2; x < hall.tx + HALL_W + 2; x++) {
+        if (y < 0 || x < 0 || y >= MAP_H || x >= MAP_W) continue;
+        elev[y][x] = 1;
+        height[y][x] = 1 / LIFT_LEVELS;
       }
     }
 
@@ -520,15 +559,16 @@
       for (let x = 2; x < MAP_W - 2; x++) {
         if (nearHall(x, y)) continue;
         const h = height[y][x];
+        const e = elev[y][x];
         const r = hash(x + 3, y + 9);
-        if ((h > 0.55 && localMax(x, y) && r > 0.42) || (h > 0.5 && r > 0.988)) {
+        if (e >= 3 && localMax(x, y) && r > 0.35) {
           props.push({
             kind: "prop",
             img: imgs.hillock,
             x: x * TILE + 8,
             y: y * TILE + 12,
           });
-        } else if (r > 0.968) {
+        } else if (e >= 2 && r > 0.96) {
           const i = (hash(x, y + 4) * 3) | 0;
           props.push({
             kind: "prop",
@@ -536,7 +576,7 @@
             x: x * TILE + 8,
             y: y * TILE + 10,
           });
-        } else if (h < 0.48 && r > 0.94 && r <= 0.972) {
+        } else if (e <= 1 && h < 0.35 && r > 0.93 && r <= 0.975) {
           const i = hash(x + 1, y) > 0.5 ? 1 : 0;
           props.push({
             kind: "prop",
@@ -586,54 +626,67 @@
     return n;
   }
 
+  function scatterTiles(cx, cy, radius, max, ok) {
+    const out = [];
+    if (ok(cx, cy)) out.push([cx, cy]);
+    let i = 0;
+    while (out.length < max && i++ < max * 14) {
+      const ang = hash(cx + i * 3, cy + 11) * Math.PI * 2;
+      const rad = Math.sqrt(hash(i + 5, cy + 19)) * radius;
+      const tx = (cx + Math.cos(ang) * rad + 0.5) | 0;
+      const ty = (cy + Math.sin(ang) * rad + 0.5) | 0;
+      if (out.some(([x, y]) => x === tx && y === ty)) continue;
+      if (ok(tx, ty)) out.push([tx, ty]);
+    }
+    return out;
+  }
+
   function placeNodes() {
-    const goldTargets = [
-      { tx: 48, ty: 18 },
-      { tx: 10, ty: 46 },
-      { tx: 54, ty: 50 },
+    const goldVeins = [
+      { tx: hall.tx + 16, ty: hall.ty + 8, n: 5 },
+      { tx: 52, ty: 16, n: 6 },
+      { tx: 10, ty: 50, n: 5 },
+      { tx: 56, ty: 50, n: 4 },
     ];
-    const goldCount = 2 + (hash(7, 9) > 0.4 ? 1 : 0);
-    for (let i = 0; i < goldCount; i++) {
-      const t = goldTargets[i];
-      let placed = false;
-      for (let r = 0; r < 14 && !placed; r++) {
-        for (let oy = -r; oy <= r && !placed; oy++) {
-          for (let ox = -r; ox <= r && !placed; ox++) {
-            const tx = t.tx + ox;
-            const ty = t.ty + oy;
-            if (!tileFree(tx, ty)) continue;
-            if (Math.hypot(tx - hall.tx, ty - hall.ty) < 16) continue;
-            if (blockedAround(tx, ty) >= 5) continue;
-            const hp = 12 + ((hash(tx, ty) * 7) | 0);
-            occupyNode(tx, ty, "gold", hp, imgs.goldNode);
-            placed = true;
-          }
-        }
+    for (const v of goldVeins) {
+      const spots = scatterTiles(v.tx, v.ty, 2.4, v.n, (tx, ty) => {
+        if (!tileFree(tx, ty)) return false;
+        if (elev[ty][tx] >= 4) return false;
+        if (Math.hypot(tx - hall.tx, ty - hall.ty) < 10) return false;
+        return blockedAround(tx, ty) < 5;
+      });
+      for (const [tx, ty] of spots) {
+        const hp = 14 + ((hash(tx, ty) * 8) | 0);
+        occupyNode(tx, ty, "gold", hp, imgs.goldNode);
       }
     }
 
-    const treeTarget = 45 + (seed % 26);
-    let trees = 0;
-    let guard = 0;
-    let i = 0;
-    while (trees < treeTarget && guard++ < 24000) {
-      i++;
-      const tx = 2 + ((hash(i * 3 + 11, 17) * (MAP_W - 4)) | 0);
-      const ty = 2 + ((hash(i * 5 + 19, 29) * (MAP_H - 4)) | 0);
-      if (!tileFree(tx, ty)) continue;
-      if (blockedAround(tx, ty) >= 5) continue;
-      let nearGold = false;
-      for (const n of nodes) {
-        if (n.kind === "gold" && Math.abs(n.tx - tx) <= 1 && Math.abs(n.ty - ty) <= 1) {
-          nearGold = true;
-          break;
+    const groves = [
+      { tx: hall.tx + 9, ty: hall.ty + 7, n: 12, r: 3.2 },
+      { tx: hall.tx - 4, ty: hall.ty + 10, n: 9, r: 2.8 },
+      { tx: 34, ty: 10, n: 16, r: 4.2 },
+      { tx: 58, ty: 22, n: 14, r: 3.8 },
+      { tx: 8, ty: 36, n: 15, r: 4 },
+      { tx: 24, ty: 54, n: 18, r: 4.5 },
+      { tx: 48, ty: 46, n: 16, r: 4 },
+      { tx: 62, ty: 58, n: 12, r: 3.4 },
+      { tx: 40, ty: 28, n: 11, r: 3.2 },
+    ];
+    for (const g of groves) {
+      const spots = scatterTiles(g.tx, g.ty, g.r, g.n, (tx, ty) => {
+        if (!tileFree(tx, ty)) return false;
+        if (elev[ty][tx] >= 4) return false;
+        if (blockedAround(tx, ty) >= 5) return false;
+        for (const n of nodes) {
+          if (n.kind === "gold" && Math.abs(n.tx - tx) <= 1 && Math.abs(n.ty - ty) <= 1) return false;
         }
+        return true;
+      });
+      for (const [tx, ty] of spots) {
+        const variant = hash(tx, ty + 2) > 0.55 ? 1 : 0;
+        const hp = 3 + ((hash(tx + 2, ty + 8) * 3) | 0);
+        occupyNode(tx, ty, "tree", hp, variant ? imgs.tree1 : imgs.tree0);
       }
-      if (nearGold) continue;
-      const variant = hash(tx, ty + 2) > 0.55 ? 1 : 0;
-      const hp = 3 + ((hash(tx + 2, ty + 8) * 3) | 0);
-      occupyNode(tx, ty, "tree", hp, variant ? imgs.tree1 : imgs.tree0);
-      trees++;
     }
   }
 
@@ -878,11 +931,11 @@
     }
 
     let g, r, b;
-    if (h < 0.34) {
-      const t = h / 0.34;
-      r = lerp(70, 92, t);
-      g = lerp(78, 118, t);
-      b = lerp(32, 46, t);
+    if (h < 0.26) {
+      const t = h / 0.26;
+      r = lerp(58, 86, t);
+      g = lerp(72, 108, t);
+      b = lerp(28, 42, t);
       if (n2 > 0.58) {
         r = 108;
         g = 80;
@@ -900,7 +953,7 @@
       b = lerp(40, 56, t);
     }
 
-    const lit = 1 + slope * 0.85 + (h - 0.45) * 0.35 + (n - 0.5) * 0.18;
+    const lit = 1 + slope * 1.15 + (h - 0.35) * 0.55 + (n - 0.5) * 0.16;
     r = clamp(r * lit, 20, 210);
     g = clamp(g * lit, 24, 220);
     b = clamp(b * lit, 16, 140);
@@ -914,23 +967,32 @@
 
   function prerenderTerrain() {
     const w = MAP_W * TILE;
-    const h = MAP_H * TILE;
+    const h = MAP_H * TILE + TERRAIN_PAD;
     terrain = document.createElement("canvas");
     terrain.width = w;
     terrain.height = h;
     const g = terrain.getContext("2d");
     const img = g.createImageData(w, h);
     const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = 12;
+      d[i + 1] = 8;
+      d[i + 2] = 6;
+      d[i + 3] = 255;
+    }
     const miniData = mctx.createImageData(MAP_W, MAP_H);
 
     for (let ty = 0; ty < MAP_H; ty++) {
       for (let tx = 0; tx < MAP_W; tx++) {
+        const e = elev[ty][tx];
+        const destY = ty * TILE - e * LIFT_STEP + TERRAIN_PAD;
         let ar = 0, ag = 0, ab = 0;
         for (let ly = 0; ly < TILE; ly++) {
-          const py = ty * TILE + ly;
+          const py = destY + ly;
+          if (py < 0 || py >= h) continue;
           for (let lx = 0; lx < TILE; lx++) {
             const px = tx * TILE + lx;
-            const [r, gv, b] = colorAt(px, py, tx, ty);
+            const [r, gv, b] = colorAt(px, ty * TILE + ly, tx, ty);
             const i = (py * w + px) * 4;
             d[i] = r;
             d[i + 1] = gv;
@@ -941,11 +1003,46 @@
             ab += b;
           }
         }
+        const es = ty + 1 < MAP_H ? elev[ty + 1][tx] : 0;
+        if (e > es) {
+          const faceH = (e - es) * LIFT_STEP;
+          for (let fy = 0; fy < faceH; fy++) {
+            const py = destY + TILE + fy;
+            if (py < 0 || py >= h) continue;
+            const t = fy / Math.max(1, faceH - 1);
+            for (let lx = 0; lx < TILE; lx++) {
+              const px = tx * TILE + lx;
+              const n = hash(tx * 17 + lx, ty * 13 + fy);
+              let r, gv, b;
+              if (e >= 3) {
+                r = 122 + n * 36;
+                gv = 108 + n * 24;
+                b = 86 + n * 14;
+              } else {
+                r = 102 + n * 26;
+                gv = 70 + n * 16;
+                b = 40 + n * 10;
+              }
+              let shade = 1.12 - t * 0.5;
+              if (lx === 0 || lx === TILE - 1) shade -= 0.18;
+              if (fy === 0) shade += 0.18;
+              r = clamp(r * shade, 24, 210);
+              gv = clamp(gv * shade, 20, 190);
+              b = clamp(b * shade, 14, 150);
+              const i = (py * w + px) * 4;
+              d[i] = r;
+              d[i + 1] = gv;
+              d[i + 2] = b;
+              d[i + 3] = 255;
+            }
+          }
+        }
         const n = TILE * TILE;
         const mi = (ty * MAP_W + tx) * 4;
-        miniData.data[mi] = (ar / n) | 0;
-        miniData.data[mi + 1] = (ag / n) | 0;
-        miniData.data[mi + 2] = (ab / n) | 0;
+        const lit = 0.72 + e * 0.1;
+        miniData.data[mi] = clamp((ar / n) * lit, 0, 255) | 0;
+        miniData.data[mi + 1] = clamp((ag / n) * lit, 0, 255) | 0;
+        miniData.data[mi + 2] = clamp((ab / n) * lit, 0, 255) | 0;
         miniData.data[mi + 3] = 255;
       }
     }
@@ -1039,6 +1136,7 @@
         const nx = cur.x + dx;
         const ny = cur.y + dy;
         if (isBlocked(nx, ny)) continue;
+        if (Math.abs((elev[ny][nx] || 0) - (elev[cur.y][cur.x] || 0)) > 1) continue;
         if (dx && dy && (isBlocked(cur.x + dx, cur.y) || isBlocked(cur.x, cur.y + dy))) continue;
         const nk = key(nx, ny);
         const ng = (gScore.get(key(cur.x, cur.y)) || 0) + c;
@@ -1544,7 +1642,7 @@
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = "#0c0806";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(terrain, -cam.x | 0, -cam.y | 0);
+    ctx.drawImage(terrain, -cam.x | 0, (-cam.y - TERRAIN_PAD) | 0);
 
     const drawables = [];
     for (const p of props) drawables.push({ y: p.y, fn: () => drawProp(p) });
@@ -1638,10 +1736,13 @@
       mctx.fillRect(bf.x * sx, bf.y * sy, bf.w * sx, bf.h * sy);
     }
     for (const n of nodes) {
-      if (n.kind === "tree") mctx.fillStyle = "#163818";
-      else if (n.kind === "gold") mctx.fillStyle = "#e8c44a";
-      else continue;
-      mctx.fillRect((n.x * sx) | 0, (n.y * sy) | 0, 2, 2);
+      if (n.kind === "tree") {
+        mctx.fillStyle = "#163818";
+        mctx.fillRect((n.x * sx) | 0, (n.y * sy) | 0, 2, 2);
+      } else if (n.kind === "gold") {
+        mctx.fillStyle = "#e8c44a";
+        mctx.fillRect((n.x * sx) | 0, (n.y * sy) | 0, 3, 3);
+      }
     }
     mctx.fillStyle = "#ffe46a";
     for (const u of units) mctx.fillRect((u.x * sx) | 0, (u.y * sy) | 0, 2, 2);
