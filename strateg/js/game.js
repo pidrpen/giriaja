@@ -1003,9 +1003,8 @@
             ab += b;
           }
         }
-        const es = ty + 1 < MAP_H ? elev[ty + 1][tx] : 0;
-        if (e > es) {
-          const faceH = (e - es) * LIFT_STEP;
+        if (e > 0) {
+          const faceH = e * LIFT_STEP;
           for (let fy = 0; fy < faceH; fy++) {
             const py = destY + TILE + fy;
             if (py < 0 || py >= h) continue;
