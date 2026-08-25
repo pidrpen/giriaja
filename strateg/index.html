@@ -39,21 +39,28 @@
         <div id="queue"></div>
       </div>
       <div id="commands">
-        <div class="cmd-wrap">
+        <div class="cmd-wrap" id="wrap-worker">
           <button id="btn-worker" class="cmd-btn" disabled title="Рабочий (1) · 50 золота">
             <img src="assets/ui/btn_worker.png" alt="" />
             <span class="cost">50</span>
           </button>
           <div class="cmd-label">Рабочий · 1</div>
         </div>
-        <div class="cmd-wrap">
+        <div class="cmd-wrap is-hidden" id="wrap-barracks">
+          <button id="btn-barracks" class="cmd-btn" disabled title="Казармы (B) · 100 золота · 50 дерева">
+            <img src="assets/ui/btn_barracks.png" alt="" />
+            <span class="cost">100</span>
+          </button>
+          <div class="cmd-label">Казармы · B</div>
+        </div>
+        <div class="cmd-wrap is-hidden" id="wrap-militia">
           <button id="btn-militia" class="cmd-btn" disabled title="Ополченец (2) · 40 золота · 25 дерева">
             <img src="assets/ui/btn_militia.png" alt="" />
             <span class="cost">40</span>
           </button>
           <div class="cmd-label">Ополченец · 2</div>
         </div>
-        <div class="cmd-wrap">
+        <div class="cmd-wrap is-hidden" id="wrap-archer">
           <button id="btn-archer" class="cmd-btn" disabled title="Лучник (3) · 45 золота · 35 дерева">
             <img src="assets/ui/btn_archer.png" alt="" />
             <span class="cost">45</span>
@@ -65,7 +72,7 @@
     </footer>
 
     <div id="hint">
-      ЛКМ — выбрать · ПКМ по дереву/золоту — собирать · ПКМ — идти / точка сбора · 1 рабочий · 2 ополченец · 3 лучник · H — к совету
+      ЛКМ — выбрать · ПКМ — собирать / идти · 1 рабочий · B казармы · 2 ополченец · 3 лучник · H совет · G казармы
     </div>
   </div>
 

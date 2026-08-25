@@ -1,5 +1,7 @@
 (() => {
   "use strict";
+  if (globalThis.__STRATEG_STARTED) return;
+  globalThis.__STRATEG_STARTED = true;
 
   const TILE = 16;
   const MAP_W = 72;
@@ -22,6 +24,12 @@
     militia: { gold: 40, wood: 25, time: 7, speed: 46, name: "Ополченец", sheet: "militia" },
     archer: { gold: 45, wood: 35, time: 8, speed: 48, name: "Лучник", sheet: "archer" },
   };
+  const BAR_W = 5;
+  const BAR_H = 3;
+  const BAR_GOLD = 100;
+  const BAR_WOOD = 50;
+  const BAR_TIME = 12;
+  const BAR_MAX = 4;
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -39,6 +47,11 @@
     btn: document.getElementById("btn-worker"),
     btnMilitia: document.getElementById("btn-militia"),
     btnArcher: document.getElementById("btn-archer"),
+    btnBarracks: document.getElementById("btn-barracks"),
+    wrapWorker: document.getElementById("wrap-worker"),
+    wrapBarracks: document.getElementById("wrap-barracks"),
+    wrapMilitia: document.getElementById("wrap-militia"),
+    wrapArcher: document.getElementById("wrap-archer"),
     toasts: document.getElementById("toasts"),
     boot: document.getElementById("boot"),
     bootMsg: document.getElementById("boot-msg"),
@@ -54,7 +67,8 @@
   let gold = START_GOLD;
   let wood = START_WOOD;
   let height, blocked, yard, terrain, miniTerrain;
-  let hall, units, props, nodes, selected, rally;
+  let hall, units, props, nodes, selected, rally, buildings;
+  let placeMode = null;
   let box = null;
   let panning = false;
   let pan0 = null;
@@ -230,19 +244,24 @@
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   }
 
-  function hallFoot() {
+  function bldgFoot(b) {
     return {
-      x: hall.tx * TILE,
-      y: hall.ty * TILE,
-      w: HALL_W * TILE,
-      h: HALL_H * TILE,
+      x: b.tx * TILE,
+      y: b.ty * TILE,
+      w: (b.tw || HALL_W) * TILE,
+      h: (b.th || HALL_H) * TILE,
     };
   }
 
-  function hallSpriteRect() {
-    const f = hallFoot();
-    const sw = imgs.hall.width;
-    const sh = imgs.hall.height;
+  function bldgImg(b) {
+    return b.kind === "barracks" ? imgs.barracks : imgs.hall;
+  }
+
+  function bldgSpriteRect(b) {
+    const f = bldgFoot(b);
+    const im = bldgImg(b);
+    const sw = im && im.width ? im.width : f.w;
+    const sh = im && im.height ? im.height : f.h;
     return {
       x: f.x + f.w / 2 - sw / 2,
       y: f.y + f.h - sh,
@@ -251,9 +270,125 @@
     };
   }
 
-  function doorPos() {
-    const f = hallFoot();
+  function bldgDoor(b) {
+    const f = bldgFoot(b);
     return { x: f.x + f.w / 2, y: f.y + f.h + 6 };
+  }
+
+  function hallFoot() {
+    return bldgFoot(hall);
+  }
+
+  function hallSpriteRect() {
+    return bldgSpriteRect(hall);
+  }
+
+  function doorPos() {
+    return bldgDoor(hall);
+  }
+
+  function isUnit(s) {
+    return !!(s && UNIT_SPEC[s.kind]);
+  }
+
+  function queuedCount() {
+    let n = 0;
+    for (const b of buildings) n += (b.queue || []).length;
+    return n;
+  }
+
+  function readyBarracks() {
+    const sel = selected && selected.find((s) => s.kind === "barracks" && s.done);
+    if (sel) return sel;
+    return buildings.find((b) => b.kind === "barracks" && b.done) || null;
+  }
+
+  function occupyBldg(b, on) {
+    for (let y = 0; y < b.th; y++) {
+      for (let x = 0; x < b.tw; x++) {
+        const tx = b.tx + x;
+        const ty = b.ty + y;
+        if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) blocked[ty][tx] = on;
+      }
+    }
+  }
+
+  function canPlaceAt(tx, ty, tw, th) {
+    if (tx < 2 || ty < 2 || tx + tw >= MAP_W - 2 || ty + th >= MAP_H - 3) return false;
+    for (let y = 0; y < th; y++) {
+      for (let x = 0; x < tw; x++) {
+        if (isBlocked(tx + x, ty + y)) return false;
+      }
+    }
+    for (const p of props) {
+      const px = (p.x / TILE) | 0;
+      const py = (p.y / TILE) | 0;
+      if (px >= tx && px < tx + tw && py >= ty && py < ty + th) return false;
+    }
+    return true;
+  }
+
+  function tryPlaceBarracks(wx, wy) {
+    if (buildings.filter((b) => b.kind === "barracks").length >= BAR_MAX) {
+      toast("Лимит казарм", true);
+      return;
+    }
+    if (gold < BAR_GOLD || wood < BAR_WOOD) {
+      toast("Недостаточно ресурсов", true);
+      beep(90, 0.12, "sawtooth");
+      return;
+    }
+    const tx = clamp((wx / TILE) | 0, 0, MAP_W - BAR_W);
+    const ty = clamp((wy / TILE) | 0, 0, MAP_H - BAR_H);
+    if (!canPlaceAt(tx, ty, BAR_W, BAR_H)) {
+      toast("Здесь не построить", true);
+      return;
+    }
+    gold -= BAR_GOLD;
+    wood -= BAR_WOOD;
+    const b = {
+      kind: "barracks",
+      tx,
+      ty,
+      tw: BAR_W,
+      th: BAR_H,
+      queue: [],
+      done: false,
+      progress: 0,
+    };
+    b.x = b.tx * TILE + (BAR_W * TILE) / 2;
+    b.y = b.ty * TILE + BAR_H * TILE;
+    const d = bldgDoor(b);
+    b.rally = { x: d.x, y: d.y + 28 };
+    occupyBldg(b, true);
+    buildings.push(b);
+    const workers = selected.filter((s) => s.kind === "worker");
+    workers.forEach((u) => {
+      u.job = { type: "build", building: b, phase: "go" };
+      orderMove(u, d.x, d.y + 8);
+    });
+    placeMode = null;
+    canvas.style.cursor = "crosshair";
+    selected = [b];
+    toast(workers.length ? "Строим казармы" : "Казармы заложены — пришлите рабочих");
+    beep(320, 0.06);
+    syncUi();
+  }
+
+  function enterPlaceBarracks() {
+    const workers = selected.filter((s) => s.kind === "worker");
+    if (!workers.length && !selected.includes(hall)) {
+      toast("Выберите рабочих", true);
+      return;
+    }
+    if (gold < BAR_GOLD || wood < BAR_WOOD) {
+      toast("Нужно 100 золота и 50 дерева", true);
+      beep(90, 0.12, "sawtooth");
+      return;
+    }
+    placeMode = "barracks";
+    toast("ЛКМ — поставить казармы · ПКМ — отмена");
+    syncUi();
   }
 
   function visLift(wx, wy) {
@@ -315,10 +450,14 @@
       kind: "hall",
       tx: 14,
       ty: 13,
+      tw: HALL_W,
+      th: HALL_H,
       queue: [],
+      done: true,
     };
     hall.x = hall.tx * TILE + (HALL_W * TILE) / 2;
     hall.y = hall.ty * TILE + HALL_H * TILE;
+    buildings = [hall];
 
     const cx = hall.tx + HALL_W / 2;
     const cy = hall.ty + HALL_H / 2;
@@ -611,7 +750,10 @@
   }
 
   function harvesting(u) {
-    return u.job && u.job.type === "gather" && u.job.phase === "harvest";
+    return (
+      (u.job && u.job.type === "gather" && u.job.phase === "harvest") ||
+      (u.job && u.job.type === "build" && u.job.phase === "work")
+    );
   }
 
   function updateGatherJob(u, dt) {
@@ -933,18 +1075,20 @@
     last.y = y;
   }
 
-  function spawnUnit(kind, slot) {
+  function spawnUnit(kind, slot, fromBldg) {
     const spec = UNIT_SPEC[kind] || UNIT_SPEC.worker;
     if (units.length >= WORKER_CAP) {
       toast("Лимит населения", true);
       return null;
     }
-    const d = doorPos();
+    const src = fromBldg || hall;
+    const d = bldgDoor(src);
+    const rallyPt = src.kind === "hall" ? rally : src.rally || { x: d.x, y: d.y + 28 };
     const col = slot % 5;
     const row = (slot / 5) | 0;
     const target = {
-      x: rally.x + (col - 2) * 14,
-      y: rally.y + row * 14,
+      x: rallyPt.x + (col - 2) * 14,
+      y: rallyPt.y + row * 14,
     };
     const u = {
       kind,
@@ -970,24 +1114,34 @@
   function trainUnit(kind) {
     const spec = UNIT_SPEC[kind];
     if (!spec) return;
+    let dest = null;
+    if (kind === "worker") dest = hall;
+    else {
+      dest = readyBarracks();
+      if (!dest) {
+        toast("Сначала постройте казармы", true);
+        beep(90, 0.12, "sawtooth");
+        return;
+      }
+    }
     if (gold < spec.gold || wood < spec.wood) {
       toast("Недостаточно ресурсов", true);
       beep(90, 0.12, "sawtooth");
       return;
     }
-    if (units.length + hall.queue.length >= WORKER_CAP) {
+    if (units.length + queuedCount() >= WORKER_CAP) {
       toast("Лимит населения", true);
       return;
     }
-    if (hall.queue.length >= 5) {
+    if (dest.queue.length >= 5) {
       toast("Очередь заполнена", true);
       return;
     }
     gold -= spec.gold;
     wood -= spec.wood;
-    hall.queue.push({ t: 0, dur: spec.time, kind });
-    selected = [hall];
-    trainedOnce = true;
+    dest.queue.push({ t: 0, dur: spec.time, kind });
+    selected = [dest];
+    if (kind === "worker") trainedOnce = true;
     beep(320, 0.06);
     beep(480, 0.08);
     syncUi();
@@ -1067,21 +1221,85 @@
       }
     }
 
+    for (const b of buildings) {
+      if (b === hall) continue;
+      const bf = bldgFoot(b);
+      for (const u of units) {
+        if (u.x > bf.x && u.x < bf.x + bf.w && u.y > bf.y && u.y < bf.y + bf.h) {
+          u.y = bf.y + bf.h + UNIT_R;
+        }
+      }
+    }
+
     for (const u of units) {
       if (u.job && u.job.type === "gather") updateGatherJob(u, dt);
+      if (u.job && u.job.type === "build") updateBuildJob(u, dt);
+    }
+  }
+
+  function updateBuildJob(u, dt) {
+    const job = u.job;
+    if (!job || job.type !== "build") return;
+    const b = job.building;
+    if (!b || b.done) {
+      u.job = null;
+      return;
+    }
+    const d = bldgDoor(b);
+    if (job.phase === "go") {
+      if (Math.hypot(u.x - d.x, u.y - d.y) < 18) {
+        u.path = [];
+        u.moving = false;
+        job.phase = "work";
+        return;
+      }
+      if (!u.path.length) orderMove(u, d.x, d.y + 8);
+      return;
+    }
+    u.path = [];
+    u.moving = false;
+    b.progress = (b.progress || 0) + dt;
+    if (b.progress >= BAR_TIME) {
+      b.done = true;
+      toast("Казармы готовы");
+      beep(520, 0.08);
+      for (const o of units) {
+        if (o.job && o.job.type === "build" && o.job.building === b) o.job = null;
+      }
     }
   }
 
   function updateHall(dt) {
-    if (!hall.queue.length) return;
-    const q = hall.queue[0];
-    q.t += dt;
-    if (q.t >= q.dur) {
-      const kind = q.kind || "worker";
-      hall.queue.shift();
-      spawnUnit(kind, units.length);
-      toast((UNIT_SPEC[kind] || UNIT_SPEC.worker).name + " вышел из совета");
-      beep(520, 0.07);
+    if (hall.queue.length) {
+      const q = hall.queue[0];
+      q.t += dt;
+      if (q.t >= q.dur) {
+        const kind = q.kind || "worker";
+        hall.queue.shift();
+        spawnUnit(kind, units.length, hall);
+        toast((UNIT_SPEC[kind] || UNIT_SPEC.worker).name + " вышел из совета");
+        beep(520, 0.07);
+      }
+    }
+    for (const b of buildings) {
+      if (b.kind === "barracks" && !b.done && (b.progress || 0) >= BAR_TIME) {
+        b.done = true;
+        toast("Казармы готовы");
+        beep(520, 0.08);
+        for (const o of units) {
+          if (o.job && o.job.type === "build" && o.job.building === b) o.job = null;
+        }
+      }
+      if (b.kind !== "barracks" || !b.done || !b.queue.length) continue;
+      const q = b.queue[0];
+      q.t += dt;
+      if (q.t >= q.dur) {
+        const kind = q.kind || "militia";
+        b.queue.shift();
+        spawnUnit(kind, units.length, b);
+        toast((UNIT_SPEC[kind] || UNIT_SPEC.militia).name + " вышел из казарм");
+        beep(520, 0.07);
+      }
     }
   }
 
@@ -1090,8 +1308,11 @@
       const u = units[i];
       if (wx >= u.x - 10 && wx <= u.x + 10 && wy >= u.y - 22 && wy <= u.y + 4) return u;
     }
-    const r = hallSpriteRect();
-    if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return hall;
+    for (let i = buildings.length - 1; i >= 0; i--) {
+      const b = buildings[i];
+      const r = bldgSpriteRect(b);
+      if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return b;
+    }
     return null;
   }
 
@@ -1105,17 +1326,40 @@
       selected = hit;
       return;
     }
-    const r = hallSpriteRect();
-    const hx = r.x + r.w / 2;
-    const hy = r.y + r.h * 0.7;
-    if (hx >= xa && hx <= xb && hy >= ya && hy <= yb) selected = [hall];
-    else selected = [];
+    for (const b of buildings) {
+      const r = bldgSpriteRect(b);
+      const hx = r.x + r.w / 2;
+      const hy = r.y + r.h * 0.7;
+      if (hx >= xa && hx <= xb && hy >= ya && hy <= yb) {
+        selected = [b];
+        return;
+      }
+    }
+    selected = [];
   }
 
   function issueRightClick(wx, wy) {
+    if (placeMode) {
+      placeMode = null;
+      canvas.style.cursor = "crosshair";
+      syncUi();
+      return;
+    }
     const workers = selected.filter((s) => s.kind === "worker");
-    const troops = selected.filter((s) => s.kind && s.kind !== "hall");
+    const troops = selected.filter((s) => isUnit(s));
     const node = pickNodeAt(wx, wy);
+    const bldgHit = pickAt(wx, wy);
+    if (workers.length && bldgHit && bldgHit.kind === "barracks" && !bldgHit.done) {
+      const d = bldgDoor(bldgHit);
+      workers.forEach((u) => {
+        u.job = { type: "build", building: bldgHit, phase: "go" };
+        orderMove(u, d.x, d.y + 8);
+      });
+      pings.push({ x: bldgHit.x, y: bldgHit.y, t: 0.45, color: "#e4c45c" });
+      toast("Рабочие строят");
+      beep(400, 0.05);
+      return;
+    }
     if (workers.length && node && nodeLive(node)) {
       workers.forEach((u, i) => {
         u.job = {
@@ -1150,6 +1394,14 @@
       pings.push({ x: wx, y: wy, t: 0.5, color: "#ffd25a" });
       toast("Точка сбора");
       beep(400, 0.05);
+    } else {
+      const bar = selected.find((s) => s.kind === "barracks");
+      if (bar) {
+        bar.rally = { x: wx, y: wy };
+        pings.push({ x: wx, y: wy, t: 0.5, color: "#ffd25a" });
+        toast("Точка сбора");
+        beep(400, 0.05);
+      }
     }
   }
 
@@ -1231,24 +1483,43 @@
   }
 
   function drawHall() {
-    const r = hallSpriteRect();
-    const f = hallFoot();
-    const lift = visLift(hall.x, hall.y);
+    drawBldg(hall);
+  }
+
+  function drawBldg(b) {
+    const r = bldgSpriteRect(b);
+    const f = bldgFoot(b);
+    const lift = visLift(b.x, b.y);
     const sx = (r.x - cam.x) | 0;
     const sy = (r.y - lift - cam.y) | 0;
     drawBuildingShadow((f.x - cam.x) | 0, (f.y + f.h - lift - cam.y) | 0, f.w);
-    if (selected.includes(hall)) {
+    if (selected.includes(b)) {
       drawRing(
         (f.x + f.w / 2 - cam.x) | 0,
         (f.y + f.h - lift - cam.y) | 0,
-        26,
+        b.kind === "hall" ? 26 : 22,
         7,
         "#7dff6a"
       );
     }
-    ctx.drawImage(imgs.hall, sx, sy);
-    if (hall.queue.length) {
-      const q = hall.queue[0];
+    const im = bldgImg(b);
+    if (im) {
+      ctx.globalAlpha = b.done === false ? 0.45 + Math.min(0.5, (b.progress || 0) / BAR_TIME) : 1;
+      ctx.drawImage(im, sx, sy);
+      ctx.globalAlpha = 1;
+    }
+    if (b.done === false) {
+      const bw = 40;
+      const bx = sx + r.w / 2 - bw / 2;
+      const by = sy + 4;
+      ctx.fillStyle = "#1a100c";
+      ctx.fillRect(bx, by, bw, 4);
+      ctx.fillStyle = "#7dff6a";
+      ctx.fillRect(bx, by, (((b.progress || 0) / BAR_TIME) * bw) | 0, 4);
+      ctx.strokeStyle = "#100808";
+      ctx.strokeRect(bx, by, bw, 4);
+    } else if (b.queue && b.queue.length) {
+      const q = b.queue[0];
       const bw = 40;
       const bx = sx + r.w / 2 - bw / 2;
       const by = sy + 4;
@@ -1278,18 +1549,38 @@
     const drawables = [];
     for (const p of props) drawables.push({ y: p.y, fn: () => drawProp(p) });
     for (const n of nodes) drawables.push({ y: n.y, fn: () => drawNode(n) });
-    drawables.push({ y: hall.y, fn: drawHall });
+    for (const b of buildings) drawables.push({ y: b.y, fn: () => drawBldg(b) });
     for (const u of units) drawables.push({ y: u.y, fn: () => drawWorker(u) });
     drawables.sort((a, b) => a.y - b.y);
     for (const d of drawables) d.fn();
 
-    if (selected.includes(hall) && imgs.flag) {
-      const lift = visLift(rally.x, rally.y);
-      ctx.drawImage(
-        imgs.flag,
-        (rally.x - 2 - cam.x) | 0,
-        (rally.y - imgs.flag.height - lift - cam.y) | 0
-      );
+    const rallyBldg = selected.find((s) => s.kind === "hall" || s.kind === "barracks");
+    if (rallyBldg && imgs.flag) {
+      const rp = rallyBldg.kind === "hall" ? rally : rallyBldg.rally;
+      if (rp) {
+        const lift = visLift(rp.x, rp.y);
+        ctx.drawImage(
+          imgs.flag,
+          (rp.x - 2 - cam.x) | 0,
+          (rp.y - imgs.flag.height - lift - cam.y) | 0
+        );
+      }
+    }
+
+    if (placeMode === "barracks" && imgs.barracks) {
+      const tx = clamp((mouse.wx / TILE) | 0, 0, MAP_W - BAR_W);
+      const ty = clamp((mouse.wy / TILE) | 0, 0, MAP_H - BAR_H);
+      const ok = canPlaceAt(tx, ty, BAR_W, BAR_H);
+      const fake = { kind: "barracks", tx, ty, tw: BAR_W, th: BAR_H, x: tx * TILE + (BAR_W * TILE) / 2, y: ty * TILE + BAR_H * TILE, done: false };
+      const r = bldgSpriteRect(fake);
+      const f = bldgFoot(fake);
+      const lift = visLift(fake.x, fake.y);
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(imgs.barracks, (r.x - cam.x) | 0, (r.y - lift - cam.y) | 0);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = ok ? "#7dff6a" : "#c44c3a";
+      ctx.lineWidth = 1;
+      ctx.strokeRect((f.x - cam.x) | 0, (f.y - lift - cam.y) | 0, f.w, f.h);
     }
 
     for (const p of pings) {
@@ -1340,6 +1631,12 @@
     mctx.fillStyle = "#c47848";
     const f = hallFoot();
     mctx.fillRect(f.x * sx, f.y * sy, f.w * sx, f.h * sy);
+    for (const b of buildings) {
+      if (b.kind !== "barracks") continue;
+      const bf = bldgFoot(b);
+      mctx.fillStyle = b.done ? "#8b2a2a" : "#5a3820";
+      mctx.fillRect(bf.x * sx, bf.y * sy, bf.w * sx, bf.h * sy);
+    }
     for (const n of nodes) {
       if (n.kind === "tree") mctx.fillStyle = "#163818";
       else if (n.kind === "gold") mctx.fillStyle = "#e8c44a";
@@ -1353,33 +1650,67 @@
     mctx.strokeRect(cam.x * sx, cam.y * sy, canvas.width * sx, canvas.height * sy);
   }
 
+  function showWrap(el, on) {
+    if (!el) return;
+    el.classList.toggle("is-hidden", !on);
+  }
+
   function syncUi() {
     ui.gold.textContent = gold | 0;
     if (ui.wood) ui.wood.textContent = wood | 0;
     ui.pop.textContent = units.length + " / " + WORKER_CAP;
-    const queued = hall.queue.length;
+    const queued = queuedCount();
     const popFull = units.length + queued >= WORKER_CAP;
-    const queueFull = queued >= 5;
-    function setBtn(el, spec) {
-      if (!el) return;
-      el.disabled = popFull || queueFull || gold < spec.gold || wood < spec.wood;
+    const hallFull = hall.queue.length >= 5;
+    const bar = selected.find((s) => s.kind === "barracks");
+    const barReady = bar && bar.done;
+    const barFull = barReady && bar.queue.length >= 5;
+    if (ui.btn) ui.btn.disabled = popFull || hallFull || gold < UNIT_SPEC.worker.gold;
+    if (ui.btnMilitia) {
+      ui.btnMilitia.disabled =
+        !barReady || popFull || barFull || gold < UNIT_SPEC.militia.gold || wood < UNIT_SPEC.militia.wood;
     }
-    setBtn(ui.btn, UNIT_SPEC.worker);
-    setBtn(ui.btnMilitia, UNIT_SPEC.militia);
-    setBtn(ui.btnArcher, UNIT_SPEC.archer);
+    if (ui.btnArcher) {
+      ui.btnArcher.disabled =
+        !barReady || popFull || barFull || gold < UNIT_SPEC.archer.gold || wood < UNIT_SPEC.archer.wood;
+    }
+    if (ui.btnBarracks) {
+      ui.btnBarracks.disabled =
+        gold < BAR_GOLD ||
+        wood < BAR_WOOD ||
+        buildings.filter((b) => b.kind === "barracks").length >= BAR_MAX;
+    }
     ui.btn.classList.toggle("pulse", selected.includes(hall) && !trainedOnce);
+    if (ui.btnBarracks) ui.btnBarracks.classList.toggle("pulse", placeMode === "barracks");
 
-    const troops = selected.filter((s) => s.kind && s.kind !== "hall");
+    const troops = selected.filter((s) => isUnit(s));
     const workers = troops.filter((s) => s.kind === "worker");
-    if (selected.includes(hall)) {
+    const hallSel = selected.includes(hall);
+    const barSel = !!bar;
+    showWrap(ui.wrapWorker, hallSel);
+    showWrap(ui.wrapBarracks, hallSel || (workers.length > 0 && workers.length === troops.length));
+    showWrap(ui.wrapMilitia, barSel && bar.done);
+    showWrap(ui.wrapArcher, barSel && bar.done);
+
+    if (hallSel) {
       ui.title.textContent = "Городской совет";
-      ui.sub.textContent =
-        "1 — рабочий (50з). 2 — ополченец (40з 25д). 3 — лучник (45з 35д). ПКМ — точка сбора.";
+      ui.sub.textContent = "1 — рабочий (50з). B — казармы (100з 50д). ПКМ — точка сбора.";
       ui.portrait.src = "assets/buildings/townhall.png";
+      ui.portrait.style.display = "block";
+    } else if (barSel && !bar.done) {
+      ui.title.textContent = "Казармы (стройка)";
+      ui.sub.textContent =
+        "Готово на " + Math.min(100, (((bar.progress || 0) / BAR_TIME) * 100) | 0) + "%. Пришлите рабочих ПКМ.";
+      ui.portrait.src = "assets/buildings/barracks.png";
+      ui.portrait.style.display = "block";
+    } else if (barSel) {
+      ui.title.textContent = "Казармы";
+      ui.sub.textContent = "2 — ополченец (40з 25д). 3 — лучник (45з 35д). ПКМ — точка сбора.";
+      ui.portrait.src = "assets/buildings/barracks.png";
       ui.portrait.style.display = "block";
     } else if (workers.length && workers.length === troops.length) {
       ui.title.textContent = workers.length > 1 ? "Рабочие × " + workers.length : "Рабочий";
-      ui.sub.textContent = "ПКМ по дереву/золоту — собирать. ПКМ по земле — идти.";
+      ui.sub.textContent = "ПКМ по дереву/золоту — собирать. B — казармы. ПКМ по стройке — строить.";
       ui.portrait.src = "assets/ui/btn_worker.png";
       ui.portrait.style.display = "block";
     } else if (troops.length) {
@@ -1391,18 +1722,19 @@
       ui.portrait.style.display = "block";
     } else {
       ui.title.textContent = "Ничего не выбрано";
-      ui.sub.textContent = "Выберите городской совет. Рабочие рубят деревья и копают золото.";
+      ui.sub.textContent = "Совет нанимает рабочих. Казармы — ополченцев и лучников.";
       ui.portrait.style.display = "none";
     }
 
     ui.queue.innerHTML = "";
-    if (selected.includes(hall)) {
-      hall.queue.forEach((q, i) => {
+    const qSrc = hallSel ? hall : barSel ? bar : null;
+    if (qSrc && qSrc.queue) {
+      qSrc.queue.forEach((q, i) => {
         const pip = document.createElement("div");
         pip.className = "q-pip";
-        const bar = document.createElement("i");
-        bar.style.width = i === 0 ? ((q.t / q.dur) * 100).toFixed(0) + "%" : "0%";
-        pip.appendChild(bar);
+        const barEl = document.createElement("i");
+        barEl.style.width = i === 0 ? ((q.t / q.dur) * 100).toFixed(0) + "%" : "0%";
+        pip.appendChild(barEl);
         ui.queue.appendChild(pip);
       });
     }
@@ -1434,6 +1766,11 @@
       return;
     }
     if (e.button !== 0) return;
+    if (placeMode === "barracks") {
+      tryPlaceBarracks(w.x, w.y);
+      e.preventDefault();
+      return;
+    }
     mouse.left = true;
     box = { x0: w.x, y0: w.y, x1: w.x, y1: w.y, shifted: e.shiftKey };
   }
@@ -1445,7 +1782,7 @@
     mouse.wx = w.x;
     mouse.wy = w.y;
     hover = pickAt(w.x, w.y) || pickNodeAt(w.x, w.y);
-    canvas.style.cursor = hover ? "pointer" : "crosshair";
+    canvas.style.cursor = placeMode ? (canPlaceAt(clamp((w.x / TILE) | 0, 0, MAP_W - BAR_W), clamp((w.y / TILE) | 0, 0, MAP_H - BAR_H), BAR_W, BAR_H) ? "copy" : "not-allowed") : hover ? "pointer" : "crosshair";
 
     if (panning && pan0) {
       cam.x = pan0.cx - (e.clientX - pan0.mx) / zoom;
@@ -1563,13 +1900,24 @@
       if (!el) return;
       el.addEventListener("click", () => {
         ensureAudio();
-        selected = [hall];
         trainUnit(kind);
       });
     }
     bindTrain(ui.btn, "worker");
     bindTrain(ui.btnMilitia, "militia");
     bindTrain(ui.btnArcher, "archer");
+    if (ui.btnBarracks) {
+      ui.btnBarracks.addEventListener("click", () => {
+        ensureAudio();
+        if (placeMode === "barracks") {
+          placeMode = null;
+          canvas.style.cursor = "crosshair";
+          syncUi();
+        } else {
+          enterPlaceBarracks();
+        }
+      });
+    }
 
     window.addEventListener("keydown", (e) => {
       keys[e.code] = true;
@@ -1578,21 +1926,34 @@
         e.preventDefault();
       }
       if (e.code === "Escape") {
-        selected = [];
+        if (placeMode) {
+          placeMode = null;
+          canvas.style.cursor = "crosshair";
+        } else {
+          selected = [];
+        }
         syncUi();
       }
       if (e.code === "KeyH") centerOn(hall.x, hall.y);
+      if (e.code === "KeyG") {
+        const b = readyBarracks() || buildings.find((x) => x.kind === "barracks");
+        if (b) {
+          centerOn(b.x, b.y);
+          selected = [b];
+          syncUi();
+        }
+      }
       if (e.repeat) return;
+      if (e.code === "KeyB") {
+        enterPlaceBarracks();
+      }
       if (e.code === "Digit1" || e.code === "KeyR") {
-        selected = [hall];
         trainUnit("worker");
       }
       if (e.code === "Digit2") {
-        selected = [hall];
         trainUnit("militia");
       }
       if (e.code === "Digit3") {
-        selected = [hall];
         trainUnit("archer");
       }
     });
@@ -1608,6 +1969,7 @@
     try {
       const [
         hallIm,
+        barracksIm,
         workerIm,
         hillock,
         rock0,
@@ -1618,6 +1980,7 @@
         flag,
       ] = await Promise.all([
         loadImg("assets/buildings/townhall.png"),
+        loadImgOpt("assets/buildings/barracks.png"),
         loadImg("assets/units/worker.png"),
         loadImg("assets/props/hillock.png"),
         loadImg("assets/props/rock_0.png"),
@@ -1628,6 +1991,7 @@
         loadImg("assets/props/flag.png"),
       ]);
       imgs.hall = hallIm;
+      imgs.barracks = barracksIm;
       imgs.worker = workerIm;
       imgs.militia = (await loadImgOpt("assets/units/militia.png")) || workerIm;
       imgs.archer = (await loadImgOpt("assets/units/archer.png")) || workerIm;
@@ -1693,7 +2057,27 @@
         issueRightClick(x, y);
       },
       finishTrain() {
-        if (hall.queue.length) hall.queue[0].t = hall.queue[0].dur;
+        for (const b of buildings) {
+          if (b.queue && b.queue.length) {
+            b.queue[0].t = b.queue[0].dur;
+            return;
+          }
+        }
+      },
+      finishBuild() {
+        for (const b of buildings) {
+          if (b.kind === "barracks" && !b.done) {
+            b.progress = BAR_TIME;
+            b.done = true;
+          }
+        }
+      },
+      placeBarracks(x, y) {
+        tryPlaceBarracks(x, y);
+      },
+      barracksPos() {
+        const b = buildings.find((x) => x.kind === "barracks");
+        return b ? { x: b.x, y: b.y, done: b.done } : null;
       },
       hallPos() {
         return { x: hall.x, y: hall.y };
