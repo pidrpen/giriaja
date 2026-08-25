@@ -933,9 +933,9 @@
     let g, r, b;
     if (h < 0.26) {
       const t = h / 0.26;
-      r = lerp(58, 86, t);
-      g = lerp(72, 108, t);
-      b = lerp(28, 42, t);
+      r = lerp(76, 98, t);
+      g = lerp(102, 124, t);
+      b = lerp(36, 50, t);
       if (n2 > 0.58) {
         r = 108;
         g = 80;
@@ -975,9 +975,9 @@
     const img = g.createImageData(w, h);
     const d = img.data;
     for (let i = 0; i < d.length; i += 4) {
-      d[i] = 12;
-      d[i + 1] = 8;
-      d[i + 2] = 6;
+      d[i] = 62;
+      d[i + 1] = 78;
+      d[i + 2] = 32;
       d[i + 3] = 255;
     }
     const miniData = mctx.createImageData(MAP_W, MAP_H);
