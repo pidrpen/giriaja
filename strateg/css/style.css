@@ -35,7 +35,7 @@ html, body {
 
 #hud { pointer-events: none; }
 
-#topbar, #bottom, .cmd-btn, #minimap, #boot {
+#topbar, #bottom, .cmd-btn, #minimap, #boot, #end-screen {
   pointer-events: auto;
 }
 
@@ -267,6 +267,41 @@ html, body {
 }
 .boot-sub { color: var(--muted); margin-top: 8px; letter-spacing: 0.18em; }
 .boot-msg { margin-top: 28px; color: var(--ink); }
+
+#end-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 4, 2, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 18;
+  pointer-events: auto;
+}
+#end-screen.hidden { display: none; }
+.end-card {
+  text-align: center;
+  padding: 28px 36px;
+  background: linear-gradient(#2c1c12, #1a100c);
+  box-shadow: 0 0 0 2px #100808, 0 0 0 4px #8a5a32;
+}
+.end-title {
+  font-size: 32px;
+  letter-spacing: 0.28em;
+  color: var(--gold);
+  margin-left: 0.28em;
+}
+.end-sub { color: var(--muted); margin-top: 10px; }
+.end-btn {
+  margin-top: 22px;
+  padding: 8px 18px;
+  background: #3a2416;
+  color: var(--ink);
+  border: 2px solid #d4b07a;
+  cursor: pointer;
+  font: inherit;
+}
+.end-btn:hover { filter: brightness(1.15); }
 
 @media (max-width: 640px) {
   #topbar {
