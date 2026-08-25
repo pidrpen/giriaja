@@ -83,6 +83,18 @@ html, body {
   font-size: 11px;
 }
 
+#dl-game {
+  color: var(--gold);
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border: 1px solid var(--edge-hi);
+  background: #3a2416;
+  pointer-events: auto;
+}
+#dl-game:hover { filter: brightness(1.15); }
+
 #bottom {
   position: absolute;
   left: 0; right: 0; bottom: 0;
