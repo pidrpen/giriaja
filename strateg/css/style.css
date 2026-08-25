@@ -77,6 +77,30 @@ html, body {
   height: 18px;
 }
 
+#idle-res .idle-tag {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+#pause-banner {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  letter-spacing: 0.45em;
+  font-size: 28px;
+  color: var(--gold);
+  z-index: 12;
+  pointer-events: none;
+  text-shadow: 0 2px 0 #100808, 0 0 0 2px #100808;
+  padding: 8px 18px;
+  background: rgba(16, 10, 8, 0.72);
+  box-shadow: 0 0 0 2px #8a5a32;
+}
+#pause-banner.hidden { display: none; }
+
 #seed-label {
   margin-left: auto;
   color: var(--muted);
@@ -316,6 +340,7 @@ html, body {
 .end-btn:hover { filter: brightness(1.15); }
 
 @media (max-width: 640px) {
+  #idle-res { display: none; }
   #topbar {
     gap: 10px;
     padding: 0 8px;
