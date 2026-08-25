@@ -2326,22 +2326,16 @@
     if (!fog) return;
     const x0 = clamp((cam.x / TILE) | 0, 0, MAP_W - 1);
     const y0 = clamp((cam.y / TILE) | 0, 0, MAP_H - 1);
-    const x1 = clamp((((cam.x + canvas.width) / TILE) | 0) + 1, 0, MAP_W);
+    const x1 = clamp((((cam.x + canvas.width) / TILE) | 0) + 2, 0, MAP_W);
     const y1 = clamp((((cam.y + canvas.height) / TILE) | 0) + 2, 0, MAP_H);
     for (let ty = y0; ty < y1; ty++) {
       for (let tx = x0; tx < x1; tx++) {
         const v = fog[ty][tx];
         if (v === 2) continue;
-        const lift = (elev[ty][tx] || 0) * LIFT_STEP;
         const sx = (tx * TILE - cam.x) | 0;
-        const sy = (ty * TILE - lift - cam.y) | 0;
-        if (v === 0) {
-          ctx.fillStyle = "#0c0806";
-          ctx.fillRect(sx, sy, TILE, TILE + lift);
-        } else {
-          ctx.fillStyle = "rgba(10,6,4,0.48)";
-          ctx.fillRect(sx, sy, TILE, TILE);
-        }
+        const sy = (ty * TILE - cam.y) | 0;
+        ctx.fillStyle = v === 0 ? "#0c0806" : "rgba(10,6,4,0.52)";
+        ctx.fillRect(sx, sy, TILE + 1, TILE + 1);
       }
     }
   }
