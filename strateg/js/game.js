@@ -137,6 +137,12 @@
   let paused = false;
   let attackMoveMode = false;
   let lastPick = { t: 0, kind: null };
+  const groups = [[], [], [], [], [], [], [], [], [], []];
+  let lastGroupKey = { n: -1, t: 0 };
+  let lastArmyT = 0;
+  let alertCd = 0;
+  let alertMark = null;
+  let nextRaidAt = 55;
   const seed = (Math.random() * 1e9) | 0;
 
   function loadImg(src) {
@@ -483,6 +489,32 @@
     u.job = { type: "build", building: b, phase: "go" };
     u.holdFire = true;
     orderMove(u, d.x, d.y + 8);
+  }
+
+  function sendRepair(u, b) {
+    const d = bldgDoor(b);
+    u.job = { type: "repair", building: b, phase: "go" };
+    u.holdFire = true;
+    orderMove(u, d.x, d.y + 8);
+  }
+
+  function queueBuilding() {
+    if (selected.includes(hall)) return hall;
+    return selected.find((s) => s.kind === "barracks" && s.done) || null;
+  }
+
+  function cancelQueueAt(b, index) {
+    if (!b || !b.queue || index < 0 || !b.queue[index]) return;
+    const item = b.queue[index];
+    const spec = UNIT_SPEC[item.kind];
+    b.queue.splice(index, 1);
+    if (spec && (b.team || 0) === 0) {
+      gold += spec.gold;
+      wood += spec.wood;
+    }
+    toast("Отмена: " + (spec ? spec.name : "заказ"));
+    beep(200, 0.06);
+    syncUi();
   }
 
   function sendGather(u, node, slot) {
@@ -1181,7 +1213,8 @@
   function harvesting(u) {
     return (
       (u.job && u.job.type === "gather" && u.job.phase === "harvest") ||
-      (u.job && u.job.type === "build" && u.job.phase === "work")
+      (u.job && u.job.type === "build" && u.job.phase === "work") ||
+      (u.job && u.job.type === "repair" && u.job.phase === "work")
     );
   }
 
@@ -1731,7 +1764,12 @@
       if (s) s.textContent = win ? "Орочий лагерь пал." : "Городской совет разрушен.";
     }
     toast(win ? "Победа!" : "Поражение…");
-    beep(win ? 520 : 90, 0.2, win ? "square" : "sawtooth");
+    if (win) {
+      beep(392, 0.12, "square");
+      beep(523, 0.18, "square");
+    } else {
+      beep(90, 0.28, "sawtooth");
+    }
   }
 
   function killEnt(ent) {
@@ -1744,7 +1782,7 @@
         kind: ent.kind,
         dir: ent.dir || 0,
         team: ent.team || 0,
-        t: 1.15,
+        t: 4,
       });
       selected = selected.filter((s) => s !== ent);
       const i = units.indexOf(ent);
@@ -1766,13 +1804,38 @@
     toast((spec ? spec.name : "Здание") + " разрушено");
   }
 
+  function offscreen(x, y) {
+    const pad = 12;
+    return (
+      x < cam.x - pad ||
+      y < cam.y - pad ||
+      x > cam.x + canvas.width + pad ||
+      y > cam.y + canvas.height + pad
+    );
+  }
+
+  function pingAttack(ent) {
+    if (!ent || (ent.team || 0) !== 0) return;
+    if (alertCd > 0) return;
+    if (!offscreen(ent.x, ent.y)) return;
+    alertCd = 8;
+    alertMark = { x: ent.x, y: ent.y, t: 2 };
+    toast("На нас напали", true);
+    beep(90, 0.16, "sawtooth");
+    beep(160, 0.1, "square");
+  }
+
   function dealDamage(from, to, dmg) {
     if (!to || to.hp <= 0) return;
     to.hp -= dmg;
     to.hitT = 0.14;
     pings.push({ x: to.x, y: to.y - 6, t: 0.28, color: "#c44c3a" });
     beep(150, 0.04, "sawtooth");
-    if (to.hp <= 0) killEnt(to);
+    pingAttack(to);
+    if (to.hp <= 0) {
+      beep(70, 0.14, "triangle");
+      killEnt(to);
+    }
   }
 
   function updateCombat(dt) {
@@ -1824,7 +1887,7 @@
             dealDamage(u, t, spec.dmg);
           }
         }
-      } else if (job && (job.type === "gather" || job.type === "build" || job.type === "move")) {
+      } else if (job && (job.type === "gather" || job.type === "build" || job.type === "repair" || job.type === "move")) {
         continue;
       } else {
         if (u.kind === "worker" || u.kind === "peon") continue;
@@ -1864,6 +1927,20 @@
     return best;
   }
 
+  function nearestTree(u) {
+    let best = null;
+    let bestD = 1e9;
+    for (const n of nodes) {
+      if (!nodeLive(n) || n.kind !== "tree") continue;
+      const d = Math.hypot(n.x - u.x, n.y - u.y);
+      if (d < bestD) {
+        bestD = d;
+        best = n;
+      }
+    }
+    return best;
+  }
+
   function updateTowers(dt) {
     if (gameOver) return;
     for (const b of buildings) {
@@ -1893,6 +1970,7 @@
     if (gameOver || !enemyHall || enemyHall.hp <= 0) return;
     raidT += dt;
     const hallHurt = enemyHall.hp < enemyHall.maxHp * 0.92;
+    const peons = units.filter((u) => u.kind === "peon" && u.hp > 0);
     for (const u of units) {
       if ((u.team || 0) !== 1) continue;
       if (u.kind === "peon") {
@@ -1903,14 +1981,23 @@
           continue;
         }
         if (!u.job) {
-          const mine = nearestMine(u);
-          if (mine) sendGather(u, mine, 0);
+          const idx = peons.indexOf(u);
+          const node = idx >= 0 && idx < 2 ? nearestMine(u) : nearestTree(u) || nearestMine(u);
+          if (node) sendGather(u, node, Math.max(0, idx));
         }
         continue;
       }
+      if (u.kind !== "grunt") continue;
       if (u.job && u.job.type === "attack") continue;
       const close = nearestFoe(u, hallHurt ? 240 : 70);
-      if (close) attackTarget(u, close);
+      if (close) {
+        attackTarget(u, close);
+        continue;
+      }
+      if (hallHurt && (!u.job || u.job.type !== "attackmove")) {
+        const d = bldgDoor(enemyHall);
+        orderAttackMove(u, d.x, d.y + 18);
+      }
     }
     const nGrunt = units.filter((u) => u.kind === "grunt").length;
     const bar = buildings.find((b) => b.kind === "orc_barracks" && b.done && b.hp > 0);
@@ -1918,18 +2005,26 @@
       enemyGold -= 40;
       bar.queue.push({ t: 0, dur: 8, kind: "grunt" });
     }
-    if (raidT > 38 && ((raidT / 24) | 0) !== (((raidT - dt) / 24) | 0)) {
-      const wave = Math.min(5, 2 + (((raidT - 38) / 24) | 0));
+    const playerBarReady = buildings.some((b) => b.kind === "barracks" && b.done && (b.team || 0) === 0 && b.hp > 0);
+    if (raidT >= 40 && playerBarReady && nextRaidAt === 55) nextRaidAt = raidT;
+    if (raidT >= nextRaidAt) {
+      nextRaidAt = raidT + 24;
+      const wave = Math.min(5, 2 + (((raidT - 40) / 24) | 0));
+      const free = units.filter((u) => u.kind === "grunt" && u.hp > 0 && !nearestFoe(u, 48));
+      const keep = Math.min(2, free.length);
+      const n = Math.min(wave, Math.max(0, free.length - keep));
       let sent = 0;
-      for (const u of units) {
-        if (u.kind !== "grunt") continue;
-        if (nearestFoe(u, 48)) continue;
-        if (hallHurt && sent >= Math.max(1, wave - 2)) break;
+      for (const u of free) {
+        if (sent >= n) break;
+        if (hallHurt && sent >= Math.max(1, n - 1)) break;
         orderAttackMove(u, hall.x, hall.y);
         sent++;
-        if (sent >= wave) break;
       }
-      if (sent) toast("Орки идут в набег! ×" + sent);
+      if (sent) {
+        toast("Орки идут в набег! ×" + sent);
+        beep(110, 0.18, "sawtooth");
+        beep(70, 0.22, "triangle");
+      }
     }
   }
 
@@ -2011,6 +2106,7 @@
     for (const u of units) {
       if (u.job && u.job.type === "gather") updateGatherJob(u, dt);
       if (u.job && u.job.type === "build") updateBuildJob(u, dt);
+      if (u.job && u.job.type === "repair") updateRepairJob(u, dt);
       if (u.job && (u.job.type === "move" || u.job.type === "attackmove") && !u.path.length) {
         u.job = null;
         u.holdFire = false;
@@ -2059,6 +2155,45 @@
           if (nxt) sendBuild(o, nxt);
         }
       }
+    }
+  }
+
+  function updateRepairJob(u, dt) {
+    const job = u.job;
+    if (!job || job.type !== "repair") return;
+    const b = job.building;
+    if (!b || b.hp <= 0 || (b.team || 0) !== 0) {
+      u.job = null;
+      return;
+    }
+    if (b.hp >= b.maxHp) {
+      u.job = null;
+      return;
+    }
+    const d = bldgDoor(b);
+    if (job.phase === "go") {
+      if (Math.hypot(u.x - d.x, u.y - d.y) < 18) {
+        u.path = [];
+        u.moving = false;
+        job.phase = "work";
+        return;
+      }
+      if (!u.path.length) orderMove(u, d.x, d.y + 8);
+      return;
+    }
+    u.path = [];
+    u.moving = false;
+    if (Math.hypot(u.x - d.x, u.y - d.y) > 22) {
+      job.phase = "go";
+      orderMove(u, d.x, d.y + 8);
+      return;
+    }
+    b.hp = Math.min(b.maxHp, b.hp + 12 * dt);
+    if (b.hp >= b.maxHp) {
+      b.hp = b.maxHp;
+      u.job = null;
+      toast((BUILD_SPEC[b.kind] ? BUILD_SPEC[b.kind].name : b.kind === "hall" ? "Совет" : "Здание") + " отремонтирован");
+      beep(500, 0.07);
     }
   }
 
@@ -2152,10 +2287,23 @@
       return;
     }
     let usedWorkers = false;
-    if (!doAttackMove && workers.length && bldgHit && bldgHit.kind !== "hall" && !bldgHit.done) {
+    if (!doAttackMove && workers.length && bldgHit && (bldgHit.team || 0) === 0 && !bldgHit.done) {
       workers.forEach((u) => sendBuild(u, bldgHit));
       pings.push({ x: bldgHit.x, y: bldgHit.y, t: 0.45, color: "#e4c45c" });
       toast("Рабочие строят");
+      beep(400, 0.05);
+      usedWorkers = true;
+    } else if (
+      !doAttackMove &&
+      workers.length &&
+      bldgHit &&
+      (bldgHit.team || 0) === 0 &&
+      bldgHit.done &&
+      bldgHit.hp < bldgHit.maxHp
+    ) {
+      workers.forEach((u) => sendRepair(u, bldgHit));
+      pings.push({ x: bldgHit.x, y: bldgHit.y, t: 0.45, color: "#7dff6a" });
+      toast("Рабочие чинят");
       beep(400, 0.05);
       usedWorkers = true;
     } else if (!doAttackMove && workers.length && node && nodeLive(node)) {
@@ -2251,19 +2399,46 @@
     const sx = (c.x - cam.x) | 0;
     const sy = (c.y - lift - cam.y) | 0;
     const sheet = imgs[c.kind] || imgs.worker;
-    ctx.globalAlpha = Math.max(0, c.t / 1.15) * 0.7;
+    ctx.globalAlpha = c.t > 1 ? 0.72 : Math.max(0, c.t) * 0.72;
     if (sheet) ctx.drawImage(sheet, 0, (c.dir || 0) * CELL, CELL, CELL, sx - 12, sy - 16, CELL, CELL);
     ctx.globalAlpha = 1;
   }
 
   function drawWorker(u) {
     const lift = visLift(u.x, u.y);
-    const sx = (u.x - cam.x) | 0;
-    const sy = (u.y - lift - cam.y) | 0;
+    const spec = UNIT_SPEC[u.kind];
+    const labor = u.kind === "worker" || u.kind === "peon";
+    const t = performance.now() / 1000;
+    const phase = u.x * 0.31 + u.y * 0.17;
+    let frame = 0;
+    let bob = 0;
+    let lungeX = 0;
+    let lungeY = 0;
+    if (labor) {
+      if (u.moving) {
+        frame = ((t * 12 + phase) | 0) % 4;
+        bob = Math.abs(Math.sin(t * 16 + phase)) * 2.1;
+      } else {
+        const fidget = (t * 0.35 + phase) % 4.6;
+        frame = fidget > 3.9 ? 1 + (((t * 7 + phase) | 0) % 3) : fidget > 3.2 ? 1 : 0;
+        bob = Math.sin(t * 3.3 + phase) * 0.6;
+      }
+    } else {
+      frame = u.moving ? ((u.walkT * 6) | 0) % 4 : 0;
+      if (u.job && u.job.type === "attack" && spec && spec.range <= 40 && spec.cd - (u.atkCd || 0) < 0.14) {
+        const p = targetPos(u.job.target);
+        if (p) {
+          const d = Math.hypot(p.x - u.x, p.y - u.y) || 1;
+          lungeX = ((p.x - u.x) / d) * 3;
+          lungeY = ((p.y - u.y) / d) * 2;
+        }
+      }
+    }
+    const sx = (u.x + lungeX - cam.x) | 0;
+    const sy = (u.y + lungeY - lift - cam.y + bob) | 0;
     if (selected.includes(u)) drawRing(sx, sy + 2, 8, 3, "#7dff6a");
     else if ((u.team || 0) === 1) drawRing(sx, sy + 2, 7, 3, "#c44c3a");
     drawShadow(sx, sy + 2, 6, 2);
-    const frame = u.moving ? ((u.walkT * 6) | 0) % 4 : 0;
     const sheet = imgs[u.kind] || imgs.worker;
     if (u.hitT > 0) ctx.globalAlpha = 0.55;
     if (sheet) ctx.drawImage(sheet, frame * CELL, u.dir * CELL, CELL, CELL, sx - 12, sy - 16, CELL, CELL);
@@ -2427,7 +2602,7 @@
       if (visAt(s.x, s.y) < 2 && (!s.from || (s.from.team || 0) !== 0)) continue;
       const lift = visLift(s.x, s.y);
       ctx.fillStyle = "#f4e0a0";
-      ctx.fillRect((s.x - cam.x) | 0, (s.y - lift - cam.y) | 0, 2, 2);
+      ctx.fillRect((s.x - cam.x) | 0, (s.y - lift - cam.y) | 0, 3, 1);
     }
 
     const rallyBldg = selected.find((s) => s.kind === "hall" || s.kind === "barracks");
@@ -2605,6 +2780,19 @@
     mctx.strokeStyle = "#f4f0d8";
     mctx.lineWidth = 1;
     mctx.strokeRect(cam.x * sx, cam.y * sy, canvas.width * sx, canvas.height * sy);
+    if (alertMark) {
+      mctx.save();
+      mctx.strokeStyle = "#c44c3a";
+      mctx.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(performance.now() / 110));
+      mctx.lineWidth = 2;
+      const px = alertMark.x * sx;
+      const py = alertMark.y * sy;
+      const r = 5 + (1 - alertMark.t / 2) * 7;
+      mctx.beginPath();
+      mctx.arc(px, py, r, 0, Math.PI * 2);
+      mctx.stroke();
+      mctx.restore();
+    }
   }
 
   function showWrap(el, on) {
@@ -2677,7 +2865,9 @@
 
     if (hallSel) {
       ui.title.textContent = "Городской совет";
-      ui.sub.textContent = "1 — рабочий. F — хижина. B — казармы. T — башня. ПКМ — точка сбора.";
+      ui.sub.textContent =
+        "1 — рабочий. F/B/T — стройка. Backspace — отмена заказа. ПКМ — точка сбора." +
+        (hall.hp < hall.maxHp ? " Рабочим ПКМ — ремонт." : "");
       ui.portrait.src = "assets/buildings/townhall.png";
       ui.portrait.style.display = "block";
     } else if (houseSel && !houseSel.done) {
@@ -2690,7 +2880,8 @@
       ui.portrait.style.display = "block";
     } else if (houseSel) {
       ui.title.textContent = "Хижина";
-      ui.sub.textContent = "Даёт +5 к населению.";
+      ui.sub.textContent =
+        "Даёт +5 к населению." + (houseSel.hp < houseSel.maxHp ? " Рабочим ПКМ — ремонт." : "");
       ui.portrait.src = "assets/buildings/house.png";
       ui.portrait.style.display = "block";
     } else if (towerSel && !towerSel.done) {
@@ -2703,7 +2894,8 @@
       ui.portrait.style.display = "block";
     } else if (towerSel) {
       ui.title.textContent = "Башня";
-      ui.sub.textContent = "Сама стреляет по оркам. Даёт обзор.";
+      ui.sub.textContent =
+        "Сама стреляет по оркам. Даёт обзор." + (towerSel.hp < towerSel.maxHp ? " Рабочим ПКМ — ремонт." : "");
       ui.portrait.src = "assets/buildings/tower.png";
       ui.portrait.style.display = "block";
     } else if (barSel && !bar.done) {
@@ -2714,26 +2906,29 @@
       ui.portrait.style.display = "block";
     } else if (barSel) {
       ui.title.textContent = "Казармы";
-      ui.sub.textContent = "2 — ополченец. 3 — лучник. 4 — всадник. ПКМ — точка сбора.";
+      ui.sub.textContent =
+        "2 — ополченец. 3 — лучник. 4 — всадник. Backspace — отмена. ПКМ — сбор." +
+        (bar.hp < bar.maxHp ? " Рабочим ПКМ — ремонт." : "");
       ui.portrait.src = "assets/buildings/barracks.png";
       ui.portrait.style.display = "block";
     } else if (workerSel) {
       ui.title.textContent = workers.length > 1 ? "Рабочие × " + workers.length : "Рабочий";
-      ui.sub.textContent = "ПКМ по лесу/шахте — собирать. F — хижина. B — казармы. T — башня.";
+      ui.sub.textContent = "ПКМ: лес/шахта — собирать, своё здание — чинить. F/B/T — стройка.";
       ui.portrait.src = "assets/ui/btn_worker.png";
       ui.portrait.style.display = "block";
     } else if (troops.length) {
       const k = troops[0].kind;
       const spec = UNIT_SPEC[k];
       ui.title.textContent = troops.length > 1 ? "Отряд × " + troops.length : spec ? spec.name : k;
-      ui.sub.textContent = "ПКМ — идти. Q затем ПКМ — атака-марш. X — стоп. Двойной клик — все такие.";
+      ui.sub.textContent =
+        "ПКМ — идти. Q — атака-марш. X — стоп. Ctrl/Alt+1–9 — группа. F1 — все войска.";
       ui.portrait.src =
         k === "archer" ? "assets/ui/btn_archer.png" : k === "rider" ? "assets/ui/btn_rider.png" : "assets/ui/btn_militia.png";
       ui.portrait.style.display = "block";
     } else {
       ui.title.textContent = "Ничего не выбрано";
       ui.sub.textContent =
-        "Туман войны. Юго-восток — орки. Tab — свободный рабочий. Q — атака-марш. X — стоп. P — пауза.";
+        "F1 — войска. Alt+1–9 — группа. Tab — простой. Q — атака-марш. P — пауза.";
       ui.portrait.style.display = "none";
     }
 
@@ -2743,9 +2938,14 @@
       qSrc.queue.forEach((q, i) => {
         const pip = document.createElement("div");
         pip.className = "q-pip";
+        pip.title = "Отмена заказа";
         const barEl = document.createElement("i");
         barEl.style.width = i === 0 ? ((q.t / q.dur) * 100).toFixed(0) + "%" : "0%";
         pip.appendChild(barEl);
+        pip.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          cancelQueueAt(qSrc, i);
+        });
         ui.queue.appendChild(pip);
       });
     }
@@ -2924,6 +3124,11 @@
       updateTowers(dt);
       updateEnemy(dt);
       updateFog();
+      if (alertCd > 0) alertCd = Math.max(0, alertCd - dt);
+      if (alertMark) {
+        alertMark.t -= dt;
+        if (alertMark.t <= 0) alertMark = null;
+      }
       for (const c of corpses) c.t -= dt;
       corpses = corpses.filter((c) => c.t > 0);
     }
@@ -3072,17 +3277,63 @@
       if (e.code === "KeyT") {
         enterPlace("tower");
       }
-      if (e.code === "Digit4") {
-        trainUnit("rider");
+      if (e.code === "F1") {
+        e.preventDefault();
+        const army = units.filter((u) => isPlayerUnit(u) && u.kind !== "worker" && u.hp > 0);
+        if (!army.length) {
+          toast("Нет войск", true);
+        } else {
+          selected = army;
+          const now = performance.now();
+          if (now - lastArmyT < 360) {
+            const cx = army.reduce((a, u) => a + u.x, 0) / army.length;
+            const cy = army.reduce((a, u) => a + u.y, 0) / army.length;
+            centerOn(cx, cy);
+          }
+          lastArmyT = now;
+          toast("Войска × " + army.length);
+          syncUi();
+        }
       }
-      if (e.code === "Digit1" || e.code === "KeyR") {
+      if (e.code === "Backspace" || e.code === "Delete") {
+        const qb = queueBuilding();
+        if (qb && qb.queue && qb.queue.length) {
+          e.preventDefault();
+          cancelQueueAt(qb, qb.queue.length - 1);
+        }
+      }
+      if (e.code === "KeyR") {
         trainUnit("worker");
       }
-      if (e.code === "Digit2") {
-        trainUnit("militia");
-      }
-      if (e.code === "Digit3") {
-        trainUnit("archer");
+      const digit = e.code && e.code.startsWith("Digit") ? +e.code.slice(5) : -1;
+      if (digit >= 1 && digit <= 9) {
+        if (e.ctrlKey || e.altKey) {
+          e.preventDefault();
+          const live = selected.filter((s) => isPlayerUnit(s) && s.hp > 0);
+          groups[digit] = live.slice();
+          toast(live.length ? "Группа " + digit + " · " + live.length : "Группа " + digit + " пуста");
+          beep(480, 0.05);
+        } else {
+          const g = (groups[digit] || []).filter((s) => isPlayerUnit(s) && s.hp > 0 && units.includes(s));
+          groups[digit] = g;
+          if (g.length) {
+            e.preventDefault();
+            selected = g.slice();
+            const now = performance.now();
+            if (lastGroupKey.n === digit && now - lastGroupKey.t < 360) {
+              const cx = g.reduce((a, u) => a + u.x, 0) / g.length;
+              const cy = g.reduce((a, u) => a + u.y, 0) / g.length;
+              centerOn(cx, cy);
+            }
+            lastGroupKey = { n: digit, t: now };
+            toast("Группа " + digit + " · " + g.length);
+            beep(700, 0.03);
+            syncUi();
+          } else if (digit === 1) trainUnit("worker");
+          else if (digit === 2) trainUnit("militia");
+          else if (digit === 3) trainUnit("archer");
+          else if (digit === 4) trainUnit("rider");
+        }
       }
     });
     window.addEventListener("keyup", (e) => {
@@ -3259,6 +3510,7 @@
       },
       forceRaid() {
         raidT = 40;
+        nextRaidAt = 40;
         const g = spawnUnit("grunt", 9, enemyHall, 1);
         if (g) attackTarget(g, hall);
       },

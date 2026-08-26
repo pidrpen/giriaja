@@ -89,17 +89,27 @@ html, body {
   top: 46%;
   left: 50%;
   transform: translate(-50%, -50%);
-  letter-spacing: 0.45em;
-  font-size: 28px;
   color: var(--gold);
   z-index: 12;
   pointer-events: none;
-  text-shadow: 0 2px 0 #100808, 0 0 0 2px #100808;
-  padding: 8px 18px;
-  background: rgba(16, 10, 8, 0.72);
+  text-align: center;
+  padding: 14px 22px;
+  background: rgba(16, 10, 8, 0.78);
   box-shadow: 0 0 0 2px #8a5a32;
 }
 #pause-banner.hidden { display: none; }
+.pause-title {
+  letter-spacing: 0.45em;
+  font-size: 28px;
+  text-shadow: 0 2px 0 #100808;
+  margin-bottom: 10px;
+}
+.pause-hint {
+  letter-spacing: 0.04em;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.55;
+}
 
 #seed-label {
   margin-left: auto;
@@ -180,6 +190,10 @@ html, body {
   box-shadow: inset 0 0 0 1px #8a5a32;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+}
+.q-pip:hover {
+  box-shadow: inset 0 0 0 1px #e4c45c;
 }
 
 .q-pip > i {
