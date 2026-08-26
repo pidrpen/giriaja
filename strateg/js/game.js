@@ -648,9 +648,21 @@
   }
 
   function visLift(wx, wy) {
-    const tx = clamp((wx / TILE) | 0, 0, MAP_W - 1);
-    const ty = clamp((wy / TILE) | 0, 0, MAP_H - 1);
-    return (elev[ty][tx] || 0) * LIFT_STEP;
+    if (!elev) return 0;
+    const x = wx / TILE;
+    const y = wy / TILE;
+    const x0 = clamp(Math.floor(x), 0, MAP_W - 1);
+    const y0 = clamp(Math.floor(y), 0, MAP_H - 1);
+    const x1 = clamp(x0 + 1, 0, MAP_W - 1);
+    const y1 = clamp(y0 + 1, 0, MAP_H - 1);
+    const fx = clamp(x - x0, 0, 1);
+    const fy = clamp(y - y0, 0, 1);
+    const e00 = elev[y0][x0] || 0;
+    const e10 = elev[y0][x1] || 0;
+    const e01 = elev[y1][x0] || 0;
+    const e11 = elev[y1][x1] || 0;
+    const e = e00 * (1 - fx) * (1 - fy) + e10 * fx * (1 - fy) + e01 * (1 - fx) * fy + e11 * fx * fy;
+    return e * LIFT_STEP;
   }
 
   function inHud(clientY) {
@@ -1664,6 +1676,7 @@
       atkCd: 0,
       hitT: 0,
       holdFire: false,
+      idleS: hash(slot, units.length) * 8,
     };
     units.push(u);
     orderMove(u, target.x, target.y);
@@ -1717,6 +1730,17 @@
   function dirFrom(dx, dy) {
     if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? 1 : 3;
     return dy >= 0 ? 0 : 2;
+  }
+
+  function face(u, dx, dy) {
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    const ax = Math.abs(dx);
+    const ay = Math.abs(dy);
+    const horiz = dx >= 0 ? 1 : 3;
+    const vert = dy >= 0 ? 0 : 2;
+    if (ax > ay * 1.45) u.dir = horiz;
+    else if (ay > ax * 1.45) u.dir = vert;
+    else if (u.dir !== horiz && u.dir !== vert) u.dir = ax >= ay ? horiz : vert;
   }
 
   function targetPos(t) {
@@ -2095,7 +2119,13 @@
           const step = Math.min(u.speed * dt, td);
           u.x += (tdx / td) * step;
           u.y += (tdy / td) * step;
-          u.dir = dirFrom(tdx, tdy);
+          let look = t;
+          if (u.path.length > 1) {
+            let i = 0;
+            while (i < u.path.length - 1 && Math.hypot(u.path[i].x - u.x, u.path[i].y - u.y) < 28) i++;
+            look = u.path[i];
+          }
+          face(u, look.x - u.x, look.y - u.y);
           u.moving = true;
           u.walkT += dt;
           u.x = clamp(u.x, UNIT_R, MAP_W * TILE - UNIT_R);
@@ -2480,35 +2510,26 @@
   function drawWorker(u) {
     const lift = visLift(u.x, u.y);
     const spec = UNIT_SPEC[u.kind];
-    const labor = u.kind === "worker" || u.kind === "peon";
-    const t = performance.now() / 1000;
-    const phase = u.x * 0.31 + u.y * 0.17;
     let frame = 0;
-    let bob = 0;
     let lungeX = 0;
     let lungeY = 0;
-    if (labor) {
-      if (u.moving) {
-        frame = ((t * 12 + phase) | 0) % 4;
-        bob = Math.abs(Math.sin(t * 16 + phase)) * 2.1;
-      } else {
-        const fidget = (t * 0.35 + phase) % 4.6;
-        frame = fidget > 3.9 ? 1 + (((t * 7 + phase) | 0) % 3) : fidget > 3.2 ? 1 : 0;
-        bob = Math.sin(t * 3.3 + phase) * 0.6;
-      }
+    if (u.moving) {
+      frame = ((u.walkT * 8) | 0) % 4;
     } else {
-      frame = u.moving ? ((u.walkT * 6) | 0) % 4 : 0;
-      if (u.job && u.job.type === "attack" && spec && spec.range <= 40 && spec.cd - (u.atkCd || 0) < 0.14) {
-        const p = targetPos(u.job.target);
-        if (p) {
-          const d = Math.hypot(p.x - u.x, p.y - u.y) || 1;
-          lungeX = ((p.x - u.x) / d) * 3;
-          lungeY = ((p.y - u.y) / d) * 2;
-        }
+      const t = performance.now() / 1000;
+      const seed = u.idleS || 0;
+      frame = (t * 0.22 + seed) % 5 > 4.6 ? 1 : 0;
+    }
+    if (u.job && u.job.type === "attack" && spec && spec.range <= 40 && spec.cd - (u.atkCd || 0) < 0.14) {
+      const p = targetPos(u.job.target);
+      if (p) {
+        const d = Math.hypot(p.x - u.x, p.y - u.y) || 1;
+        lungeX = ((p.x - u.x) / d) * 3;
+        lungeY = ((p.y - u.y) / d) * 2;
       }
     }
     const sx = (u.x + lungeX - cam.x) | 0;
-    const sy = (u.y + lungeY - lift - cam.y + bob) | 0;
+    const sy = (u.y + lungeY - lift - cam.y) | 0;
     if (selected.includes(u)) drawRing(sx, sy + 2, 8, 3, "#7dff6a");
     else if ((u.team || 0) === 1) drawRing(sx, sy + 2, 7, 3, "#c44c3a");
     drawShadow(sx, sy + 2, 6, 2);
