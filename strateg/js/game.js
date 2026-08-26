@@ -370,6 +370,10 @@
     return units.filter((u) => (u.team || 0) === 0).length;
   }
 
+  function isLabor(s) {
+    return s && (s.kind === "worker" || s.kind === "peon");
+  }
+
   function isPlayerUnit(s) {
     return isUnit(s) && (s.team || 0) === 0;
   }
@@ -538,6 +542,7 @@
     if (!nxt) return false;
     job.node = nxt;
     job.res = kind === "gold" ? "gold" : "wood";
+    job.spot = null;
     return true;
   }
 
@@ -1132,9 +1137,15 @@
   }
 
   function pathToNode(u, node, slot) {
+    if (u.job && u.job.spot && u.job.node === node) {
+      orderMove(u, u.job.spot.x, u.job.spot.y);
+      return;
+    }
     const spots = spotsAround(node);
     if (!spots.length) {
-      orderMove(u, node.x, node.y + TILE);
+      const fallback = { x: node.x, y: node.y + TILE };
+      if (u.job) u.job.spot = fallback;
+      orderMove(u, fallback.x, fallback.y);
       return;
     }
     let best = spots[(slot || 0) % spots.length];
@@ -1144,18 +1155,21 @@
       let used = 0;
       for (const o of units) {
         if (o === u || !o.job || o.job.node !== node) continue;
+        const pinned = o.job.spot;
         const last = o.path.length ? o.path[o.path.length - 1] : null;
         const onSpot =
+          (pinned && Math.hypot(pinned.x - s.x, pinned.y - s.y) < 8) ||
           (last && Math.hypot(last.x - s.x, last.y - s.y) < 8) ||
           (harvesting(o) && Math.hypot(o.x - s.x, o.y - s.y) < 10);
         if (onSpot) used++;
       }
-      const score = Math.hypot(s.x - u.x, s.y - u.y) + used * 22;
+      const score = Math.hypot(s.x - u.x, s.y - u.y) + used * 28 + i * 0.3;
       if (score < bestScore) {
         bestScore = score;
         best = s;
       }
     }
+    if (u.job) u.job.spot = { x: best.x, y: best.y };
     orderMove(u, best.x, best.y);
   }
 
@@ -1166,23 +1180,22 @@
   function hallDropSpot(u) {
     const h = homeHall(u);
     const d = bldgDoor(h);
-    let slot = 0;
-    for (const o of units) {
-      if (o === u || !o.job || o.job.type !== "gather") continue;
-      if (o.job.phase !== "toHall") continue;
-      if (homeHall(o) !== h) continue;
-      slot++;
-    }
-    const col = (slot % 5) - 2;
-    const row = (slot / 5) | 0;
-    return { x: d.x + col * 12, y: d.y + 4 + row * 10 };
+    const id = Math.max(0, units.indexOf(u));
+    const col = (id % 5) - 2;
+    const row = ((id / 5) | 0) % 2;
+    return { x: d.x + col * 14, y: d.y + 6 + row * 12 };
   }
 
   function pathToHall(u) {
     const h = homeHall(u);
     if (!h) return;
-    const s = hallDropSpot(u);
-    orderMove(u, s.x, s.y);
+    if (!u.job || !u.job.drop) {
+      const s = hallDropSpot(u);
+      if (u.job) u.job.drop = s;
+      orderMove(u, s.x, s.y);
+      return;
+    }
+    orderMove(u, u.job.drop.x, u.job.drop.y);
   }
 
   function nearNode(u, node) {
@@ -1318,7 +1331,7 @@
         u.carry = null;
         if (nodeLive(job.node) || retargetGather(u)) {
           job.phase = "toNode";
-          pathToNode(u, job.node, 0);
+          pathToNode(u, job.node, units.indexOf(u));
         } else {
           u.job = null;
         }
@@ -1594,18 +1607,27 @@
     const sy = clamp((unit.y / TILE) | 0, 0, MAP_H - 1);
     const gx = clamp((x / TILE) | 0, 0, MAP_W - 1);
     const gy = clamp((y / TILE) | 0, 0, MAP_H - 1);
+    if (Math.hypot(x - unit.x, y - unit.y) < 28) {
+      unit.path = [{ x, y }];
+      return;
+    }
     const path = astar(sx, sy, gx, gy);
     if (!path || !path.length) {
       unit.path = [{ x, y }];
       return;
     }
-    unit.path = path.map(([tx, ty]) => ({
+    const pts = path.map(([tx, ty]) => ({
       x: tx * TILE + TILE / 2,
       y: ty * TILE + TILE / 2,
     }));
-    const last = unit.path[unit.path.length - 1];
+    const sm = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (i === 0 || i === pts.length - 1 || i % 2 === 0) sm.push(pts[i]);
+    }
+    const last = sm[sm.length - 1];
     last.x = x;
     last.y = y;
+    unit.path = sm;
   }
 
   function spawnUnit(kind, slot, fromBldg, team) {
@@ -1643,8 +1665,8 @@
       hitT: 0,
       holdFire: false,
     };
-    orderMove(u, target.x, target.y);
     units.push(u);
+    orderMove(u, target.x, target.y);
     return u;
   }
 
@@ -2058,13 +2080,22 @@
         const dx = p.x - u.x;
         const dy = p.y - u.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < 2.2) {
+        if (dist < 10) {
           u.path.shift();
+          u.moving = !!u.path.length;
         } else {
-          const step = Math.min(u.speed * dt, dist);
-          u.x += (dx / dist) * step;
-          u.y += (dy / dist) * step;
-          u.dir = dirFrom(dx, dy);
+          if (u.path.length > 1) {
+            const n = u.path[1];
+            if (Math.hypot(n.x - u.x, n.y - u.y) + 2 < dist) u.path.shift();
+          }
+          const t = u.path[0];
+          const tdx = t.x - u.x;
+          const tdy = t.y - u.y;
+          const td = Math.hypot(tdx, tdy) || 1;
+          const step = Math.min(u.speed * dt, td);
+          u.x += (tdx / td) * step;
+          u.y += (tdy / td) * step;
+          u.dir = dirFrom(tdx, tdy);
           u.moving = true;
           u.walkT += dt;
           u.x = clamp(u.x, UNIT_R, MAP_W * TILE - UNIT_R);
@@ -2077,56 +2108,20 @@
       for (let j = i + 1; j < units.length; j++) {
         const a = units[i];
         const b = units[j];
-        const ah = harvesting(a);
-        const bh = harvesting(b);
-        if (ah && bh) continue;
-        const labor =
-          (a.kind === "worker" || a.kind === "peon") &&
-          (b.kind === "worker" || b.kind === "peon");
+        if (isLabor(a) || isLabor(b)) continue;
+        if (harvesting(a) && harvesting(b)) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.hypot(dx, dy) || 0.001;
-        const min = UNIT_R * (labor ? 1.4 : 2.1);
+        const min = UNIT_R * 2.1;
         if (d >= min) continue;
-        const push = (min - d) * 0.5;
-        let nx = dx / d;
-        let ny = dy / d;
-        if (d < 0.35) {
-          const ang = i * 2.399 + j * 1.713;
-          nx = Math.cos(ang);
-          ny = Math.sin(ang);
-        }
-        const slide = (u, awayX, awayY) => {
-          if (harvesting(u) || !u.path.length) return;
-          const p = u.path[0];
-          const mx = p.x - u.x;
-          const my = p.y - u.y;
-          const ml = Math.hypot(mx, my) || 1;
-          let px = -my / ml;
-          let py = mx / ml;
-          if (px * awayX + py * awayY < 0) {
-            px = -px;
-            py = -py;
-          }
-          u.x += px * push * 1.6;
-          u.y += py * push * 1.6;
-        };
-        if (ah) {
-          b.x += nx * push * 1.7;
-          b.y += ny * push * 1.7;
-          slide(b, nx, ny);
-        } else if (bh) {
-          a.x -= nx * push * 1.7;
-          a.y -= ny * push * 1.7;
-          slide(a, -nx, -ny);
-        } else {
-          a.x -= nx * push;
-          a.y -= ny * push;
-          b.x += nx * push;
-          b.y += ny * push;
-          slide(a, -nx, -ny);
-          slide(b, nx, ny);
-        }
+        const push = ((min - d) / 2) * 0.6;
+        const nx = dx / d;
+        const ny = dy / d;
+        a.x -= nx * push;
+        a.y -= ny * push;
+        b.x += nx * push;
+        b.y += ny * push;
       }
     }
 
@@ -2167,21 +2162,18 @@
         continue;
       }
       const moved = Math.hypot(u.x - (u.lastX ?? u.x), u.y - (u.lastY ?? u.y));
-      if (moved < 6 * dt + 0.2) u.stuckT = (u.stuckT || 0) + dt;
+      if (moved < 4 * dt + 0.15) u.stuckT = (u.stuckT || 0) + dt;
       else u.stuckT = 0;
       u.lastX = u.x;
       u.lastY = u.y;
-      if ((u.stuckT || 0) < 0.5) continue;
+      if ((u.stuckT || 0) < 0.4) continue;
       u.stuckT = 0;
-      u.path.shift();
-      const ang = hash((u.x / TILE) | 0, units.indexOf(u) + 3) * Math.PI * 2;
-      u.x = clamp(u.x + Math.cos(ang) * 14, UNIT_R, MAP_W * TILE - UNIT_R);
-      u.y = clamp(u.y + Math.sin(ang) * 14, UNIT_R, MAP_H * TILE - UNIT_R);
+      const goal = u.path[u.path.length - 1];
+      u.path = goal ? [goal] : [];
       if (u.job && u.job.type === "gather") {
         if (u.job.phase === "toHall") pathToHall(u);
         else if (u.job.phase === "toNode" && u.job.node) pathToNode(u, u.job.node, units.indexOf(u));
-      } else if (u.job && u.job.type === "build" && u.job.building) sendBuild(u, u.job.building);
-      else if (u.job && u.job.type === "repair" && u.job.building) sendRepair(u, u.job.building);
+      }
     }
 
     for (const u of units) {
