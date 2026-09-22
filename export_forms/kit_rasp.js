@@ -27,6 +27,16 @@ const RASP_WRAP = 80;
  * @param {number} maxLen
  * @returns {string[]}
  */
+function fioInitialsFirst(fio) {
+  const s = String(fio || '').trim().replace(/\s+/g, ' ');
+  if (!s) return '';
+  const already = s.match(/^([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)\s+(.+)$/i);
+  if (already) return already[1].replace(/\s+/g, '') + ' ' + already[2];
+  const m = s.match(/^(.+?)\s+([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)$/i);
+  if (m) return m[2].replace(/\s+/g, '') + ' ' + m[1];
+  return s;
+}
+
 function wrapLines(text, maxLen) {
   const s = String(text ?? '')
     .replace(/\s+/g, ' ')
@@ -157,7 +167,7 @@ function exportMatrixKit({ product, orderDate, fioGi, pagePhrases }) {
 
   // Signature
   rows.push({
-    cells: ['Главный инженер', fioGi || ''],
+    cells: ['Главный инженер', fioInitialsFirst(fioGi) || ''],
     style: 'sig',
     height: SIG_H,
   });
@@ -172,10 +182,10 @@ function exportMatrixKit({ product, orderDate, fioGi, pagePhrases }) {
 
 /**
  * Распоряжение (letter form).
- * @param {{ orderDate: string, productsText: string, fioGi: string }} args
+ * @param {{ orderDate: string, productsText: string, fioGi: string, executor?: string, executorPhone?: string }} args
  * productsText: multi-line product list (split by newlines → one row each)
  */
-function exportMatrixRasp({ orderDate, productsText, fioGi }) {
+function exportMatrixRasp({ orderDate, productsText, fioGi, executor, executorPhone }) {
   const colCount = 2;
   const colWidths = [220, 80];
   const rows = [];
@@ -224,7 +234,7 @@ function exportMatrixRasp({ orderDate, productsText, fioGi }) {
     ['Заместитель директора по ВК и МТС', 'Е.В. Мазур'],
     ['Заместитель директора по производству', 'С.В. Сухарев'],
     ['Заместитель директора по экономике и финансам', 'А.Г. Сыркина'],
-    ['Главный инженер', fioGi || ''],
+    ['Главный инженер', fioInitialsFirst(fioGi) || 'И.В. Мельников'],
   ];
   sigs.forEach(([role, fio], i) => {
     rows.push({
@@ -237,6 +247,10 @@ function exportMatrixRasp({ orderDate, productsText, fioGi }) {
     }
   });
 
+  rows.push(blankRow());
+  rows.push(letterLine('Исполнитель: ' + (executor || ''), { mergeAcross: 1, height: 14 }));
+  rows.push(letterLine('Тел: ' + (executorPhone || ''), { mergeAcross: 1, height: 14 }));
+
   return {
     sheetName: 'Распоряжение',
     colCount,
@@ -246,5 +260,5 @@ function exportMatrixRasp({ orderDate, productsText, fioGi }) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { wrapLines, exportMatrixKit, exportMatrixRasp };
+  module.exports = { wrapLines, fioInitialsFirst, exportMatrixKit, exportMatrixRasp };
 }
