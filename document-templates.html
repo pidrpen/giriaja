@@ -1601,7 +1601,18 @@
 
       const startRow = opts.startRow ?? 0;
       const startCol = opts.startCol ?? 0;
-      const replace = opts.replace !== false && startRow === 0 && startCol === 0;
+      const replace = opts.append ? false : (opts.replace !== false && startRow === 0 && startCol === 0);
+
+      if (opts.append) {
+        const parsed = gridToRows(grid, tableKey, { startCol: 0 });
+        if (!parsed.length) return { ok: false, msg: 'Не удалось разобрать строки (проверьте столбцы)' };
+        const prev = Array.isArray(state[tableKey]) ? state[tableKey] : [];
+        const hasPrev = prev.some((r) => schema.keys.some((k) => cleanCell(r && r[k])));
+        state[tableKey] = hasPrev ? prev.concat(parsed) : parsed;
+        const added = parsed.filter((r) => schema.keys.some((k) => cleanCell(r && r[k]))).length;
+        const total = state[tableKey].filter((r) => schema.keys.some((k) => cleanCell(r && r[k]))).length;
+        return { ok: true, msg: `Добавлено строк: ${added}. Всего: ${total}` };
+      }
 
       // вставка с середины (как Excel с активной ячейки)
       if (!replace && (startRow > 0 || startCol > 0)) {
@@ -1676,9 +1687,14 @@
           <label>Вставить из 1С / Excel</label>
           <div class="cols-hint">Порядок столбцов: ${cols}<br>
             Скопируйте диапазон в 1С (как в Excel) и вставьте сюда <b>Ctrl+V</b> — строки разложатся сами. Шапка и «Итого» отфильтруются.</div>
+          <label style="display:flex;align-items:center;gap:8px;margin:6px 0;font-weight:600">
+            <input type="checkbox" class="paste-append-flag" data-paste-table="${tableKey}" ${state.pasteAppend ? 'checked' : ''} />
+            Добавлять к уже вставленным строкам
+          </label>
           <textarea class="paste-area" data-paste-table="${tableKey}" placeholder="${esc(placeholder || 'Ctrl+V — таблица из 1С…')}" spellcheck="false"></textarea>
           <div class="btn-row">
             <button type="button" class="ok btn-apply-paste" data-paste-table="${tableKey}">Применить вставку</button>
+            <button type="button" class="btn-append-paste" data-paste-table="${tableKey}">Добавить к данным</button>
             <button type="button" class="btn-clear-paste" data-paste-table="${tableKey}">Очистить поле</button>
           </div>
           <div class="paste-status" data-paste-status="${tableKey}"></div>
@@ -1836,27 +1852,39 @@
     }
 
     function bindPasteZones() {
-      $('editorBody').querySelectorAll('.btn-apply-paste').forEach((btn) => {
+      $('editorBody').querySelectorAll('.paste-append-flag').forEach((box) => {
+        box.onchange = () => {
+          state.pasteAppend = box.checked;
+          $('editorBody').querySelectorAll('.paste-append-flag').forEach((other) => {
+            other.checked = box.checked;
+          });
+        };
+      });
+      const finishPaste = (tk, res, extra) => {
+        if (!res.ok) {
+          const st = document.querySelector(`[data-paste-status="${tk}"]`);
+          if (st) {
+            st.textContent = res.msg;
+            st.className = 'paste-status err';
+          }
+          return;
+        }
+        renderEditor();
+        renderPreview();
+        const st2 = document.querySelector(`[data-paste-status="${tk}"]`);
+        if (st2) {
+          st2.textContent = res.msg + (extra || '');
+          st2.className = 'paste-status';
+        }
+      };
+      $('editorBody').querySelectorAll('.btn-apply-paste, .btn-append-paste').forEach((btn) => {
         btn.onclick = () => {
           const tk = btn.dataset.pasteTable;
           const ta = $('editorBody').querySelector(`textarea.paste-area[data-paste-table="${tk}"]`);
-          const st = $('editorBody').querySelector(`[data-paste-status="${tk}"]`);
-          const res = applyPasteToTable(tk, ta.value, { replace: true });
-          if (st) {
-            st.textContent = res.msg;
-            st.className = 'paste-status' + (res.ok ? '' : ' err');
-          }
-          if (res.ok) {
-            ta.value = '';
-            renderEditor();
-            renderPreview();
-            // restore status after re-render
-            const st2 = document.querySelector(`[data-paste-status="${tk}"]`);
-            if (st2) {
-              st2.textContent = res.msg;
-              st2.className = 'paste-status';
-            }
-          }
+          const append = btn.classList.contains('btn-append-paste') || !!state.pasteAppend;
+          const res = applyPasteToTable(tk, ta.value, append ? { append: true } : { replace: true });
+          if (res.ok && ta) ta.value = '';
+          finishPaste(tk, res);
         };
       });
       $('editorBody').querySelectorAll('.btn-clear-paste').forEach((btn) => {
@@ -1878,20 +1906,9 @@
           e.preventDefault();
           ta.value = text || payload;
           const tk = ta.dataset.pasteTable;
-          const res = applyPasteToTable(tk, payload, { replace: true });
-          const st = document.querySelector(`[data-paste-status="${tk}"]`);
-          if (res.ok) {
-            renderEditor();
-            renderPreview();
-            const st2 = document.querySelector(`[data-paste-status="${tk}"]`);
-            if (st2) {
-              st2.textContent = res.msg + ' (авто из буфера)';
-              st2.className = 'paste-status';
-            }
-          } else if (st) {
-            st.textContent = res.msg;
-            st.className = 'paste-status err';
-          }
+          const append = !!state.pasteAppend;
+          const res = applyPasteToTable(tk, payload, append ? { append: true } : { replace: true });
+          finishPaste(tk, res, res.ok ? ' (авто из буфера)' : '');
         });
       });
     }
