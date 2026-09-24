@@ -571,7 +571,7 @@
       text-indent: 1.25cm;
       min-height: 2em;
     }
-    /* Распоряжение: логотип + АО/завод (чёрный, мельче «РАСПОРЯЖЕНИЕ»); тема в 2 строки */
+    /* Акт: логотип + АО/завод (чёрный, мельче «АКТ»); тема в 2 строки */
     .letter.rasp-doc {
       display: block;
     }
@@ -602,7 +602,7 @@
       box-sizing: border-box;
       padding: 0 1mm;
     }
-    /* АО / завод — чёрный, на ~2–3pt меньше «РАСПОРЯЖЕНИЕ» (11pt) */
+    /* АО / завод — чёрный, на ~2–3pt меньше «АКТ» (11pt) */
     .rasp-org .org-line {
       margin: 0;
       font-size: 9pt;
@@ -617,7 +617,7 @@
       color: #000;
       font-weight: 700;
     }
-    /* пустая строка над и под «РАСПОРЯЖЕНИЕ» */
+    /* пустая строка над и под «АКТ» */
     .rasp-org .doc-name {
       margin: 1.15em 0;
       font-size: 12pt;
@@ -841,7 +841,7 @@
 
       <div class="panel-section">
         <h2>Комплект: печать и Excel</h2>
-        <p class="note" style="margin-top:0">Состав комплекта (Excel и база для печати). Перед печатью откроется окно выбора. Порядок по умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+        <p class="note" style="margin-top:0">Состав комплекта (Excel и база для печати). Перед печатью откроется окно выбора. Порядок по умолчанию: Акт → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
         <div class="pack-list" id="packList"></div>
         <div class="btn-row">
           <button type="button" id="btnPackAll">Все</button>
@@ -902,7 +902,7 @@
     <div class="modal">
       <header>
         <h3 id="printModalTitle">Печать комплекта</h3>
-        <p>Отметьте формы и задайте порядок (↑↓). По умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+        <p>Отметьте формы и задайте порядок (↑↓). По умолчанию: Акт → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
       </header>
       <div class="modal-body">
         <div class="pack-list" id="printPackList"></div>
@@ -927,13 +927,13 @@
       { id: 'mat', name: 'Материалы', short: 'Мат.', excelName: 'Материалы' },
       { id: 'stat', name: 'Статистика', short: 'Стат.', excelName: 'Статистика' },
       { id: 'kit', name: 'Комплект', short: 'Компл.', excelName: 'Комплект' },
-      { id: 'rasp', name: 'Распоряжение', short: 'Расп.', excelName: 'Распоряжение' },
+      { id: 'rasp', name: 'Акт', short: 'Акт', excelName: 'Акт' },
       { id: 'cmp', name: 'Сравнение', short: 'Сравн.', excelName: 'Сравнение' },
     ];
 
     /**
      * Порядок печати по умолчанию:
-     * Распоряжение → Комплект → Материалы → Форма 3 → Форма 2 → Форма 1 → остальное
+     * Акт → Комплект → Материалы → Форма 3 → Форма 2 → Форма 1 → остальное
      */
     const DEFAULT_PACK = ['rasp', 'kit', 'mat', 'f3', 'f2', 'f1', 'stat', 'cmp'];
 
@@ -1734,7 +1734,7 @@
           renderPreview('screen');
         };
       } else if (id === 'rasp') {
-        title.textContent = 'Распоряжение — изделия';
+        title.textContent = 'Акт — изделия';
         note.textContent = 'Можно вставить список из 1С: по одному изделию в строке (или через Tab — возьмётся 1-й столбец).';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
@@ -2331,7 +2331,7 @@
                   <p class="org-line">АКЦИОНЕРНОЕ ОБЩЕСТВО</p>
                   <p class="org-line small">«ЗАВОД</p>
                   <p class="org-line small">«УНИВЕРСАЛМАШ»</p>
-                  <p class="doc-name">РАСПОРЯЖЕНИЕ</p>
+                  <p class="doc-name">АКТ</p>
                   <p class="doc-num">_______________&nbsp;&nbsp;№_______________</p>
                 </div>
                 <p class="rasp-subject"><span class="line1">О запуске в работу спецификаций</span><span class="line2">изделий в 1С-ERP</span></p>
@@ -2990,7 +2990,7 @@
       pushL('АКЦИОНЕРНОЕ ОБЩЕСТВО', 'letter', 14);
       pushL('«ЗАВОД «УНИВЕРСАЛМАШ»', 'letter', 14);
       rows.push({ cells: ['', ''], height: 6 });
-      pushL('РАСПОРЯЖЕНИЕ', 'title', 20);
+      pushL('АКТ', 'title', 20);
       pushL('_______________  №_______________', 'letter', 16);
       rows.push({ cells: ['', ''], height: 10 });
       pushL('О запуске в работу спецификаций изделий в 1С-ERP', 'title', 22);
@@ -3017,7 +3017,7 @@
       rows.push({ cells: ['', ''], height: 16 });
       rows.push({ cells: ['Исполнитель: ' + (executor || ''), ''], style: 'letter', mergeAcross: 1, height: 14 });
       rows.push({ cells: ['Тел: ' + (executorPhone || ''), ''], style: 'letter', mergeAcross: 1, height: 14 });
-      return { sheetName: 'Распоряжение', colCount: 2, colWidths: [280, 90], rows };
+      return { sheetName: 'Акт', colCount: 2, colWidths: [280, 90], rows };
     }
 
     /** Диспетчер: печатные данные state → матрица листа формы + pageSetup/колонтитулы */
@@ -3286,7 +3286,7 @@ ${sheets.join('\n')}
         ['Главный инженер', state.fioGi],
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
-        ['Распоряжение', state.orderDate],
+        ['Акт', state.orderDate],
         ['Порядок печати/Excel', ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id).join(' → ')],
       ]));
       ids.forEach((id) => {
