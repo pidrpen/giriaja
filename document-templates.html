@@ -980,21 +980,21 @@
     const COMMON_FIELDS = ['product', 'fioBtn', 'fioBpp', 'fioGi', 'orderDate', 'executor', 'executorPhone'];
 
     /**
-     * В подписи главного инженера — инициалы перед фамилией.
-     * «Мельников И.В.» → «И.В. Мельников»; уже «И.В. Мельников» не трогаем.
+     * Подписи: фамилия, затем инициалы.
+     * «И.В. Мельников» → «Мельников И.В.»; «Мельников И.В.» остаётся.
      */
-    function fioInitialsFirst(fio) {
+    function fioSurnameFirst(fio) {
       const s = String(fio || '').trim().replace(/\s+/g, ' ');
       if (!s) return '';
-      const already = s.match(/^([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)\s+(.+)$/i);
-      if (already) return already[1].replace(/\s+/g, '') + ' ' + already[2];
-      const m = s.match(/^(.+?)\s+([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)$/i);
-      if (m) return m[2].replace(/\s+/g, '') + ' ' + m[1];
+      const iniFirst = s.match(/^([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)\s+(.+)$/i);
+      if (iniFirst) return iniFirst[2].trim() + ' ' + iniFirst[1].replace(/\s+/g, '');
+      const surFirst = s.match(/^(.+?)\s+([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)$/i);
+      if (surFirst) return surFirst[1].trim() + ' ' + surFirst[2].replace(/\s+/g, '');
       return s;
     }
 
     function giFio() {
-      return fioInitialsFirst(state.fioGi) || 'И.В. Мельников';
+      return fioSurnameFirst(state.fioGi) || 'Мельников И.В.';
     }
 
     /** Схемы столбцов — порядок как при копировании из 1С/Excel */
@@ -2036,7 +2036,7 @@
           <div class="sig-line">
             <div class="role">${esc(role)}</div>
             <div class="space"></div>
-            <div class="fio">${esc(fio)}</div>
+            <div class="fio">${esc(fioSurnameFirst(fio))}</div>
           </div>
         </div>`;
     }
@@ -2328,7 +2328,7 @@
                 <p>Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${esc(pp)} ${esc(naListah(pages.mat))} формата А4</p>
               </div>
               <div class="word-sig-spacer"></div>
-              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(fioInitialsFirst(state.fioGi))}</span></p>
+              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
             </div>`,
           sigs: '',
         };
@@ -2356,22 +2356,22 @@
               </p>
               <div class="products">${esc(products)}</div>
               <div class="word-sig-spacer"></div>
-              <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">В.В. Романов</span></p>
+              <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">Романов В.В.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">Заместитель директора по ВК и МТС</span><span class="fio">Е.В. Мазур</span></p>
+              <p class="word-sig"><span class="role">Заместитель директора по ВК и МТС</span><span class="fio">Мазур Е.В.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">Заместитель директора по производству</span><span class="fio">С.В. Сухарев</span></p>
+              <p class="word-sig"><span class="role">Заместитель директора по производству</span><span class="fio">Сухарев С.В.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">А.Г. Сыркина</span></p>
+              <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">Сыркина А.Г.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(giFio())}</span></p>
               <div class="rasp-executor">
-                <p>Исполнитель: ${esc(state.executor || '')}</p>
+                <p>Исполнитель: ${esc(fioSurnameFirst(state.executor || ''))}</p>
                 <p>Тел: ${esc(state.executorPhone || '')}</p>
               </div>
             </div>`,
@@ -2891,7 +2891,7 @@
           { cells: ['Итого', '', sumMin, sumHour], style: 'total', height: 16 },
           ...data.map((r) => ({ cells: [hierExcelText(r.name, f3HierarchyLevel(r.name)), r.qty, r.min, r.hour], style: 'data', height: 14 })),
           { cells: ['', '', '', ''], height: 22 },
-          { cells: ['Начальник БТН', '', '', fioBtn], style: 'sig', height: 18 },
+          { cells: ['Начальник БТН', '', '', fioSurnameFirst(fioBtn)], style: 'sig', height: 18 },
         ],
       };
     }
@@ -2908,7 +2908,7 @@
             return { cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: st, height: 14 };
           }),
           { cells: ['', '', ''], height: 22 },
-          { cells: ['Начальник ТБПП', '', fioBpp], style: 'sig', height: 18 },
+          { cells: ['Начальник ТБПП', '', fioSurnameFirst(fioBpp)], style: 'sig', height: 18 },
         ],
       };
     }
@@ -2925,9 +2925,9 @@
           { cells: ['Код Союза', 'Наименование изделия', 'Контр. сумма по кол-ву', 'Контр. сумма по трудоёмкости', ''], style: 'hdr', height: 28 },
           ...(sums || []).map((r) => ({ cells: [r.code, r.name, r.qtySum, r.laborSum, ''], style: 'data', height: 14 })),
           { cells: ['', '', '', '', ''], height: 12 },
-          { cells: ['Начальник БТН', '', '', '', fioBtn], style: 'sig', height: 16 },
+          { cells: ['Начальник БТН', '', '', '', fioSurnameFirst(fioBtn)], style: 'sig', height: 16 },
           { cells: ['', '', '', '', ''], height: 8 },
-          { cells: ['Начальник БПП', '', '', '', fioBpp], style: 'sig', height: 16 },
+          { cells: ['Начальник БПП', '', '', '', fioSurnameFirst(fioBpp)], style: 'sig', height: 16 },
         ],
       };
     }
@@ -2993,7 +2993,7 @@
         `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${ph('mat')} формата А4`,
       ].forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
-      rows.push({ cells: ['Главный инженер', fioInitialsFirst(fioGi) || ''], style: 'sig', height: 16 });
+      rows.push({ cells: ['Главный инженер', fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
       return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
     }
 
@@ -3019,17 +3019,17 @@
       else productLines.forEach((line) => wrapLines(line, 90).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 14 });
       [
-        ['Операционный директор', 'В.В. Романов'],
-        ['Заместитель директора по ВК и МТС', 'Е.В. Мазур'],
-        ['Заместитель директора по производству', 'С.В. Сухарев'],
-        ['Заместитель директора по экономике и финансам', 'А.Г. Сыркина'],
-        ['Главный инженер', fioInitialsFirst(fioGi) || 'И.В. Мельников'],
+        ['Операционный директор', 'Романов В.В.'],
+        ['Заместитель директора по ВК и МТС', 'Мазур Е.В.'],
+        ['Заместитель директора по производству', 'Сухарев С.В.'],
+        ['Заместитель директора по экономике и финансам', 'Сыркина А.Г.'],
+        ['Главный инженер', fioSurnameFirst(fioGi) || 'Мельников И.В.'],
       ].forEach(([role, fio], i, arr) => {
         rows.push({ cells: [role, fio], style: 'sig', height: 16 });
         if (i < arr.length - 1) rows.push({ cells: ['', ''], height: 10 });
       });
       rows.push({ cells: ['', ''], height: 16 });
-      rows.push({ cells: ['Исполнитель: ' + (executor || ''), ''], style: 'letter', mergeAcross: 1, height: 14 });
+      rows.push({ cells: ['Исполнитель: ' + fioSurnameFirst(executor || ''), ''], style: 'letter', mergeAcross: 1, height: 14 });
       rows.push({ cells: ['Тел: ' + (executorPhone || ''), ''], style: 'letter', mergeAcross: 1, height: 14 });
       return { sheetName: 'Акт', colCount: 2, colWidths: [280, 90], rows };
     }
