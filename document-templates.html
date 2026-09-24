@@ -1364,6 +1364,19 @@
       return false;
     }
 
+    /** 1С Материалы: «АДЕ … Накладка, , шт» — хвост после «, , » в ед. хранения */
+    function applyMatStorageUnit(row) {
+      const raw = String(row.name ?? '');
+      const m = raw.match(/^([\s\S]*?),\s*,\s*([^,\t]+?)\s*$/);
+      if (!m) return;
+      const unit = m[2].replace(/\s+/g, ' ').trim();
+      if (!unit || unit.length > 40) return;
+      const name = m[1].replace(/[ \t\u00a0]+$/, '');
+      if (!name.trim()) return;
+      row.name = name;
+      if (!String(row.unit ?? '').trim()) row.unit = unit;
+    }
+
     function alignCellsToSchema(cells, schema) {
       const keys = schema.keys || [];
       let c = (cells || []).map((x) => (x == null ? '' : x));
@@ -1532,6 +1545,8 @@
           }
         }
 
+        if (tableKey === 'mat') applyMatStorageUnit(row);
+
         const hasText = keys.some((k) => !(schema.numeric || []).includes(k) && cleanCell(row[k]));
         const hasNum = (schema.numeric || []).some((k) => num(row[k]) !== null);
         if (!hasText && !hasNum) {
@@ -1586,6 +1601,7 @@
               rows[ri].hour = normalizeNumericString(Math.round((m / 60) * 1000) / 1000);
             }
           }
+          if (tableKey === 'mat') applyMatStorageUnit(rows[ri]);
           gi++;
         });
         return { ok: true, msg: `Вставлено строк: ${g.length} (с позиции ${startRow + 1})` };
@@ -1678,8 +1694,8 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Вставка из 1С: 3 столбца. После сборки 1С даёт пустую строку — сохраняем. Иерархия по отступам. Сборка с детьми — жёлтая. «Итого» без суммы кол-ва.';
-        body.innerHTML = pasteZoneHtml('mat', 'Узел сборки\tшт\t1\n    Деталь А\tшт\t2\n    Деталь Б\tкг\t0,5\nДругой узел\tшт\t1')
+        note.textContent = 'Вставка из 1С: 3 столбца. Хвост номенклатуры «, , шт» (кг, м и любая ед.) переносится в «Ед. изм.» / единицу хранения. После сборки пустая строка сохраняется. Иерархия по отступам. «Итого» без суммы кол-ва.';
+        body.innerHTML = pasteZoneHtml('mat', 'АДЕ 3422-682.00.09 Накладка, , шт\t2\n    Труба 20х2, , м\t1,5\nУзел сборки\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
         title.textContent = 'Статистика — две таблицы';
