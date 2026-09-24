@@ -371,12 +371,12 @@
       position: relative;
     }
     .page.has-footer {
-      /* запас чтобы последняя строка не наехала на колонтитул (absolute bottom 6mm) */
-      padding-bottom: 18mm;
+      /* колонтитул absolute bottom 6mm — узкий зазор, чтобы лист заполнялся плотнее */
+      padding-bottom: 14mm;
     }
-    /* последний лист с подписью: колонтитул + блок «Начальник …» */
+    /* последний лист с подписью: подпись в потоке, снизу только зазор до колонтитула */
     .page.has-footer.has-sigs {
-      padding-bottom: 30mm;
+      padding-bottom: 16mm;
     }
     /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
     .page-body {
@@ -1694,7 +1694,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Вставка из 1С: 3 столбца. Хвост номенклатуры «, , шт» (кг, м и любая ед.) переносится в «Ед. изм.» / единицу хранения. После сборки пустая строка сохраняется. Иерархия по отступам. «Итого» без суммы кол-ва.';
+        note.textContent = 'Вставка из 1С: 3 столбца. Хвост номенклатуры «, , шт» (кг, м и любая ед.) переносится в «Ед. изм.» / единицу хранения. После сборки пустая строка сохраняется. Иерархия по отступам. Строки «Итого» нет.';
         body.innerHTML = pasteZoneHtml('mat', 'АДЕ 3422-682.00.09 Накладка, , шт\t2\n    Труба 20х2, , м\t1,5\nУзел сборки\tшт\t1')
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
@@ -2076,8 +2076,8 @@
      * Без этого, если таблица ровно заполняет лист, «Начальник ТБПП/БТН» сливается с footer.
      */
     function sigReserveRowsFor(id) {
-      if (id === 'mat') return 6;
-      if (id === 'f3') return 6;
+      if (id === 'mat') return 3;
+      if (id === 'f3') return 3;
       return 0;
     }
 
@@ -2111,17 +2111,16 @@
 
     /**
      * Сколько строк данных на лист A4.
-     * Полезная высота ≈ 297 − поля − title − шапка+Итого − колонтитул → ~50–55 строк.
-     * Раньше 36–42 давали большую пустоту снизу до footer на каждом листе.
+     * Поля и колонтитул узкие: однострочная строка ~4.5–5 мм, на лист помещается больше, чем 44–48.
      * На последнем листе с подписью см. sigReserveRowsFor / chunkRowsLastReserve.
      */
     function rowsPerPageFor(id) {
-      if (id === 'f3') return 44;
-      if (id === 'mat') return 46;
-      if (id === 'stat') return 26;
-      if (id === 'cmp') return 44;
-      if (id === 'f2') return 46;
-      return 48; // f1
+      if (id === 'f3') return 54;
+      if (id === 'mat') return 54;
+      if (id === 'stat') return 32;
+      if (id === 'cmp') return 52;
+      if (id === 'f2') return 54;
+      return 56; // f1
     }
 
     /* ---------- склонение «лист» и подсчёт листов для Комплекта ---------- */
@@ -2265,7 +2264,7 @@
             const cls = matRowClassAt(rows, i);
             return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
           }),
-          total: `<tr class="total"><td>Итого</td><td></td><td class="num"></td></tr>`, // количество не суммируем (разные ед. изм.)
+          total: '',
           sigs: excelSignature('Начальник ТБПП', state.fioBpp),
         };
       }
@@ -2729,9 +2728,9 @@
       const footerCenter = base
         ? `${base}  Страница &P из &N`
         : `Страница &P из &N`;
-      // повторять шапку+Итого на каждом листе (R2:R3 = hdr + total после title)
+      // шапка (+ «Итого», если строка есть) повторяется на каждом листе Excel
       const printTitles = {
-        f1: 'R2:R3', f2: 'R2:R3', f3: 'R2:R3', mat: 'R2:R3',
+        f1: 'R2:R3', f2: 'R2:R3', f3: 'R2:R3', mat: 'R2:R2',
         cmp: 'R2:R2',
       };
       return {
@@ -2903,7 +2902,6 @@
         rows: [
           { cells: [`Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${product}`], style: 'title', mergeAcross: 2, height: 32 },
           { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
-          { cells: ['Итого', '', sumQty != null && sumQty !== '' ? sumQty : ''], style: 'total', height: 16 },
           ...data.map((r, i) => {
             if (matIsBlankRow(r)) return { cells: ['', '', ''], style: 'data', height: 10 };
             const st = matRowClassAt(data, i).includes('parent') ? 'parent' : 'data';
