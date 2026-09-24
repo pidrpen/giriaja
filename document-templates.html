@@ -827,6 +827,12 @@
             <input id="executorPhone" value="" placeholder="12-34" />
           </div>
         </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:600">
+            <input type="checkbox" id="hasStatUnload" checked />
+            Есть статистика выгрузки
+          </label>
+        </div>
       </div>
 
       <div class="panel-section" id="editorPanel">
@@ -953,6 +959,8 @@
       orderDate: '№342/02 от 16.01.2026',
       executor: '',
       executorPhone: '',
+      /** false — в комплекте нет строк про статистику выгрузки */
+      hasStatUnload: true,
       /** [{id, on}] — состав и порядок комплекта для печати / Excel */
       pack: defaultPackState(),
       // tables
@@ -1730,18 +1738,20 @@
         clearBtn.classList.add('hidden');
         recalcKitPages();
         const p = state.kitPages;
+        const statOn = state.hasStatUnload !== false;
         const line = (label, n) =>
           `<div class="field"><label>${esc(label)}</label>
             <input type="text" readonly value="${esc(listovForm(n) + ' → ' + naListah(n) + ' формата А4')}" /></div>`;
+        const totalSheets = (statOn ? p.stat : 0) + p.f1 + p.f2 + p.f3 + p.mat;
         body.innerHTML = `
           <p class="note" style="margin-top:0">Пересчёт при открытии «Комплекта», печати и выгрузке в Excel.</p>
-          ${line('Статистика', p.stat)}
+          ${statOn ? line('Статистика', p.stat) : ''}
           ${line('Форма 1', p.f1)}
           ${line('Форма 2', p.f2)}
           ${line('Форма 3', p.f3)}
           ${line('Материалы', p.mat)}
           <div class="field"><label>Всего по пакету в сопроводительном</label>
-            <input type="text" readonly value="${esc(listovForm(p.stat + p.f1 + p.f2 + p.f3 + p.mat))}" /></div>
+            <input type="text" readonly value="${esc(listovForm(totalSheets))}" /></div>
           <div class="btn-row"><button type="button" id="btnRecalcKit">Пересчитать листы</button></div>
         `;
         $('btnRecalcKit').onclick = () => {
@@ -2194,6 +2204,21 @@
       return state.kitPages;
     }
 
+    function kitCoverItems(pp, pages) {
+      const n = (k) => naListah((pages && pages[k]) || 1);
+      const items = [];
+      if (state.hasStatUnload !== false) {
+        items.push(`Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${n('stat')} формата А4`);
+      }
+      items.push(
+        `Сводная ведомость нормативной трудоемкости операций на изделие ${pp} (Форма 1) ${n('f1')} формата А4`,
+        `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${pp} (Форма 2) ${n('f2')} формата А4`,
+        `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${pp} (Форма 3) ${n('f3')} формата А4`,
+        `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${n('mat')} формата А4`,
+      );
+      return items;
+    }
+
     function buildDocSpec(id) {
       const p = productLabel();
       if (id === 'f1') {
@@ -2321,11 +2346,7 @@
                 В соответствии с п-п 2-2.9 Распоряжения ${esc(state.orderDate)} направляю на согласование комиссии следующий пакет документов на изделие ${esc(pp)}:
               </p>
               <div class="kit-items">
-                <p>Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${esc(naListah(pages.stat))} формата А4</p>
-                <p>Сводная ведомость нормативной трудоемкости операций на изделие ${esc(pp)} (Форма 1) ${esc(naListah(pages.f1))} формата А4</p>
-                <p>Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(pp)} (Форма 2) ${esc(naListah(pages.f2))} формата А4</p>
-                <p>Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(pp)} (Форма 3) ${esc(naListah(pages.f3))} формата А4</p>
-                <p>Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${esc(pp)} ${esc(naListah(pages.mat))} формата А4</p>
+                ${kitCoverItems(pp, pages).map((t) => `<p>${esc(t)}</p>`).join('')}
               </div>
               <div class="word-sig-spacer"></div>
               <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
@@ -2969,9 +2990,8 @@
       return lines;
     }
 
-    function exportMatrixKit({ product, orderDate, fioGi, pagePhrases }) {
+    function exportMatrixKit({ product, orderDate, fioGi, pages }) {
       const pp = product || '(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)';
-      const ph = (k) => (pagePhrases && pagePhrases[k]) || 'на 1 листе';
       const rows = [];
       const pushL = (t, st, h) => rows.push({ cells: [t, ''], style: st || 'letter', mergeAcross: 1, height: h || 15 });
       rows.push({ cells: ['Акционерное общество', ''], style: 'letterRight', mergeAcross: 1, height: 15 });
@@ -2984,14 +3004,7 @@
         96
       ).forEach((ln) => pushL(ln));
       rows.push({ cells: ['', ''], height: 8 });
-      // без нумерации пунктов (как в бланке / требование)
-      [
-        `Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${ph('stat')} формата А4`,
-        `Сводная ведомость нормативной трудоемкости операций на изделие ${pp} (Форма 1) ${ph('f1')} формата А4`,
-        `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${pp} (Форма 2) ${ph('f2')} формата А4`,
-        `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${pp} (Форма 3) ${ph('f3')} формата А4`,
-        `Сводная ведомость плановой себестоимости продукции-материальных затрат на изделие ${pp} ${ph('mat')} формата А4`,
-      ].forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
+      kitCoverItems(pp, pages || {}).forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
       rows.push({ cells: ['Главный инженер', fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
       return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
@@ -3050,10 +3063,7 @@
           product: productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)'),
           orderDate: state.orderDate,
           fioGi: state.fioGi,
-          pagePhrases: {
-            stat: naListah(pages.stat), f1: naListah(pages.f1), f2: naListah(pages.f2),
-            f3: naListah(pages.f3), mat: naListah(pages.mat),
-          },
+          pages,
         });
       } else if (id === 'rasp') {
         matrix = exportMatrixRasp({
@@ -3121,6 +3131,7 @@ ${sheets.join('\n')}
       state.fioBpp = 'Сажнев Д.Н.';
       state.fioGi = 'Мельников И.В.';
       state.orderDate = '№342/02 от 16.01.2026';
+      state.hasStatUnload = true;
       state.f1 = [
         { op: '0101 Разметка', min: '56', hour: '0,9333' },
         { op: '0104 Раскрой', min: '67,2', hour: '1,12' },
@@ -3245,6 +3256,8 @@ ${sheets.join('\n')}
       COMMON_FIELDS.forEach((k) => {
         if ($(k)) $(k).value = state[k] ?? '';
       });
+      const statSample = $('hasStatUnload');
+      if (statSample) statSample.checked = state.hasStatUnload !== false;
       buildTabs();
       renderPackList();
       renderEditor();
@@ -3301,6 +3314,7 @@ ${sheets.join('\n')}
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
         ['Акт', state.orderDate],
+        ['Статистика выгрузки', state.hasStatUnload === false ? 'нет' : 'да'],
         ['Порядок печати/Excel', ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id).join(' → ')],
       ]));
       ids.forEach((id) => {
@@ -3324,6 +3338,17 @@ ${sheets.join('\n')}
           renderPreview();
         };
       });
+
+      const statBox = $('hasStatUnload');
+      if (state.hasStatUnload == null) state.hasStatUnload = true;
+      if (statBox) {
+        statBox.checked = state.hasStatUnload !== false;
+        statBox.onchange = () => {
+          state.hasStatUnload = statBox.checked;
+          if (state.current === 'kit') renderEditor();
+          renderPreview();
+        };
+      }
 
       $('btnAddRow').onclick = () => {
         const key = currentTableKey();
@@ -3544,9 +3569,12 @@ ${sheets.join('\n')}
       Object.assign(state, data);
       if (state.executor == null) state.executor = '';
       if (state.executorPhone == null) state.executorPhone = '';
+      if (state.hasStatUnload == null) state.hasStatUnload = true;
       COMMON_FIELDS.forEach((k) => {
         if ($(k)) $(k).value = state[k] ?? '';
       });
+      const statLoaded = $('hasStatUnload');
+      if (statLoaded) statLoaded.checked = state.hasStatUnload !== false;
       normalizePack();
       Object.keys(SCHEMAS).forEach((k) => {
         if (!Array.isArray(state[k]) || !state[k].length) state[k] = [emptyRowFor(k)];
@@ -3636,6 +3664,7 @@ ${sheets.join('\n')}
         Object.assign(state, data);
         if (state.executor == null) state.executor = '';
         if (state.executorPhone == null) state.executorPhone = '';
+        if (state.hasStatUnload == null) state.hasStatUnload = true;
         COMMON_FIELDS.forEach((k) => {
           if ($(k)) $(k).value = state[k] ?? '';
         });
