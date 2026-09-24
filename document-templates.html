@@ -371,12 +371,12 @@
       position: relative;
     }
     .page.has-footer {
-      /* запас чтобы последняя строка не наехала на колонтитул (absolute bottom 6mm) */
-      padding-bottom: 18mm;
+      /* колонтитул absolute bottom 6mm — узкий зазор, чтобы лист заполнялся плотнее */
+      padding-bottom: 14mm;
     }
-    /* последний лист с подписью: колонтитул + блок «Начальник …» */
+    /* последний лист с подписью: подпись в потоке, снизу только зазор до колонтитула */
     .page.has-footer.has-sigs {
-      padding-bottom: 30mm;
+      padding-bottom: 16mm;
     }
     /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
     .page-body {
@@ -2076,8 +2076,8 @@
      * Без этого, если таблица ровно заполняет лист, «Начальник ТБПП/БТН» сливается с footer.
      */
     function sigReserveRowsFor(id) {
-      if (id === 'mat') return 6;
-      if (id === 'f3') return 6;
+      if (id === 'mat') return 3;
+      if (id === 'f3') return 3;
       return 0;
     }
 
@@ -2111,17 +2111,16 @@
 
     /**
      * Сколько строк данных на лист A4.
-     * Полезная высота ≈ 297 − поля − title − шапка+Итого − колонтитул → ~50–55 строк.
-     * Раньше 36–42 давали большую пустоту снизу до footer на каждом листе.
+     * Поля и колонтитул узкие: однострочная строка ~4.5–5 мм, на лист помещается больше, чем 44–48.
      * На последнем листе с подписью см. sigReserveRowsFor / chunkRowsLastReserve.
      */
     function rowsPerPageFor(id) {
-      if (id === 'f3') return 44;
-      if (id === 'mat') return 46;
-      if (id === 'stat') return 26;
-      if (id === 'cmp') return 44;
-      if (id === 'f2') return 46;
-      return 48; // f1
+      if (id === 'f3') return 54;
+      if (id === 'mat') return 54;
+      if (id === 'stat') return 32;
+      if (id === 'cmp') return 52;
+      if (id === 'f2') return 54;
+      return 56; // f1
     }
 
     /* ---------- склонение «лист» и подсчёт листов для Комплекта ---------- */
