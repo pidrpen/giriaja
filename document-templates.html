@@ -809,8 +809,12 @@
         </div>
         <div class="row2">
           <div class="field">
-            <label>Главный инженер (ФИО)</label>
-            <input id="fioGi" value="Мельников И.В." />
+            <label id="fioGiLabel">Главный инженер (ФИО)</label>
+            <select id="giRole" title="Должность в подписи">
+              <option>Главный инженер</option>
+              <option>Главный технолог</option>
+            </select>
+            <input id="fioGi" value="Мельников И.В." style="margin-top:6px" />
           </div>
           <div class="field">
             <label>Дата распоряжения (текст)</label>
@@ -956,6 +960,7 @@
       fioBtn: 'Алексеев А.А.',
       fioBpp: 'Сажнев Д.Н.',
       fioGi: 'Мельников И.В.',
+      giRole: 'Главный инженер',
       orderDate: '№342/02 от 16.01.2026',
       executor: '',
       executorPhone: '',
@@ -985,7 +990,7 @@
         .replace(/"/g, '&quot;');
     }
 
-    const COMMON_FIELDS = ['product', 'fioBtn', 'fioBpp', 'fioGi', 'orderDate', 'executor', 'executorPhone'];
+    const COMMON_FIELDS = ['product', 'fioBtn', 'fioBpp', 'fioGi', 'giRole', 'orderDate', 'executor', 'executorPhone'];
 
     /**
      * Подписи: фамилия, затем инициалы.
@@ -999,6 +1004,21 @@
       const surFirst = s.match(/^(.+?)\s+([А-ЯЁA-Z]\.\s*[А-ЯЁA-Z]\.?)$/i);
       if (surFirst) return surFirst[1].trim() + ' ' + surFirst[2].replace(/\s+/g, '');
       return s;
+    }
+
+    function giRoleTitle() {
+      return state.giRole === 'Главный технолог' ? 'Главный технолог' : 'Главный инженер';
+    }
+
+    function normalizeGiRole() {
+      if (state.giRole !== 'Главный инженер' && state.giRole !== 'Главный технолог') {
+        state.giRole = 'Главный инженер';
+      }
+    }
+
+    function syncGiRoleLabel() {
+      const lab = $('fioGiLabel');
+      if (lab) lab.textContent = giRoleTitle() + ' (ФИО)';
     }
 
     function giFio() {
@@ -2349,7 +2369,7 @@
                 ${kitCoverItems(pp, pages).map((t) => `<p>${esc(t)}</p>`).join('')}
               </div>
               <div class="word-sig-spacer"></div>
-              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
+              <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
             </div>`,
           sigs: '',
         };
@@ -2390,7 +2410,7 @@
               <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">Сыркина А.Г.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">Главный инженер</span><span class="fio">${esc(giFio())}</span></p>
+              <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(giFio())}</span></p>
               <div class="rasp-executor">
                 <p>Исполнитель: ${esc(fioSurnameFirst(state.executor || ''))}</p>
                 <p>Тел: ${esc(state.executorPhone || '')}</p>
@@ -3006,7 +3026,7 @@
       rows.push({ cells: ['', ''], height: 8 });
       kitCoverItems(pp, pages || {}).forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
-      rows.push({ cells: ['Главный инженер', fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
+      rows.push({ cells: [giRoleTitle(), fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
       return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
     }
 
@@ -3036,7 +3056,7 @@
         ['Заместитель директора по ВК и МТС', 'Мазур Е.В.'],
         ['Заместитель директора по производству', 'Сухарев С.В.'],
         ['Заместитель директора по экономике и финансам', 'Сыркина А.Г.'],
-        ['Главный инженер', fioSurnameFirst(fioGi) || 'Мельников И.В.'],
+        [giRoleTitle(), fioSurnameFirst(fioGi) || 'Мельников И.В.'],
       ].forEach(([role, fio], i, arr) => {
         rows.push({ cells: [role, fio], style: 'sig', height: 16 });
         if (i < arr.length - 1) rows.push({ cells: ['', ''], height: 10 });
@@ -3130,6 +3150,7 @@ ${sheets.join('\n')}
       state.fioBtn = 'Алексеев А.А.';
       state.fioBpp = 'Сажнев Д.Н.';
       state.fioGi = 'Мельников И.В.';
+      state.giRole = 'Главный инженер';
       state.orderDate = '№342/02 от 16.01.2026';
       state.hasStatUnload = true;
       state.f1 = [
@@ -3258,6 +3279,7 @@ ${sheets.join('\n')}
       });
       const statSample = $('hasStatUnload');
       if (statSample) statSample.checked = state.hasStatUnload !== false;
+      syncGiRoleLabel();
       buildTabs();
       renderPackList();
       renderEditor();
@@ -3310,7 +3332,7 @@ ${sheets.join('\n')}
         ['Изделие', state.product],
         ['Нач. БТН', state.fioBtn],
         ['Нач. БПП/ТБПП', state.fioBpp],
-        ['Главный инженер', state.fioGi],
+        [giRoleTitle(), state.fioGi],
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
         ['Акт', state.orderDate],
@@ -3326,18 +3348,21 @@ ${sheets.join('\n')}
 
     /* ---------- common fields ---------- */
     function bindCommon() {
+      normalizeGiRole();
       const map = COMMON_FIELDS.map((k) => [k, k]);
       map.forEach(([elId, key]) => {
         const el = $(elId);
         el.value = state[key];
         el.oninput = () => {
           state[key] = el.value;
+          if (key === 'giRole') syncGiRoleLabel();
           if (key === 'product' && state.current === 'rasp' && !state.raspProducts) {
             // keep live
           }
           renderPreview();
         };
       });
+      syncGiRoleLabel();
 
       const statBox = $('hasStatUnload');
       if (state.hasStatUnload == null) state.hasStatUnload = true;
@@ -3570,11 +3595,13 @@ ${sheets.join('\n')}
       if (state.executor == null) state.executor = '';
       if (state.executorPhone == null) state.executorPhone = '';
       if (state.hasStatUnload == null) state.hasStatUnload = true;
+      normalizeGiRole();
       COMMON_FIELDS.forEach((k) => {
         if ($(k)) $(k).value = state[k] ?? '';
       });
       const statLoaded = $('hasStatUnload');
       if (statLoaded) statLoaded.checked = state.hasStatUnload !== false;
+      syncGiRoleLabel();
       normalizePack();
       Object.keys(SCHEMAS).forEach((k) => {
         if (!Array.isArray(state[k]) || !state[k].length) state[k] = [emptyRowFor(k)];
@@ -3665,6 +3692,7 @@ ${sheets.join('\n')}
         if (state.executor == null) state.executor = '';
         if (state.executorPhone == null) state.executorPhone = '';
         if (state.hasStatUnload == null) state.hasStatUnload = true;
+        normalizeGiRole();
         COMMON_FIELDS.forEach((k) => {
           if ($(k)) $(k).value = state[k] ?? '';
         });
