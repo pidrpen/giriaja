@@ -177,6 +177,15 @@
       text-align: right;
       font-variant-numeric: tabular-nums;
     }
+    table.editor td.pick, table.editor th.pick {
+      width: 28px;
+      text-align: center;
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 2;
+    }
+    table.editor th.pick { background: #eef3f8; }
     table.editor .del {
       width: 28px;
       text-align: center;
@@ -184,7 +193,12 @@
       cursor: pointer;
       font-weight: 700;
       user-select: none;
+      position: sticky;
+      right: 0;
+      background: #fff;
+      z-index: 2;
     }
+    table.editor th.del { background: #eef3f8; }
     .paste-box {
       margin-bottom: 10px;
       border: 1px dashed #8aa4c0;
@@ -371,12 +385,12 @@
       position: relative;
     }
     .page.has-footer {
-      /* запас чтобы последняя строка не наехала на колонтитул (absolute bottom 6mm) */
-      padding-bottom: 18mm;
+      /* колонтитул absolute bottom 6mm — узкий зазор, чтобы лист заполнялся плотнее */
+      padding-bottom: 14mm;
     }
-    /* последний лист с подписью: колонтитул + блок «Начальник …» */
+    /* последний лист с подписью: подпись в потоке, снизу только зазор до колонтитула */
     .page.has-footer.has-sigs {
-      padding-bottom: 30mm;
+      padding-bottom: 16mm;
     }
     /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
     .page-body {
@@ -844,6 +858,7 @@
         <div id="editorBody"></div>
         <div class="btn-row">
           <button type="button" id="btnAddRow">+ Строка</button>
+          <button type="button" id="btnDelRows" class="danger">Удалить отмеченные</button>
           <button type="button" id="btnClearRows" class="danger">Очистить строки</button>
         </div>
         <p class="note" id="editorNote"></p>
@@ -1718,9 +1733,11 @@
       const note = $('editorNote');
       const addBtn = $('btnAddRow');
       const clearBtn = $('btnClearRows');
+      const delBtn = $('btnDelRows');
 
       addBtn.classList.remove('hidden');
       clearBtn.classList.remove('hidden');
+      if (delBtn) delBtn.classList.remove('hidden');
 
       if (id === 'f1') {
         title.textContent = 'Форма 1 — операции';
@@ -1773,6 +1790,7 @@
         note.textContent = 'Число листов можно поправить вручную. «Пересчитать» снова берёт его из данных форм. В бланке: на 1 листе / на 2 листах / на 5 листах.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
+        if (delBtn) delBtn.classList.add('hidden');
         recalcKitPages();
         const p = state.kitPages;
         const statOn = state.hasStatUnload !== false;
@@ -1830,6 +1848,7 @@
         note.textContent = 'Можно вставить список из 1С: по одному изделию в строке (или через Tab — возьмётся 1-й столбец).';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
+        if (delBtn) delBtn.classList.add('hidden');
         body.innerHTML = `
           <div class="paste-box">
             <label>Список изделий (из 1С)</label>
@@ -1869,15 +1888,15 @@
     function editorTableFromSchema(tableKey, rows) {
       const sch = SCHEMAS[tableKey];
       const keys = sch.keys;
-      const headers = sch.headers.concat(['']);
+      const headers = [''].concat(sch.headers, ['']);
       const numeric = new Set(sch.numeric || []);
       const tAttr = ` data-table="${tableKey}"`;
       const body = rows.map((r, i) => {
         const cells = keys.map((k) => inputCell(i, k, r[k], tableKey, numeric.has(k))).join('');
-        return `<tr>${cells}<td class="del" data-del="${i}" data-t="${tableKey}">×</td></tr>`;
+        return `<tr><td class="pick"><input type="checkbox" class="row-pick" data-i="${i}" data-t="${tableKey}" /></td>${cells}<td class="del" data-del="${i}" data-t="${tableKey}" title="Удалить строку">×</td></tr>`;
       }).join('');
       return `<div class="mini-table-wrap"><table class="editor"${tAttr}><thead><tr>${
-        headers.map((h) => `<th>${esc(h)}</th>`).join('')
+        headers.map((h, hi) => `<th class="${hi === 0 ? 'pick' : hi === headers.length - 1 ? 'del' : ''}">${hi === 0 ? `<input type="checkbox" class="row-pick-all" data-t="${tableKey}" title="Отметить все" />` : esc(h)}</th>`).join('')
       }</tr></thead><tbody>${body}</tbody></table></div>`;
     }
 
@@ -1988,6 +2007,14 @@
           }
           renderPreview();
         });
+      });
+      $('editorBody').querySelectorAll('.row-pick-all').forEach((all) => {
+        all.onclick = () => {
+          const t = all.dataset.t;
+          $('editorBody').querySelectorAll(`.row-pick[data-t="${t}"]`).forEach((box) => {
+            box.checked = all.checked;
+          });
+        };
       });
       $('editorBody').querySelectorAll('[data-del]').forEach((el) => {
         el.onclick = () => {
@@ -2153,8 +2180,8 @@
      * Без этого, если таблица ровно заполняет лист, «Начальник ТБПП/БТН» сливается с footer.
      */
     function sigReserveRowsFor(id) {
-      if (id === 'mat') return 6;
-      if (id === 'f3') return 6;
+      if (id === 'mat') return 3;
+      if (id === 'f3') return 3;
       return 0;
     }
 
@@ -2188,17 +2215,16 @@
 
     /**
      * Сколько строк данных на лист A4.
-     * Полезная высота ≈ 297 − поля − title − шапка+Итого − колонтитул → ~50–55 строк.
-     * Раньше 36–42 давали большую пустоту снизу до footer на каждом листе.
+     * Поля и колонтитул узкие: однострочная строка ~4.5–5 мм, на лист помещается больше, чем 44–48.
      * На последнем листе с подписью см. sigReserveRowsFor / chunkRowsLastReserve.
      */
     function rowsPerPageFor(id) {
-      if (id === 'f3') return 44;
-      if (id === 'mat') return 46;
-      if (id === 'stat') return 26;
-      if (id === 'cmp') return 44;
-      if (id === 'f2') return 46;
-      return 48; // f1
+      if (id === 'f3') return 54;
+      if (id === 'mat') return 54;
+      if (id === 'stat') return 32;
+      if (id === 'cmp') return 52;
+      if (id === 'f2') return 54;
+      return 56; // f1
     }
 
     /* ---------- склонение «лист» и подсчёт листов для Комплекта ---------- */
@@ -3440,6 +3466,25 @@ ${sheets.join('\n')}
           renderEditor();
           renderPreview();
         }
+      };
+      $('btnDelRows').onclick = () => {
+        const boxes = [...document.querySelectorAll('#editorBody .row-pick:checked')];
+        if (!boxes.length) return;
+        const byTable = {};
+        boxes.forEach((b) => {
+          const t = b.dataset.t;
+          if (!byTable[t]) byTable[t] = [];
+          byTable[t].push(+b.dataset.i);
+        });
+        Object.keys(byTable).forEach((t) => {
+          if (!Array.isArray(state[t])) return;
+          byTable[t].sort((a, b) => b - a).forEach((i) => {
+            if (state[t][i] != null) state[t].splice(i, 1);
+          });
+          if (!state[t].length) state[t].push(emptyRowFor(t));
+        });
+        renderEditor();
+        renderPreview();
       };
       $('btnClearRows').onclick = () => {
         if (state.current === 'stat') {
