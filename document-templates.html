@@ -531,6 +531,15 @@
       line-height: 1.1;
     }
     table.doc .hdr-gray th { background: #f2f2f2; }
+    .mat-sum-block {
+      margin: 5mm 0 0 8mm;
+    }
+    .mat-sum-title {
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 700;
+      font-size: 11pt;
+      margin: 0 0 2mm;
+    }
 
     /* Excel-подписи: должность слева, ФИО справа — чуть ниже таблицы */
     .sig-block {
@@ -990,6 +999,7 @@
       f2: [{ unit: '', min: '', hour: '' }],
       f3: [{ name: '', qty: '', min: '', hour: '' }],
       mat: [{ name: '', unit: '', qty: '' }],
+      matSum: [{ name: '', unit: '', qty: '' }],
       statUnload: [{ status: '', section: '', info: '', qty: '', total: '' }],
       statSum: [{ code: '', name: '', qtySum: '', laborSum: '' }],
       kitPages: { stat: 1, f1: 1, f2: 1, f3: 1, mat: 1 },
@@ -1153,6 +1163,16 @@
         },
       },
       mat: {
+        keys: ['name', 'unit', 'qty'],
+        headers: ['Номенклатура / Полуфабрикат', 'Ед. изм.', 'Количество'],
+        numeric: ['qty'],
+        aliases: {
+          name: ['номенклатур', 'полуфабрик', 'наименование', 'материал'],
+          unit: ['ед', 'единиц', 'изм'],
+          qty: ['количеств', 'кол-во', 'колво'],
+        },
+      },
+      matSum: {
         keys: ['name', 'unit', 'qty'],
         headers: ['Номенклатура / Полуфабрикат', 'Ед. изм.', 'Количество'],
         numeric: ['qty'],
@@ -1622,7 +1642,7 @@
 
       const out = [];
       // Материалы (1С): после узла-сборки идёт ПУСТАЯ строка — разделитель, её нельзя терять
-      const keepEmpty = (tableKey === 'mat');
+      const keepEmpty = (tableKey === 'mat' || tableKey === 'matSum');
       for (let i = start; i < grid.length; i++) {
         let cells = grid[i];
         const isEmptyLine = isEmptyGridRow(cells);
@@ -1664,7 +1684,7 @@
           }
         }
 
-        if (tableKey === 'mat') applyMatStorageUnit(row);
+        if (tableKey === 'mat' || tableKey === 'matSum') applyMatStorageUnit(row);
 
         const hasText = keys.some((k) => !(schema.numeric || []).includes(k) && cleanCell(row[k]));
         const hasNum = (schema.numeric || []).some((k) => num(row[k]) !== null);
@@ -1731,7 +1751,7 @@
               rows[ri].hour = normalizeNumericString(Math.round((m / 60) * 1000) / 1000);
             }
           }
-          if (tableKey === 'mat') applyMatStorageUnit(rows[ri]);
+          if (tableKey === 'mat' || tableKey === 'matSum') applyMatStorageUnit(rows[ri]);
           gi++;
         });
         return { ok: true, msg: `Вставлено строк: ${g.length} (с позиции ${startRow + 1})` };
@@ -1741,7 +1761,7 @@
       if (!parsed.length) return { ok: false, msg: 'Не удалось разобрать строки (проверьте столбцы)' };
       state[tableKey] = parsed;
       let msg = `Загружено строк: ${parsed.length}`;
-      if (tableKey === 'mat') {
+      if (tableKey === 'mat' || tableKey === 'matSum') {
         const blanks = parsed.filter((r) => matIsBlankRow(r)).length;
         const ind = parsed.filter((r) => !matIsBlankRow(r) && leadingSpaceLevel(r.name) != null).length;
         msg += ` (пустых-разделителей: ${blanks}, с отступом: ${ind})`;
@@ -1794,7 +1814,7 @@
 
     function inputCell(i, key, val, tableKey, isNum) {
       const tAttr = tableKey ? ` data-t="${tableKey}"` : '';
-      const hier = (tableKey === 'f2' && key === 'unit') || (tableKey === 'f3' && key === 'name') || (tableKey === 'mat' && key === 'name');
+      const hier = (tableKey === 'f2' && key === 'unit') || (tableKey === 'f3' && key === 'name') || ((tableKey === 'mat' || tableKey === 'matSum') && key === 'name');
       let cls = '';
       if (isNum) cls = ' class="col-num"';
       else if (hier) cls = ' class="col-hier"';
@@ -1831,9 +1851,18 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Вставка из 1С: 3 столбца. Хвост номенклатуры «, , шт» (кг, м и любая ед.) переносится в «Ед. изм.» / единицу хранения. После сборки пустая строка сохраняется. Иерархия по отступам. Строки «Итого» нет.';
+        note.textContent = 'Две вставки из 1С. Вторая — «Сумма материалов»: на листе она идёт после основной таблицы, с небольшим отступом. Хвост «, , шт» переносится в единицу хранения.';
         body.innerHTML = pasteZoneHtml('mat', 'АДЕ 3422-682.00.09 Накладка, , шт\t2\n    Труба 20х2, , м\t1,5\nУзел сборки\tшт\t1')
-          + editorTableFromSchema('mat', state.mat);
+          + editorTableFromSchema('mat', state.mat)
+          + `<p class="note" style="margin:14px 0 6px"><b>Сумма материалов</b></p>`
+          + pasteZoneHtml('matSum', 'Лист Ст3сп, , кг\t12,4\nКруг ст.45, , кг\t3,2')
+          + editorTableFromSchema('matSum', state.matSum)
+          + `<div class="btn-row" style="margin:8px 0"><button type="button" id="btnAddMatSum">+ Строка суммы</button></div>`;
+        $('btnAddMatSum').onclick = () => {
+          state.matSum.push(emptyRowFor('matSum'));
+          renderEditor();
+          renderPreview();
+        };
       } else if (id === 'stat') {
         title.textContent = 'Статистика — две таблицы';
         note.textContent = 'Таблицы вставляются из 1С. Заголовки сверху можно переписать — они попадут на лист и в Excel.';
@@ -2358,13 +2387,39 @@
       return `на ${n} листах`;
     }
 
+    function matSumPageExtra() {
+      const rows = state.matSum || [];
+      const n = rows.filter((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')).length;
+      return n ? n + 4 : 0;
+    }
+
+    function matDataRowHtml(rows, r, i) {
+      if (matIsBlankRow(r)) {
+        return `<tr class="row-empty"><td class="pre">&nbsp;</td><td class="num"></td><td class="num"></td></tr>`;
+      }
+      const lv = matHierarchyLevel(r.name);
+      const cls = matRowClassAt(rows, i);
+      return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
+    }
+
+    function matSumBlock(rowHtmls) {
+      return `<div class="mat-sum-block">
+        <p class="mat-sum-title">Сумма материалов</p>
+        <table class="doc arial">
+          <colgroup><col style="width:72%"><col style="width:14%"><col style="width:14%"></colgroup>
+          <thead><tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr></thead>
+          <tbody>${rowHtmls.join('')}</tbody>
+        </table>
+      </div>`;
+    }
+
     /** Число печатных листов документа (та же нарезка, что при печати) */
     function countDocPages(id) {
       if (id === 'f1' || id === 'f2' || id === 'f3' || id === 'mat' || id === 'cmp') {
         const data = state[id] || [];
         const filled = data.filter((r) =>
           Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')
-        ).length;
+        ).length + (id === 'mat' ? matSumPageExtra() : 0);
         const rpp = rowsPerPageFor(id);
         if (filled === 0) return 1;
         let pages = Math.max(1, Math.ceil(filled / rpp));
@@ -2492,14 +2547,10 @@
           tableClass: 'doc arial',
           colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
-          dataRows: rows.map((r, i) => {
-            if (matIsBlankRow(r)) {
-              return `<tr class="row-empty"><td class="pre">&nbsp;</td><td class="num"></td><td class="num"></td></tr>`;
-            }
-            const lv = matHierarchyLevel(r.name);
-            const cls = matRowClassAt(rows, i);
-            return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
-          }),
+          dataRows: rows.map((r, i) => matDataRowHtml(rows, r, i)),
+          tailRows: (state.matSum || []).some((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== ''))
+            ? state.matSum.map((r, i) => matDataRowHtml(state.matSum, r, i))
+            : null,
           total: '',
           sigs: excelSignature('Начальник ТБПП', state.fioBpp),
         };
@@ -2728,6 +2779,44 @@
       const hasSigHtml = !!(spec.sigs && String(spec.sigs).trim());
       const reserve = hasSigHtml ? sigReserveRowsFor(id) : 0;
       const lastMax = reserve > 0 ? Math.max(1, rpp - reserve) : rpp;
+      const tailRows = Array.isArray(spec.tailRows) ? spec.tailRows : null;
+
+      if (tailRows && tailRows.length) {
+        const items = spec.dataRows.map((html) => ({ t: 'm', html }));
+        items.push({ t: 'h' });
+        tailRows.forEach((html) => items.push({ t: 's', html }));
+        const cost = (it) => (it.t === 'h' ? 4 : 1);
+        const chunks = [];
+        let i = 0;
+        while (i < items.length) {
+          let rem = 0;
+          for (let k = i; k < items.length; k++) rem += cost(items[k]);
+          const cap = rem > rpp ? rpp : (rem > lastMax ? lastMax : rem);
+          const chunk = [];
+          let used = 0;
+          while (i < items.length) {
+            const c = cost(items[i]);
+            if (chunk.length && used + c > cap) break;
+            chunk.push(items[i]);
+            used += c;
+            i++;
+          }
+          chunks.push(chunk);
+        }
+        const totalPages = Math.max(1, chunks.length);
+        return chunks.map((chunk, idx) => {
+          const mains = chunk.filter((it) => it.t === 'm').map((it) => it.html);
+          const tails = chunk.filter((it) => it.t === 's').map((it) => it.html);
+          const showSum = chunk.some((it) => it.t === 'h') || tails.length;
+          let body = '';
+          if (mains.length || !showSum) body += tableBlock(spec, mains);
+          if (showSum) body += matSumBlock(tails);
+          const foot = footerExcel(spec.footerBase, idx + 1, totalPages);
+          const sigs = idx === chunks.length - 1 ? (spec.sigs || '') : '';
+          return pageShell(body, sigs, foot);
+        }).join('');
+      }
+
       let useChunks;
       if (reserve > 0 && (isPrint || spec.dataRows.length > lastMax)) {
         useChunks = chunkRowsLastReserve(spec.dataRows, rpp, lastMax);
@@ -3123,8 +3212,20 @@
         ],
       };
     }
-    function exportMatrixMat({ product, rows, sumQty, fioBpp }) {
+    function exportMatrixMat({ product, rows, sumRows, sumQty, fioBpp }) {
       const data = rows || [];
+      const sums = sumRows || [];
+      const hasSum = sums.some((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== ''));
+      const sumBlock = hasSum ? [
+        { cells: ['', '', ''], height: 12 },
+        { cells: ['Сумма материалов', '', ''], style: 'section', mergeAcross: 2, height: 18 },
+        { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
+        ...sums.map((r, i) => {
+          if (matIsBlankRow(r)) return { cells: ['', '', ''], style: 'data', height: 10 };
+          const st = matRowClassAt(sums, i).includes('parent') ? 'parent' : 'data';
+          return { cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: st, height: 14 };
+        }),
+      ] : [];
       return {
         sheetName: 'Материалы', colCount: 3, colWidths: [320, 80, 80],
         rows: [
@@ -3135,6 +3236,7 @@
             const st = matRowClassAt(data, i).includes('parent') ? 'parent' : 'data';
             return { cells: [hierExcelText(r.name, matHierarchyLevel(r.name)), r.unit, r.qty], style: st, height: 14 };
           }),
+          ...sumBlock,
           { cells: ['', '', ''], height: 22 },
           { cells: ['Начальник ТБПП', '', fioSurnameFirst(fioBpp)], style: 'sig', height: 18 },
         ],
@@ -3255,7 +3357,7 @@
       if (id === 'f1') matrix = exportMatrixF1({ product: p, rows: state.f1, sumMin: sumField(state.f1, 'min'), sumHour: sumField(state.f1, 'hour') });
       else if (id === 'f2') matrix = exportMatrixF2({ product: p, rows: state.f2, sumMin: sumF2(state.f2, 'min'), sumHour: sumF2(state.f2, 'hour') });
       else if (id === 'f3') matrix = exportMatrixF3({ product: p, rows: state.f3, sumMin: sumF3(state.f3, 'min'), sumHour: sumF3(state.f3, 'hour'), fioBtn: state.fioBtn });
-      else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumQty: '', fioBpp: state.fioBpp });
+      else if (id === 'mat') matrix = exportMatrixMat({ product: productLabel('(НАИМЕНОВАНИЕ ИЗДЕЛИЯ)'), rows: state.mat, sumRows: state.matSum, sumQty: '', fioBpp: state.fioBpp });
       else if (id === 'stat') matrix = exportMatrixStat({ product: p, unload: state.statUnload, sums: state.statSum, fioBtn: state.fioBtn, fioBpp: state.fioBpp });
       else if (id === 'cmp') matrix = exportMatrixCmp({ product: p, rows: state.cmp });
       else if (id === 'kit') {
@@ -3439,6 +3541,11 @@ ${sheets.join('\n')}
         { name: 'Гайка М10 ГОСТ 5915', unit: 'шт', qty: '16' },
         { name: 'Шайба 10 ГОСТ 11371', unit: 'шт', qty: '16' },
       ];
+      state.matSum = [
+        { name: 'Лист Ст3сп 8×1500×6000', unit: 'кг', qty: '12,4' },
+        { name: 'Круг ст.45 ⌀40', unit: 'кг', qty: '3,2' },
+        { name: 'Электрод УОНИ-13/55', unit: 'кг', qty: '0,8' },
+      ];
       state.statUnload = [
         { status: 'OK', section: 'Сборка', info: 'Спецификация загружена', qty: '42', total: '42' },
         { status: 'OK', section: 'Механообработка', info: 'Операции сверены', qty: '18', total: '18' },
@@ -3589,6 +3696,9 @@ ${sheets.join('\n')}
         if (state.current === 'stat') {
           state.statUnload = [emptyRowFor('statUnload')];
           state.statSum = [emptyRowFor('statSum')];
+        } else if (state.current === 'mat') {
+          state.mat = [emptyRowFor('mat')];
+          state.matSum = [emptyRowFor('matSum')];
         } else {
           const key = currentTableKey();
           state[key] = [emptyRowFor(key)];
