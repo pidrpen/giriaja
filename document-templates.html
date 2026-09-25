@@ -2341,7 +2341,7 @@
      * Без этого, если таблица ровно заполняет лист, «Начальник ТБПП/БТН» сливается с footer.
      */
     function sigReserveRowsFor(id) {
-      if (id === 'mat') return 14;
+      if (id === 'mat') return 8;
       if (id === 'f3') return 8;
       if (id === 'stat') return 8;
       return 0;
@@ -2360,30 +2360,37 @@
       let i = 0;
       while (i < list.length) {
         const rem = list.length - i;
-        if (rem > ps) {
-          out.push(list.slice(i, i + ps));
-          i += ps;
-        } else if (rem > lm) {
-          // заполняем текущий лист до lastMax, хвост — на следующий (с подписью / зазором до footer)
-          out.push(list.slice(i, i + lm));
-          i += lm;
-        } else {
+        if (rem <= lm) {
           out.push(list.slice(i));
           break;
         }
+        // Последний лист заполняем до lastMax, чтобы под таблицей не оставалась пустая полоса.
+        // Короткий «хвост» из нескольких строк на подпись не выносим.
+        const lastCount = lm;
+        let head = rem - lastCount;
+        if (head <= ps) {
+          if (head > 0 && head < 10) {
+            const give = Math.min(10 - head, Math.max(0, lastCount - Math.ceil(lm * 0.75)));
+            head += give;
+          }
+          if (head > 0) out.push(list.slice(i, i + head));
+          out.push(list.slice(i + head));
+          break;
+        }
+        out.push(list.slice(i, i + ps));
+        i += ps;
       }
       return out;
     }
 
     /**
      * Сколько строк данных на лист A4.
-     * Материалы: 48 строк, иначе ведомость и «Суммы материалов» заезжают на колонтитул.
-     * На последнем листе запас больше — там ещё подпись начальника.
-     * Ф1–Ф3 выше из‑за «Итого» и шапки.
+     * Материалы: 52 строки. На последнем листе запас 8 строк под подпись,
+     * без широкой пустой полосы после «Суммы материалов».
      */
     function rowsPerPageFor(id) {
       if (id === 'f3') return 46;
-      if (id === 'mat') return 48;
+      if (id === 'mat') return 52;
       if (id === 'stat') return 32;
       if (id === 'cmp') return 52;
       if (id === 'f2') return 48;
