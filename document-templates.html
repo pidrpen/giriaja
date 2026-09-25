@@ -1842,18 +1842,52 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Две вставки из 1С. Если вторая заполнена, в конце основной таблицы появляется строка «Суммы материалов», и дальше идут её строки. Перенос на страницы общий.';
+        note.textContent = 'Две вставки из 1С. Кнопки строк у каждой таблицы свои. Если вторая заполнена, в конце основной таблицы появляется строка «Суммы материалов».';
+        addBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        if (delBtn) delBtn.classList.add('hidden');
+        const tools = (key) => `
+          <div class="btn-row" style="margin:8px 0 14px">
+            <button type="button" data-mat-add="${key}">+ Строка</button>
+            <button type="button" class="danger" data-mat-del="${key}">Удалить отмеченные</button>
+            <button type="button" class="danger" data-mat-clear="${key}">Очистить строки</button>
+          </div>`;
         body.innerHTML = pasteZoneHtml('mat', 'АДЕ 3422-682.00.09 Накладка, , шт\t2\n    Труба 20х2, , м\t1,5\nУзел сборки\tшт\t1')
           + editorTableFromSchema('mat', state.mat)
+          + tools('mat')
           + `<p class="note" style="margin:14px 0 6px"><b>Суммы материалов</b> — попадёт строкой в конец основной таблицы</p>`
           + pasteZoneHtml('matSum', 'Лист Ст3сп, , кг\t12,4\nКруг ст.45, , кг\t3,2')
           + editorTableFromSchema('matSum', state.matSum)
-          + `<div class="btn-row" style="margin:8px 0"><button type="button" id="btnAddMatSum">+ Строка суммы</button></div>`;
-        $('btnAddMatSum').onclick = () => {
-          state.matSum.push(emptyRowFor('matSum'));
-          renderEditor();
-          renderPreview();
-        };
+          + tools('matSum');
+        body.querySelectorAll('[data-mat-add]').forEach((btn) => {
+          btn.onclick = () => {
+            const key = btn.dataset.matAdd;
+            state[key].push(emptyRowFor(key));
+            renderEditor();
+            renderPreview();
+          };
+        });
+        body.querySelectorAll('[data-mat-del]').forEach((btn) => {
+          btn.onclick = () => {
+            const key = btn.dataset.matDel;
+            const idxs = [...body.querySelectorAll(`.row-pick[data-t="${key}"]:checked`)].map((b) => +b.dataset.i);
+            if (!idxs.length || !Array.isArray(state[key])) return;
+            idxs.sort((a, b) => b - a).forEach((i) => {
+              if (state[key][i] != null) state[key].splice(i, 1);
+            });
+            if (!state[key].length) state[key].push(emptyRowFor(key));
+            renderEditor();
+            renderPreview();
+          };
+        });
+        body.querySelectorAll('[data-mat-clear]').forEach((btn) => {
+          btn.onclick = () => {
+            const key = btn.dataset.matClear;
+            state[key] = [emptyRowFor(key)];
+            renderEditor();
+            renderPreview();
+          };
+        });
       } else if (id === 'stat') {
         title.textContent = 'Статистика — две таблицы';
         note.textContent = 'Таблицы вставляются из 1С. Заголовки сверху можно переписать — они попадут на лист и в Excel.';
@@ -3645,9 +3679,6 @@ ${sheets.join('\n')}
         if (state.current === 'stat') {
           state.statUnload = [emptyRowFor('statUnload')];
           state.statSum = [emptyRowFor('statSum')];
-        } else if (state.current === 'mat') {
-          state.mat = [emptyRowFor('mat')];
-          state.matSum = [emptyRowFor('matSum')];
         } else {
           const key = currentTableKey();
           state[key] = [emptyRowFor(key)];
