@@ -981,6 +981,8 @@
       executorPhone: '',
       /** false — в комплекте нет строк про статистику выгрузки */
       hasStatUnload: true,
+      /** переопределения абзацев акта, комплекта и статистики; нет ключа — типовой текст */
+      texts: {},
       /** [{id, on}] — состав и порядок комплекта для печати / Excel */
       pack: defaultPackState(),
       // tables
@@ -1035,6 +1037,79 @@
     function syncGiRoleLabel() {
       const lab = $('fioGiLabel');
       if (lab) lab.textContent = giRoleTitle() + ' (ФИО)';
+    }
+
+    const TEXT_DEFAULTS = {
+      raspSubject1: 'О запуске в работу спецификаций',
+      raspSubject2: 'изделий в 1С-ERP',
+      raspBody: 'На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением {дата} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:',
+      kitOrg1: 'Акционерное общество',
+      kitOrg2: '«Завод «Универсалмаш»',
+      kitTitle: 'Комплект документов на изделие {изделие}',
+      kitIntro: 'В соответствии с п-п 2-2.9 Распоряжения {дата} направляю на согласование комиссии следующий пакет документов на изделие {изделие}:',
+      statTitle: 'Статистика выгрузки и контрольные суммы спецификаций на изделие {изделие}',
+      statHead1: 'Статистика выгрузки изделия',
+      statHead2: 'Контрольные суммы на изделие',
+    };
+
+    function docText(key) {
+      const bag = state.texts;
+      if (bag && Object.prototype.hasOwnProperty.call(bag, key) && bag[key] != null) return String(bag[key]);
+      return TEXT_DEFAULTS[key] != null ? TEXT_DEFAULTS[key] : '';
+    }
+
+    function applyTokens(s) {
+      return String(s ?? '')
+        .replace(/\{изделие\}/g, productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)'))
+        .replace(/\{дата\}/g, state.orderDate || '');
+    }
+
+    function kitItemsLines(pp, pages) {
+      if (state.texts && state.texts.kitItemsCustom) {
+        return String(state.texts.kitItems || '').split(/\r?\n/).map((line) => applyTokens(line)).filter((line) => line.trim());
+      }
+      return kitCoverItems(pp, pages);
+    }
+
+    function docTextBox(items) {
+      const fields = items.map((it) => `
+        <div class="field">
+          <label>${esc(it.label)}</label>
+          <textarea data-doctext="${esc(it.key)}" rows="${it.rows || 3}" spellcheck="true">${esc(it.value != null ? it.value : docText(it.key))}</textarea>
+        </div>`).join('');
+      const keys = items.map((it) => it.key).join(',');
+      return `
+        <div class="paste-box">
+          <label>Текст бланка</label>
+          <div class="cols-hint">Можно править свободно. <b>{изделие}</b> и <b>{дата}</b> подставятся из общих данных. Так же уйдёт в Excel.</div>
+          ${fields}
+          <div class="btn-row"><button type="button" class="btn-reset-doctext" data-reset="${esc(keys)}">Типовой текст</button></div>
+        </div>`;
+    }
+
+    function bindDocTexts() {
+      const root = $('editorBody');
+      if (!root) return;
+      root.querySelectorAll('[data-doctext]').forEach((ta) => {
+        ta.oninput = () => {
+          if (!state.texts) state.texts = {};
+          state.texts[ta.dataset.doctext] = ta.value;
+          if (ta.dataset.doctext === 'kitItems') state.texts.kitItemsCustom = true;
+          renderPreview();
+        };
+      });
+      root.querySelectorAll('.btn-reset-doctext').forEach((btn) => {
+        btn.onclick = () => {
+          if (!state.texts) state.texts = {};
+          String(btn.dataset.reset || '').split(',').forEach((key) => {
+            if (!key) return;
+            delete state.texts[key];
+          });
+          if (String(btn.dataset.reset || '').split(',').includes('kitItems')) state.texts.kitItemsCustom = false;
+          renderEditor();
+          renderPreview();
+        };
+      });
     }
 
     function giFio() {
@@ -1761,9 +1836,14 @@
           + editorTableFromSchema('mat', state.mat);
       } else if (id === 'stat') {
         title.textContent = 'Статистика — две таблицы';
-        note.textContent = 'Две таблицы — вставляйте каждую отдельно (Ctrl+V). Шапка/Итого 1С отфильтруются, столбцы подгоняются как у Ф2/Ф3.';
+        note.textContent = 'Таблицы вставляются из 1С. Заголовки сверху можно переписать — они попадут на лист и в Excel.';
         addBtn.classList.add('hidden');
         body.innerHTML = `
+          ${docTextBox([
+            { key: 'statTitle', label: 'Заголовок', rows: 2 },
+            { key: 'statHead1', label: 'Заголовок первой таблицы', rows: 2 },
+            { key: 'statHead2', label: 'Заголовок второй таблицы', rows: 2 },
+          ])}
           <p class="note" style="margin:0 0 6px"><b>1) Статистика выгрузки</b></p>
           ${pasteZoneHtml('statUnload', 'OK\tСборка\t...\t10\t10')}
           ${editorTableFromSchema('statUnload', state.statUnload)}
@@ -1816,7 +1896,17 @@
           ${line('mat', 'Материалы, листов')}
           <div class="field"><label>Всего по пакету в сопроводительном</label>
             <input type="text" id="kitPagesTotal" readonly value="${esc(listovForm(totalSheets))}" /></div>
-          <div class="btn-row"><button type="button" id="btnRecalcKit">Пересчитать листы</button></div>
+          <div class="btn-row">
+            <button type="button" id="btnRecalcKit">Пересчитать листы</button>
+            <button type="button" id="btnKitItemsFromPages">Собрать список из листов</button>
+          </div>
+          ${docTextBox([
+            { key: 'kitOrg1', label: 'Шапка, строка 1', rows: 1 },
+            { key: 'kitOrg2', label: 'Шапка, строка 2', rows: 1 },
+            { key: 'kitTitle', label: 'Заголовок', rows: 2 },
+            { key: 'kitIntro', label: 'Вступительный абзац', rows: 5 },
+            { key: 'kitItems', label: 'Список документов, по строке', rows: 8, value: (state.texts && state.texts.kitItemsCustom) ? String(state.texts.kitItems || '') : kitCoverItems(productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)'), p).join('\n') },
+          ])}
         `;
         const applyKitPage = (inp, commit) => {
           const key = inp.dataset.kitPages;
@@ -1832,6 +1922,10 @@
           const total = keys.reduce((s, k) => s + Math.max(1, Math.round(Number(state.kitPages[k]) || 1)), 0);
           const tot = $('kitPagesTotal');
           if (tot) tot.value = listovForm(total);
+          const itemsTa = $('editorBody').querySelector('[data-doctext="kitItems"]');
+          if (itemsTa && !state.texts?.kitItemsCustom && document.activeElement !== itemsTa) {
+            itemsTa.value = kitCoverItems(productLabel('(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)'), state.kitPages).join('\n');
+          }
           renderPreview('screen');
         };
         body.querySelectorAll('[data-kit-pages]').forEach((inp) => {
@@ -1843,13 +1937,25 @@
           renderEditor();
           renderPreview('screen');
         };
+        $('btnKitItemsFromPages').onclick = () => {
+          if (!state.texts) state.texts = {};
+          state.texts.kitItemsCustom = false;
+          delete state.texts.kitItems;
+          renderEditor();
+          renderPreview('screen');
+        };
       } else if (id === 'rasp') {
         title.textContent = 'Акт — изделия';
-        note.textContent = 'Можно вставить список из 1С: по одному изделию в строке (или через Tab — возьмётся 1-й столбец).';
+        note.textContent = 'Текст акта можно переписать. Список изделий — из 1С, по одному в строке.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
         if (delBtn) delBtn.classList.add('hidden');
         body.innerHTML = `
+          ${docTextBox([
+            { key: 'raspSubject1', label: 'Тема, строка 1', rows: 1 },
+            { key: 'raspSubject2', label: 'Тема, строка 2', rows: 1 },
+            { key: 'raspBody', label: 'Текст акта', rows: 6 },
+          ])}
           <div class="paste-box">
             <label>Список изделий (из 1С)</label>
             <div class="cols-hint">Вставьте копированием из таблицы 1С — лишние столбцы отбросятся, останется код/наименование.</div>
@@ -1883,6 +1989,7 @@
 
       bindEditorInputs();
       bindPasteZones();
+      bindDocTexts();
     }
 
     function editorTableFromSchema(tableKey, rows) {
@@ -2400,10 +2507,10 @@
       if (id === 'stat') {
         return {
           paginate: false,
-          footerBase: `Статистика выгрузки и контрольные суммы спецификаций на изделие ${esc(p)}`,
+          footerBase: esc(applyTokens(docText('statTitle'))),
           singleBody: `
-            <h1 class="doc-title small">Статистика выгрузки и контрольные суммы спецификаций на изделие ${esc(p)}</h1>
-            <div class="section-title">Статистика выгрузки изделия</div>
+            <h1 class="doc-title small">${esc(applyTokens(docText('statTitle')))}</h1>
+            <div class="section-title">${esc(applyTokens(docText('statHead1')))}</div>
             <table class="doc">
               <colgroup><col style="width:18%"><col style="width:22%"><col style="width:28%"><col style="width:16%"><col style="width:16%"></colgroup>
               <thead><tr class="hdr-gray"><th>Статус</th><th>Раздел</th><th>Информация</th><th>Количество</th><th>Всего проверено</th></tr></thead>
@@ -2411,7 +2518,7 @@
                 ${state.statUnload.map((r) => `<tr><td>${esc(r.status)}</td><td>${esc(r.section)}</td><td>${esc(r.info)}</td><td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.total)}</td></tr>`).join('') || '<tr><td colspan="5">&nbsp;</td></tr>'}
               </tbody>
             </table>
-            <div class="section-title" style="margin-top:18px">Контрольные суммы на изделие</div>
+            <div class="section-title" style="margin-top:18px">${esc(applyTokens(docText('statHead2')))}</div>
             <table class="doc">
               <colgroup><col style="width:20%"><col style="width:30%"><col style="width:25%"><col style="width:25%"></colgroup>
               <thead><tr><th>Код Союза</th><th>Наименование изделия</th><th>Контрольная сумма по количеству</th><th>Контрольная сумма по трудоемкости</th></tr></thead>
@@ -2443,14 +2550,12 @@
           footerBase: '',
           singleBody: `
             <div class="letter">
-              <p class="right">Акционерное общество</p>
-              <p class="right">«Завод «Универсалмаш»</p>
-              <p class="center bold">Комплект документов на изделие ${esc(pp)}</p>
-              <p class="justify">
-                В соответствии с п-п 2-2.9 Распоряжения ${esc(state.orderDate)} направляю на согласование комиссии следующий пакет документов на изделие ${esc(pp)}:
-              </p>
+              <p class="right">${esc(applyTokens(docText('kitOrg1')))}</p>
+              <p class="right">${esc(applyTokens(docText('kitOrg2')))}</p>
+              <p class="center bold">${esc(applyTokens(docText('kitTitle')))}</p>
+              <p class="justify">${esc(applyTokens(docText('kitIntro'))).replace(/\n/g, '<br>')}</p>
               <div class="kit-items">
-                ${kitCoverItems(pp, pages).map((t) => `<p>${esc(t)}</p>`).join('')}
+                ${kitItemsLines(pp, pages).map((t) => `<p>${esc(t)}</p>`).join('')}
               </div>
               <div class="word-sig-spacer"></div>
               <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
@@ -2474,11 +2579,9 @@
                   <p class="doc-name">АКТ</p>
                   <p class="doc-num">_______________&nbsp;&nbsp;№_______________</p>
                 </div>
-                <p class="rasp-subject"><span class="line1">О запуске в работу спецификаций</span><span class="line2">изделий в 1С-ERP</span></p>
+                <p class="rasp-subject"><span class="line1">${esc(applyTokens(docText('raspSubject1')))}</span><span class="line2">${esc(applyTokens(docText('raspSubject2')))}</span></p>
               </div>
-              <p class="justify">
-                На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${esc(state.orderDate)} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:
-              </p>
+              <p class="justify">${esc(applyTokens(docText('raspBody'))).replace(/\n/g, '<br>')}</p>
               <div class="products">${esc(products)}</div>
               <div class="word-sig-spacer"></div>
               <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">Романов В.В.</span></p>
@@ -3041,12 +3144,12 @@
       return {
         sheetName: 'Статистика', colCount: 5, colWidths: [90, 110, 160, 90, 90],
         rows: [
-          { cells: [`Статистика выгрузки и контрольные суммы спецификаций на изделие ${product}`], style: 'title', mergeAcross: 4, height: 28 },
-          { cells: ['Статистика выгрузки изделия'], style: 'section', mergeAcross: 4, height: 18 },
+          { cells: [applyTokens(docText('statTitle'))], style: 'title', mergeAcross: 4, height: 28 },
+          { cells: [applyTokens(docText('statHead1'))], style: 'section', mergeAcross: 4, height: 18 },
           { cells: ['Статус', 'Раздел', 'Информация', 'Количество', 'Всего проверено'], style: 'hdr', height: 20 },
           ...(unload || []).map((r) => ({ cells: [r.status, r.section, r.info, r.qty, r.total], style: 'data', height: 14 })),
           { cells: ['', '', '', '', ''], height: 10 },
-          { cells: ['Контрольные суммы на изделие'], style: 'section', mergeAcross: 4, height: 18 },
+          { cells: [applyTokens(docText('statHead2'))], style: 'section', mergeAcross: 4, height: 18 },
           { cells: ['Код Союза', 'Наименование изделия', 'Контр. сумма по кол-ву', 'Контр. сумма по трудоёмкости', ''], style: 'hdr', height: 28 },
           ...(sums || []).map((r) => ({ cells: [r.code, r.name, r.qtySum, r.laborSum, ''], style: 'data', height: 14 })),
           { cells: ['', '', '', '', ''], height: 12 },
@@ -3098,17 +3201,14 @@
       const pp = product || '(ВВЕСТИ НОМЕР ИЗДЕЛИЯ)';
       const rows = [];
       const pushL = (t, st, h) => rows.push({ cells: [t, ''], style: st || 'letter', mergeAcross: 1, height: h || 15 });
-      rows.push({ cells: ['Акционерное общество', ''], style: 'letterRight', mergeAcross: 1, height: 15 });
-      rows.push({ cells: ['«Завод «Универсалмаш»', ''], style: 'letterRight', mergeAcross: 1, height: 15 });
+      rows.push({ cells: [applyTokens(docText('kitOrg1')), ''], style: 'letterRight', mergeAcross: 1, height: 15 });
+      rows.push({ cells: [applyTokens(docText('kitOrg2')), ''], style: 'letterRight', mergeAcross: 1, height: 15 });
       rows.push({ cells: ['', ''], height: 10 });
-      rows.push({ cells: [`Комплект документов на изделие ${pp}`, ''], style: 'title', mergeAcross: 1, height: 24 });
+      rows.push({ cells: [applyTokens(docText('kitTitle')), ''], style: 'title', mergeAcross: 1, height: 24 });
       rows.push({ cells: ['', ''], height: 10 });
-      wrapLines(
-        `В соответствии с п-п 2-2.9 Распоряжения ${orderDate || ''} направляю на согласование комиссии следующий пакет документов на изделие ${pp}:`,
-        96
-      ).forEach((ln) => pushL(ln));
+      wrapLines(applyTokens(docText('kitIntro')), 96).forEach((ln) => pushL(ln));
       rows.push({ cells: ['', ''], height: 8 });
-      kitCoverItems(pp, pages || {}).forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
+      kitItemsLines(pp, pages || {}).forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
       rows.push({ cells: [giRoleTitle(), fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
       return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
@@ -3124,12 +3224,9 @@
       pushL('АКТ', 'title', 20);
       pushL('_______________  №_______________', 'letter', 16);
       rows.push({ cells: ['', ''], height: 10 });
-      pushL('О запуске в работу спецификаций изделий в 1С-ERP', 'title', 22);
+      pushL(applyTokens(docText('raspSubject1') + ' ' + docText('raspSubject2')).replace(/\s+/g, ' ').trim(), 'title', 22);
       rows.push({ cells: ['', ''], height: 8 });
-      wrapLines(
-        `На основании сформированных технологическим и планово-диспетчерским отделами документов и отчетов в соответствии с Распоряжением ${orderDate || ''} комиссия приняла решение запустить в работу для открытия этапов с отражением выпуска в учетной системе 1С-ERP спецификации следующих изделий:`,
-        80
-      ).forEach((ln) => pushL(ln));
+      wrapLines(applyTokens(docText('raspBody')), 80).forEach((ln) => pushL(ln));
       rows.push({ cells: ['', ''], height: 10 });
       const productLines = String(productsText || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (!productLines.length) pushL('Ввести номер изделия');
@@ -3237,6 +3334,7 @@ ${sheets.join('\n')}
       state.giRole = 'Главный инженер';
       state.orderDate = '№342/02 от 16.01.2026';
       state.hasStatUnload = true;
+      state.texts = {};
       state.f1 = [
         { op: '0101 Разметка', min: '56', hour: '0,9333' },
         { op: '0104 Раскрой', min: '67,2', hour: '1,12' },
@@ -3699,6 +3797,7 @@ ${sheets.join('\n')}
       if (state.executor == null) state.executor = '';
       if (state.executorPhone == null) state.executorPhone = '';
       if (state.hasStatUnload == null) state.hasStatUnload = true;
+      if (!state.texts || typeof state.texts !== 'object') state.texts = {};
       normalizeGiRole();
       COMMON_FIELDS.forEach((k) => {
         if ($(k)) $(k).value = state[k] ?? '';
@@ -3796,6 +3895,7 @@ ${sheets.join('\n')}
         if (state.executor == null) state.executor = '';
         if (state.executorPhone == null) state.executorPhone = '';
         if (state.hasStatUnload == null) state.hasStatUnload = true;
+        if (!state.texts || typeof state.texts !== 'object') state.texts = {};
         normalizeGiRole();
         COMMON_FIELDS.forEach((k) => {
           if ($(k)) $(k).value = state[k] ?? '';
