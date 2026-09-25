@@ -3602,67 +3602,74 @@ ${sheets.join('\n')}
       renderPreview('screen');
     }
 
-    function xmlEsc(s) {
-      return String(s ?? '')
-        .replace(/&/g, '&')
-        .replace(/</g, '<')
-        .replace(/>/g, '>');
-    }
+    const ACT_LOGO_B64 = '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';
 
     function wPara(text, opts = {}) {
+      const lines = Array.isArray(text) ? text : [text];
       const align = opts.align ? `<w:jc w:val="${opts.align}"/>` : '';
       const before = opts.before || 0;
       const after = opts.after != null ? opts.after : 120;
       const bold = opts.bold ? '<w:b/>' : '';
-      const sz = opts.sz || 22;
-      return `<w:p><w:pPr>${align}<w:spacing w:before="${before}" w:after="${after}"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:h-ansi="Times New Roman" w:cs="Times New Roman"/>${bold}<w:sz w:val="${sz}"/><w:sz-cs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xmlEsc(text)}</w:t></w:r></w:p>`;
+      const sz = opts.sz || 24;
+      const ind = opts.indent ? `<w:ind w:first-line="${opts.indent}"/>` : '';
+      const runs = lines.map((line, i) => `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:h-ansi="Times New Roman" w:cs="Times New Roman"/>${bold}<w:sz w:val="${sz}"/><w:sz-cs w:val="${sz}"/></w:rPr>${i ? '<w:br/>' : ''}<w:t xml:space="preserve">${xmlEsc(line)}</w:t></w:r>`).join('');
+      return `<w:p><w:pPr>${align}${ind}<w:spacing w:before="${before}" w:after="${after}" w:line="276" w:line-rule="auto"/></w:pPr>${runs}</w:p>`;
     }
 
-    function wSigRow(role, fio) {
-      const cell = (text, align) => `<w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr>${wPara(text, { align, after: 0, sz: 22 })}</w:tc>`;
-      return `<w:tr>${cell(role, 'left')}${cell(fio, 'right')}</w:tr>`;
+    function wLogoPara() {
+      return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="80"/></w:pPr><w:r><w:pict><w:binData w:name="wordml://logo.png" xml:space="preserve">${ACT_LOGO_B64}</w:binData><v:shape style="width:45.4pt;height:45.4pt" type="#_x0000_t75"><v:imagedata src="wordml://logo.png" o:title="logo"/></v:shape></w:pict></w:r></w:p>`;
+    }
+
+    function wSigTable(rows) {
+      const border = '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/>';
+      const body = rows.map((row) => {
+        if (row.gap) {
+          return `<w:tr><w:trPr><w:trHeight w:val="${row.gap}" w:hRule="exact"/></w:trPr><w:tc><w:p/></w:tc><w:tc><w:p/></w:tc></w:tr>`;
+        }
+        const cell = (text, align, w) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${wPara(text, { align, after: 0, before: 0, sz: 24 })}</w:tc>`;
+        return `<w:tr>${cell(row.role, 'left', 7600)}${cell(row.fio, 'right', 2400)}</w:tr>`;
+      }).join('');
+      return `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${border}</w:tblBorders></w:tblPr>${body}</w:tbl>`;
     }
 
     function buildActWordXml() {
-      const products = String(state.raspProducts || state.product || 'Ввести номер изделия').split(/\r?\n/);
-      const bodyLines = String(applyTokens(docText('raspBody'))).split(/\r?\n/).filter((l) => l.trim());
-      const subject = applyTokens(docText('raspSubject1') + ' ' + docText('raspSubject2')).replace(/\s+/g, ' ').trim();
+      const products = String(state.raspProducts || state.product || 'Ввести номер изделия').split(/\r?\n/).map((l) => l.replace(/\s+$/, ''));
+      const productLines = products.some((l) => l.trim()) ? products : ['Ввести номер изделия'];
+      const body = String(applyTokens(docText('raspBody'))).split(/\r?\n/);
+      const head = `<w:tbl><w:tblPr><w:tblW w:w="3288" w:type="dxa"/><w:jc w:val="left"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tr><w:tc><w:tcPr><w:tcW w:w="3288" w:type="dxa"/></w:tcPr>${wLogoPara()}${wPara('АКЦИОНЕРНОЕ ОБЩЕСТВО', { align: 'center', bold: true, sz: 18, after: 0, before: 40 })}${wPara('«ЗАВОД', { align: 'center', bold: true, sz: 18, after: 0, before: 0 })}${wPara('«УНИВЕРСАЛМАШ»', { align: 'center', bold: true, sz: 18, after: 0, before: 0 })}${wPara('АКТ', { align: 'center', bold: true, sz: 24, before: 276, after: 276 })}${wPara('_______________  №_______________', { align: 'center', sz: 22, after: 60, before: 0 })}</w:tc></w:tr></w:tbl>`;
       const sigs = [
-        ['Операционный директор', 'Романов В.В.'],
-        ['Заместитель директора по ВК и МТС', 'Мазур Е.В.'],
-        ['Заместитель директора по производству', 'Сухарев С.В.'],
-        ['Заместитель директора по экономике и финансам', 'Сыркина А.Г.'],
-        [giRoleTitle(), giFio()],
+        { gap: 768 },
+        { role: 'Операционный директор', fio: 'Романов В.В.' },
+        { gap: 552 },
+        { role: 'Заместитель директора по ВК и МТС', fio: 'Мазур Е.В.' },
+        { gap: 552 },
+        { role: 'Заместитель директора по производству', fio: 'Сухарев С.В.' },
+        { gap: 828 },
+        { role: 'Заместитель директора по экономике и финансам', fio: 'Сыркина А.Г.' },
+        { gap: 552 },
+        { role: giRoleTitle(), fio: giFio() },
       ];
-      const parts = [];
-      parts.push(wPara('АКЦИОНЕРНОЕ ОБЩЕСТВО', { align: 'center', bold: true, sz: 22, after: 0 }));
-      parts.push(wPara('«ЗАВОД «УНИВЕРСАЛМАШ»', { align: 'center', bold: true, sz: 22, after: 200 }));
-      parts.push(wPara('АКТ', { align: 'center', bold: true, sz: 32, before: 200, after: 80 }));
-      parts.push(wPara('_______________    №_______________', { align: 'center', sz: 22, after: 200 }));
-      parts.push(wPara(subject, { align: 'center', bold: true, sz: 24, before: 120, after: 200 }));
-      bodyLines.forEach((ln) => parts.push(wPara(ln, { align: 'both', sz: 22, after: 80 })));
-      parts.push(wPara('', { after: 60 }));
-      const lines = products.map((l) => l.trim()).filter(Boolean);
-      (lines.length ? lines : ['Ввести номер изделия']).forEach((ln) => {
-        parts.push(wPara(ln, { align: 'center', sz: 22, after: 40 }));
-      });
-      parts.push(wPara('', { after: 200 }));
-      parts.push(`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr>`);
-      sigs.forEach(([role, fio], i) => {
-        if (i) parts.push(`<w:tr><w:tc>${wPara('', { after: 160 })}</w:tc><w:tc>${wPara('', { after: 160 })}</w:tc></w:tr>`);
-        parts.push(wSigRow(role, fio));
-      });
-      parts.push('</w:tbl>');
-      parts.push(wPara('Исполнитель: ' + fioSurnameFirst(state.executor || ''), { sz: 20, before: 280, after: 0 }));
-      parts.push(wPara('Тел: ' + (state.executorPhone || ''), { sz: 20, after: 0 }));
+      const parts = [
+        head,
+        wPara(applyTokens(docText('raspSubject1')), { bold: true, sz: 24, before: 160, after: 0 }),
+        wPara(applyTokens(docText('raspSubject2')), { bold: true, sz: 24, before: 0, after: 160 }),
+        wPara(body, { align: 'both', sz: 24, indent: 709, before: 80, after: 120 }),
+        wPara(productLines, { align: 'both', sz: 24, indent: 709, before: 160, after: 200 }),
+        wSigTable(sigs),
+      ];
+      const footer = [
+        wPara('Исполнитель: ' + fioSurnameFirst(state.executor || ''), { sz: 20, after: 0, before: 0 }),
+        wPara('Тел: ' + (state.executorPhone || ''), { sz: 20, after: 0, before: 0 }),
+      ].join('');
       return `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Word.Document"?>
-<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml" xml:space="preserve">
+<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xml:space="preserve">
 <w:body>
 ${parts.join('\n')}
 <w:sectPr>
+<w:ftr w:type="odd">${footer}</w:ftr>
 <w:pgSz w:w="11906" w:h="16838"/>
-<w:pgMar w:top="851" w:right="680" w:bottom="851" w:left="851"/>
+<w:pgMar w:top="567" w:right="680" w:bottom="1020" w:left="850" w:header="284" w:footer="454"/>
 </w:sectPr>
 </w:body>
 </w:wordDocument>`;
