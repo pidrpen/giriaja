@@ -531,6 +531,13 @@
       line-height: 1.1;
     }
     table.doc .hdr-gray th { background: #f2f2f2; }
+    .mat-sum-block { margin: 4mm 0 0 6mm; }
+    .mat-sum-title {
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 700;
+      font-size: 11pt;
+      margin: 0 0 2mm;
+    }
 
     /* Excel-подписи: должность слева, ФИО справа — чуть ниже таблицы */
     .sig-block {
@@ -1842,7 +1849,7 @@
           + editorTableFromSchema('f3', state.f3);
       } else if (id === 'mat') {
         title.textContent = 'Материальная ведомость';
-        note.textContent = 'Две вставки из 1С. Кнопки строк у каждой таблицы свои. Если вторая заполнена, в конце основной таблицы появляется строка «Суммы материалов».';
+        note.textContent = 'Две вставки из 1С. Если вторая заполнена, после основной таблицы отдельно пишется «Сумма материалов» и идёт вторая таблица. Перенос страниц у обеих один и тот же.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
         if (delBtn) delBtn.classList.add('hidden');
@@ -1855,7 +1862,7 @@
         body.innerHTML = pasteZoneHtml('mat', 'АДЕ 3422-682.00.09 Накладка, , шт\t2\n    Труба 20х2, , м\t1,5\nУзел сборки\tшт\t1')
           + editorTableFromSchema('mat', state.mat)
           + tools('mat')
-          + `<p class="note" style="margin:14px 0 6px"><b>Суммы материалов</b> — попадёт строкой в конец основной таблицы</p>`
+          + `<p class="note" style="margin:14px 0 6px"><b>Сумма материалов</b> — отдельная таблица после основной</p>`
           + pasteZoneHtml('matSum', 'Лист Ст3сп, , кг\t12,4\nКруг ст.45, , кг\t3,2')
           + editorTableFromSchema('matSum', state.matSum)
           + tools('matSum');
@@ -2416,7 +2423,7 @@
     function matSumPageExtra() {
       const rows = state.matSum || [];
       const n = rows.filter((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== '')).length;
-      return n ? n + 1 : 0;
+      return n ? n + 3 : 0;
     }
 
     function matDataRowHtml(rows, r, i) {
@@ -2428,8 +2435,13 @@
       return `<tr class="${cls}">${hierLabelHtml(r.name, lv)}<td class="num">${esc(r.unit)}</td><td class="num">${fmt(r.qty)}</td></tr>`;
     }
 
-    function matSumLabelRowHtml() {
-      return `<tr class="row-parent"><td class="pre">Суммы материалов</td><td class="num"></td><td class="num"></td></tr>`;
+    function matSumTableHtml(rowHtmls, showTitle) {
+      const title = showTitle ? `<p class="mat-sum-title">Сумма материалов</p>` : '';
+      return `<div class="mat-sum-block">${title}<table class="doc arial">
+        <colgroup><col style="width:72%"><col style="width:14%"><col style="width:14%"></colgroup>
+        <thead><tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr></thead>
+        <tbody>${rowHtmls.join('')}</tbody>
+      </table></div>`;
     }
 
     /** Число печатных листов документа (та же нарезка, что при печати) */
@@ -2566,14 +2578,11 @@
           tableClass: 'doc arial',
           colgroup: '<col style="width:72%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Полуфабрикат<br><span style="font-weight:400">Номенклатура</span></th><th>Единица хранения п/ф<br><span style="font-weight:400">Ед. изм.</span></th><th>Количество</th></tr>`,
-          dataRows: (() => {
-            const out = rows.map((r, i) => matDataRowHtml(rows, r, i));
+          dataRows: rows.map((r, i) => matDataRowHtml(rows, r, i)),
+          sumRows: (() => {
             const sums = state.matSum || [];
             const hasSum = sums.some((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== ''));
-            if (!hasSum) return out;
-            out.push(matSumLabelRowHtml());
-            sums.forEach((r, i) => out.push(matDataRowHtml(sums, r, i)));
-            return out;
+            return hasSum ? sums.map((r, i) => matDataRowHtml(sums, r, i)) : null;
           })(),
           total: '',
           sigs: excelSignature('Начальник ТБПП', state.fioBpp),
@@ -2803,6 +2812,35 @@
       const hasSigHtml = !!(spec.sigs && String(spec.sigs).trim());
       const reserve = hasSigHtml ? sigReserveRowsFor(id) : 0;
       const lastMax = reserve > 0 ? Math.max(1, rpp - reserve) : rpp;
+      if (id === 'mat' && Array.isArray(spec.sumRows) && spec.sumRows.length) {
+        const items = spec.dataRows.map((html) => ({ k: 'm', html }));
+        items.push({ k: 'g' }, { k: 'g' }, { k: 'g' });
+        spec.sumRows.forEach((html) => items.push({ k: 's', html }));
+        let chunks;
+        if (reserve > 0 && (isPrint || items.length > lastMax)) chunks = chunkRowsLastReserve(items, rpp, lastMax);
+        else if (isPrint || items.length > rpp) chunks = chunkRows(items, rpp);
+        else chunks = [items];
+        for (let i = 0; i < chunks.length - 1; i++) {
+          if (chunks[i].some((x) => x.k === 'g') && !chunks[i].some((x) => x.k === 's')) {
+            const gaps = chunks[i].filter((x) => x.k === 'g');
+            chunks[i] = chunks[i].filter((x) => x.k !== 'g');
+            chunks[i + 1] = gaps.concat(chunks[i + 1]);
+          }
+        }
+        chunks = chunks.filter((c) => c.some((x) => x.k === 'm' || x.k === 's'));
+        const totalPages = Math.max(1, chunks.length);
+        return chunks.map((chunk, idx) => {
+          const mains = chunk.filter((x) => x.k === 'm').map((x) => x.html);
+          const sums = chunk.filter((x) => x.k === 's').map((x) => x.html);
+          const showTitle = chunk.some((x) => x.k === 'g') || (sums.length && !mains.length && idx === chunks.findIndex((c) => c.some((x) => x.k === 's')));
+          let body = '';
+          if (mains.length) body += tableBlock(spec, mains);
+          if (sums.length) body += matSumTableHtml(sums, showTitle);
+          const foot = footerExcel(spec.footerBase, idx + 1, totalPages);
+          const sigs = idx === chunks.length - 1 ? (spec.sigs || '') : '';
+          return pageShell(body, sigs, foot);
+        }).join('');
+      }
       let useChunks;
       if (reserve > 0 && (isPrint || spec.dataRows.length > lastMax)) {
         useChunks = chunkRowsLastReserve(spec.dataRows, rpp, lastMax);
@@ -3203,7 +3241,9 @@
       const sums = sumRows || [];
       const hasSum = sums.some((r) => Object.values(r || {}).some((v) => String(v ?? '').trim() !== ''));
       const sumBlock = hasSum ? [
-        { cells: ['Суммы материалов', '', ''], style: 'parent', height: 16 },
+        { cells: ['', '', ''], height: 10 },
+        { cells: ['Сумма материалов', '', ''], style: 'section', mergeAcross: 2, height: 18 },
+        { cells: ['Полуфабрикат / Номенклатура', 'Ед. изм.', 'Количество'], style: 'hdr', height: 22 },
         ...sums.map((r, i) => {
           if (matIsBlankRow(r)) return { cells: ['', '', ''], style: 'data', height: 10 };
           const st = matRowClassAt(sums, i).includes('parent') ? 'parent' : 'data';
