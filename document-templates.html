@@ -1131,8 +1131,16 @@
       return state.docMode === 'tooling';
     }
 
+    function toolNameLines() {
+      const list = String(state.raspProducts || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      if (list.length) return list;
+      const one = String(state.product || '').trim();
+      return one ? [one] : [];
+    }
+
     function toolCaption() {
-      return productLabel('(ввести номер изделия)');
+      const lines = toolNameLines();
+      return lines.length ? lines.join(', ') : productLabel('(ввести номер изделия)');
     }
 
     function toolQtyShown() {
@@ -2134,7 +2142,7 @@
       } else if (id === 'rasp') {
         title.textContent = isTooling() ? 'Распоряжение — оснастка' : 'Распоряжение — изделия';
         note.textContent = isTooling()
-          ? 'Количество подставится в текст. Изделие в приложении — из общих данных. Число листов — сумма листов комплекта.'
+          ? 'Наименование берётся как введено в общих данных или в списке изделий. Количество по умолчанию 1. Число листов в приложении — сумма листов комплекта.'
           : 'Текст распоряжения можно переписать. Список изделий — из 1С, по одному в строке.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
@@ -2809,6 +2817,7 @@
                 <p class="rasp-subject"><span class="line1">${esc(applyTokens(docText('raspSubject1')))}</span><span class="line2">${esc(applyTokens(docText('raspSubject2')))}</span></p>
               </div>
               <p class="justify">${esc(applyTokens(docText('raspBody'))).replace(/\n/g, '<br>')}</p>
+              ${toolNameLines().map((n) => `<p class="tool-name">${esc(n)}</p>`).join('')}
               <p class="tool-qty">в количестве ${esc(toolQtyShown())} шт.</p>
               <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Главный технолог</span><span class="fio">${esc(toolChiefShown())}</span></p>
@@ -3531,6 +3540,9 @@
         pushL(applyTokens(docText('raspSubject1')), 'title', 18);
         pushL(applyTokens(docText('raspSubject2')), 'title', 18);
         wrapLines(applyTokens(docText('raspBody')), 90).forEach((ln) => pushL(ln, 'letterwrap', 16));
+        const names = toolNameLines();
+        if (names.length) names.forEach((n) => pushL(n, 'title', 18));
+        else pushL(productLabel('(ввести номер изделия)'), 'title', 18);
         pushL('в количестве ' + toolQtyShown() + ' шт.', 'letter', 16);
         rows.push({ cells: ['Главный технолог', toolChiefShown()], style: 'sig', height: 16 });
         pushL('Приложение: комплект отчётных документов на изделие ' + toolCaption() + ' на ' + sheets + ' л. в 1 экз.', 'letterwrap', 32);
@@ -3857,6 +3869,7 @@ ${sheets.join('\n')}
         wPara(applyTokens(docText('raspSubject1')), { bold: true, sz: 24, before: 160, after: 0 }),
         wPara(applyTokens(docText('raspSubject2')), { bold: true, sz: 24, before: 0, after: 160 }),
         wPara(String(applyTokens(docText('raspBody'))).split(/\r?\n/), { align: 'both', sz: 24, indent: 709, before: 80, after: 80 }),
+        ...(toolNameLines().length ? toolNameLines() : [productLabel('(ввести номер изделия)')]).map((n) => wPara(n, { align: 'center', bold: true, sz: 24, before: 80, after: 40 })),
         wPara('в количестве ' + toolQtyShown() + ' шт.', { sz: 24, indent: 709, before: 80, after: 80 }),
         wSigTable([{ gap: 200 }, { role: 'Главный технолог', fio: toolChiefShown() }]),
         wRuns([
