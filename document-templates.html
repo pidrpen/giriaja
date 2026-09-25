@@ -759,16 +759,29 @@
       color: #000;
     }
     .rasp-executor p { margin: 0; }
+    /* Акт оснастки — по бланку .doc: 11pt, одинарный интервал, шапка колонкой слева */
+    .letter.tool-act { font-size: 11pt; line-height: 1.15; }
+    .tool-act .word-sig { font-size: 11pt; }
+    .tool-act .rasp-head { width: 66mm; gap: 0; margin: 4mm 0 0; }
+    .tool-act .rasp-logo { width: 19mm; max-height: 19mm; margin-bottom: 4mm; }
+    .tool-act .rasp-org { padding: 0; line-height: 1.15; }
+    .tool-act .rasp-org .org-line { font-size: 11pt; letter-spacing: 0; white-space: nowrap; }
+    .tool-act .rasp-org .org-line + .org-line { margin-bottom: 10pt; }
+    .tool-act .rasp-org .doc-name { font-size: 16pt; letter-spacing: 0; margin: 0 0 4pt; }
+    .tool-act .rasp-org .doc-num { font-size: 11pt; margin: 0; white-space: nowrap; }
+    .tool-act .rasp-subject { align-self: center; text-align: center; font-size: 9pt; line-height: 1.2; margin: 6pt 0 0; }
+    .tool-act .justify { margin: 34mm 0 4pt; }
     .tool-name {
       text-align: center;
       font-weight: 700;
-      font-size: 12pt;
-      margin: 12px 0 6px;
+      margin: 0 0 2pt;
     }
-    .tool-qty { margin: 0 0 8px; text-indent: 1.25cm; }
-    .tool-appendix { text-align: justify; text-indent: 1.25cm; margin: 10px 0 8px; }
+    .tool-qty { text-align: center; margin: 0 0 18pt; }
+    .tool-appendix { text-align: left; margin: 1.15em 0 0; }
     .tool-appendix em { font-style: italic; }
-    .tool-agree { font-weight: 700; margin: 8px 0 4px; }
+    .tool-agree { margin: 4.6em 0 0.5em; }
+    .tool-act .word-sig-gap.wide { height: calc(1.15em + 8pt); }
+    .tool-act .rasp-executor { font-size: 7pt; line-height: 1.2; }
     @media print {
       .rasp-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .rasp-logo { width: 16mm; max-height: 16mm; }
@@ -1136,6 +1149,26 @@
       if (list.length) return list;
       const one = String(state.product || '').trim();
       return one ? [one] : [];
+    }
+
+    function toolNameLinesShown() {
+      const lines = toolNameLines();
+      return lines.length ? lines : [productLabel('(ввести номер изделия)')];
+    }
+
+    /** «на 10-ти л.», «на 3-х л.», «на 7-ми л.» — как в бланке акта */
+    function sheetsCountText(n) {
+      const v = Math.max(0, Math.round(Number(n) || 0));
+      const d2 = v % 100;
+      const d1 = v % 10;
+      let suf = '';
+      if (d2 >= 11 && d2 <= 19) suf = 'ти';
+      else if (d2 === 40) suf = 'ка';
+      else if (d2 === 90 || (v >= 100 && d2 === 0)) suf = 'та';
+      else if (d1 >= 2 && d1 <= 4) suf = 'х';
+      else if (d1 === 7 || d1 === 8) suf = 'ми';
+      else if (d1 === 5 || d1 === 6 || d1 === 9 || d1 === 0) suf = 'ти';
+      return suf ? v + '-' + suf : String(v);
     }
 
     function toolCaption() {
@@ -2804,33 +2837,34 @@
             paginate: false,
             footerBase: '',
             singleBody: `
-            <div class="letter rasp-doc">
+            <div class="letter rasp-doc tool-act">
               <div class="rasp-head">
                 <img class="rasp-logo" src="images/universalmash-logo.png" alt="АО Завод Универсалмаш" />
                 <div class="rasp-org">
                   <p class="org-line">АКЦИОНЕРНОЕ ОБЩЕСТВО</p>
-                  <p class="org-line small">«ЗАВОД</p>
-                  <p class="org-line small">«УНИВЕРСАЛМАШ»</p>
+                  <p class="org-line">«ЗАВОД «УНИВЕРСАЛМАШ»</p>
                   <p class="doc-name">АКТ</p>
-                  <p class="doc-num">_______________&nbsp;&nbsp;№_______________</p>
+                  <p class="doc-num">_______________&nbsp;&nbsp;&nbsp;&nbsp;№_______________</p>
                 </div>
                 <p class="rasp-subject"><span class="line1">${esc(applyTokens(docText('raspSubject1')))}</span><span class="line2">${esc(applyTokens(docText('raspSubject2')))}</span></p>
               </div>
               <p class="justify">${esc(applyTokens(docText('raspBody'))).replace(/\n/g, '<br>')}</p>
-              ${toolNameLines().map((n) => `<p class="tool-name">${esc(n)}</p>`).join('')}
+              ${toolNameLinesShown().map((n) => `<p class="tool-name">${esc(n)}</p>`).join('')}
               <p class="tool-qty">в количестве ${esc(toolQtyShown())} шт.</p>
-              <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Главный технолог</span><span class="fio">${esc(toolChiefShown())}</span></p>
-              <div class="word-sig-gap"></div>
-              <p class="tool-appendix"><b>Приложение:</b> комплект отчётных документов на изделие <em>${esc(toolCaption())}</em> на ${sheets} л. в 1 экз.</p>
+              <p class="tool-appendix"><b>Приложение:</b> комплект отчётных документов на изделие <em>${esc(toolCaption())}</em> на ${esc(sheetsCountText(sheets))} л. в 1 экз.</p>
               <p class="tool-agree">Согласовано:</p>
               <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">Романов В.В.</span></p>
               <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Директор по финансам и экономике</span><span class="fio">Сыркина А.Г.</span></p>
               <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Заместитель директора по ВК и МТС</span><span class="fio">Мазур Е.В.</span></p>
-              <div class="word-sig-gap"></div>
+              <div class="word-sig-gap wide"></div>
               <p class="word-sig"><span class="role">Заместитель директора по производству</span><span class="fio">Сухарев С.В.</span></p>
+              <div class="rasp-executor">
+                <p>Исполнитель: ${esc(fioSurnameFirst(state.executor || ''))}</p>
+                <p>Тел: ${esc(state.executorPhone || '')}</p>
+              </div>
             </div>`,
             sigs: '',
             extraClass: 'rasp-title',
@@ -3535,27 +3569,33 @@
         const sheets = kitPackSheets();
         pushL('АКЦИОНЕРНОЕ ОБЩЕСТВО', 'letter', 14);
         pushL('«ЗАВОД «УНИВЕРСАЛМАШ»', 'letter', 14);
+        rows.push({ cells: ['', ''], height: 6 });
         pushL('АКТ', 'title', 20);
-        pushL('_______________  №_______________', 'letter', 16);
-        pushL(applyTokens(docText('raspSubject1')), 'title', 18);
-        pushL(applyTokens(docText('raspSubject2')), 'title', 18);
+        pushL('_______________    №_______________', 'letter', 16);
+        pushL(applyTokens(docText('raspSubject1')), 'title', 14);
+        pushL(applyTokens(docText('raspSubject2')), 'title', 14);
+        rows.push({ cells: ['', ''], height: 60 });
         wrapLines(applyTokens(docText('raspBody')), 90).forEach((ln) => pushL(ln, 'letterwrap', 16));
-        const names = toolNameLines();
-        if (names.length) names.forEach((n) => pushL(n, 'title', 18));
-        else pushL(productLabel('(ввести номер изделия)'), 'title', 18);
-        pushL('в количестве ' + toolQtyShown() + ' шт.', 'letter', 16);
+        toolNameLinesShown().forEach((n) => pushL(n, 'title', 18));
+        pushL('в количестве ' + toolQtyShown() + ' шт.', 'title', 16);
+        rows.push({ cells: ['', ''], height: 12 });
         rows.push({ cells: ['Главный технолог', toolChiefShown()], style: 'sig', height: 16 });
-        pushL('Приложение: комплект отчётных документов на изделие ' + toolCaption() + ' на ' + sheets + ' л. в 1 экз.', 'letterwrap', 32);
-        pushL('Согласовано:', 'title', 18);
+        rows.push({ cells: ['', ''], height: 14 });
+        wrapLines('Приложение: комплект отчётных документов на изделие ' + toolCaption() + ' на ' + sheetsCountText(sheets) + ' л. в 1 экз.', 90).forEach((ln) => pushL(ln, 'letterwrap', 16));
+        rows.push({ cells: ['', ''], height: 48 });
+        pushL('Согласовано:', 'letter', 16);
         [
           ['Операционный директор', 'Романов В.В.'],
           ['Директор по финансам и экономике', 'Сыркина А.Г.'],
           ['Заместитель директора по ВК и МТС', 'Мазур Е.В.'],
           ['Заместитель директора по производству', 'Сухарев С.В.'],
-        ].forEach(([role, fio]) => {
-          rows.push({ cells: ['', ''], height: 8 });
+        ].forEach(([role, fio], i) => {
+          if (i) rows.push({ cells: ['', ''], height: 14 });
           rows.push({ cells: [role, fio], style: 'sig', height: 16 });
         });
+        rows.push({ cells: ['', ''], height: 16 });
+        rows.push({ cells: ['Исполнитель: ' + fioSurnameFirst(executor || ''), ''], style: 'letter', mergeAcross: 1, height: 12 });
+        rows.push({ cells: ['Тел: ' + (executorPhone || ''), ''], style: 'letter', mergeAcross: 1, height: 12 });
         return { sheetName: 'Акт', colCount: 2, colWidths: [280, 90], rows };
       }
       const rows = [];
@@ -3831,17 +3871,17 @@ ${sheets.join('\n')}
       return `<w:p><w:pPr>${align}${ind}<w:spacing w:before="${before}" w:after="${after}" w:line="276" w:line-rule="auto"/></w:pPr>${runs}</w:p>`;
     }
 
-    function wLogoPara() {
-      return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="80"/></w:pPr><w:r><w:pict><w:binData w:name="wordml://logo.png" xml:space="preserve">${ACT_LOGO_B64}</w:binData><v:shape style="width:45.4pt;height:45.4pt" type="#_x0000_t75"><v:imagedata src="wordml://logo.png" o:title="logo"/></v:shape></w:pict></w:r></w:p>`;
+    function wLogoPara(pt = 45.4) {
+      return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="80"/></w:pPr><w:r><w:pict><w:binData w:name="wordml://logo.png" xml:space="preserve">${ACT_LOGO_B64}</w:binData><v:shape style="width:${pt}pt;height:${pt}pt" type="#_x0000_t75"><v:imagedata src="wordml://logo.png" o:title="logo"/></v:shape></w:pict></w:r></w:p>`;
     }
 
-    function wSigTable(rows) {
+    function wSigTable(rows, sz = 24) {
       const border = '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/>';
       const body = rows.map((row) => {
         if (row.gap) {
           return `<w:tr><w:trPr><w:trHeight w:val="${row.gap}" w:hRule="exact"/></w:trPr><w:tc><w:p/></w:tc><w:tc><w:p/></w:tc></w:tr>`;
         }
-        const cell = (text, align, w) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${wPara(text, { align, after: 0, before: 0, sz: 24 })}</w:tc>`;
+        const cell = (text, align, w) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${wPara(text, { align, after: 0, before: 0, sz })}</w:tc>`;
         return `<w:tr>${cell(row.role, 'left', 7600)}${cell(row.fio, 'right', 2400)}</w:tr>`;
       }).join('');
       return `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${border}</w:tblBorders></w:tblPr>${body}</w:tbl>`;
@@ -3863,40 +3903,46 @@ ${sheets.join('\n')}
 
     function buildToolActWordXml() {
       const sheets = kitPackSheets();
-      const head = `<w:tbl><w:tblPr><w:tblW w:w="3288" w:type="dxa"/><w:jc w:val="left"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tr><w:tc><w:tcPr><w:tcW w:w="3288" w:type="dxa"/></w:tcPr>${wLogoPara()}${wPara('АКЦИОНЕРНОЕ ОБЩЕСТВО', { align: 'center', bold: true, sz: 18, after: 0, before: 40 })}${wPara('«ЗАВОД', { align: 'center', bold: true, sz: 18, after: 0, before: 0 })}${wPara('«УНИВЕРСАЛМАШ»', { align: 'center', bold: true, sz: 18, after: 0, before: 0 })}${wPara('АКТ', { align: 'center', bold: true, sz: 24, before: 276, after: 276 })}${wPara('_______________  №_______________', { align: 'center', sz: 22, after: 60, before: 0 })}</w:tc></w:tr></w:tbl>`;
+      const head = `<w:tbl><w:tblPr><w:tblW w:w="3742" w:type="dxa"/><w:jc w:val="left"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tr><w:tc><w:tcPr><w:tcW w:w="3742" w:type="dxa"/></w:tcPr>${wPara('', { sz: 22, after: 0 })}${wLogoPara(53.7)}${wPara('', { sz: 22, after: 0 })}${wPara('АКЦИОНЕРНОЕ ОБЩЕСТВО', { align: 'center', bold: true, sz: 22, after: 0, before: 0 })}${wPara('«ЗАВОД «УНИВЕРСАЛМАШ»', { align: 'center', bold: true, sz: 22, after: 200, before: 0 })}${wPara('АКТ', { align: 'center', bold: true, sz: 32, before: 0, after: 80 })}${wPara('_______________    №_______________', { align: 'center', sz: 22, after: 0, before: 0 })}${wPara([applyTokens(docText('raspSubject1')), applyTokens(docText('raspSubject2'))], { align: 'center', bold: true, sz: 18, before: 120, after: 200 })}</w:tc></w:tr></w:tbl>`;
       const parts = [
         head,
-        wPara(applyTokens(docText('raspSubject1')), { bold: true, sz: 24, before: 160, after: 0 }),
-        wPara(applyTokens(docText('raspSubject2')), { bold: true, sz: 24, before: 0, after: 160 }),
-        wPara(String(applyTokens(docText('raspBody'))).split(/\r?\n/), { align: 'both', sz: 24, indent: 709, before: 80, after: 80 }),
-        ...(toolNameLines().length ? toolNameLines() : [productLabel('(ввести номер изделия)')]).map((n) => wPara(n, { align: 'center', bold: true, sz: 24, before: 80, after: 40 })),
-        wPara('в количестве ' + toolQtyShown() + ' шт.', { sz: 24, indent: 709, before: 80, after: 80 }),
-        wSigTable([{ gap: 200 }, { role: 'Главный технолог', fio: toolChiefShown() }]),
+        wPara(String(applyTokens(docText('raspBody'))).split(/\r?\n/), { align: 'both', sz: 22, indent: 709, before: 1920, after: 80 }),
+        ...toolNameLinesShown().map((n) => wPara(n, { align: 'center', bold: true, sz: 22, before: 0, after: 40 })),
+        wPara('в количестве ' + toolQtyShown() + ' шт.', { align: 'center', sz: 22, before: 0, after: 360 }),
+        wSigTable([{ role: 'Главный технолог', fio: toolChiefShown() }], 22),
         wRuns([
-          { t: 'Приложение: ', bold: true },
-          { t: 'комплект отчётных документов на изделие ' },
-          { t: toolCaption(), italic: true },
-          { t: ' на ' + sheets + ' л. в 1 экз.' },
-        ], { align: 'both', indent: 709, before: 160, after: 80 }),
-        wPara('Согласовано:', { bold: true, sz: 24, before: 120, after: 40 }),
+          { t: 'Приложение:', bold: true, sz: 22 },
+          { t: ' комплект отчётных документов на изделие ', sz: 22 },
+          { t: toolCaption(), italic: true, sz: 22 },
+          { t: ' на ' + sheetsCountText(sheets) + ' л. в 1 экз.', sz: 22 },
+        ], { before: 276, after: 0 }),
+        wPara('', { sz: 22, after: 0 }),
+        wPara('', { sz: 22, after: 0 }),
+        wPara('', { sz: 22, after: 0 }),
+        wPara('Согласовано:', { sz: 22, before: 0, after: 120 }),
         wSigTable([
           { role: 'Операционный директор', fio: 'Романов В.В.' },
-          { gap: 280 },
+          { gap: 316 },
           { role: 'Директор по финансам и экономике', fio: 'Сыркина А.Г.' },
-          { gap: 280 },
+          { gap: 316 },
           { role: 'Заместитель директора по ВК и МТС', fio: 'Мазур Е.В.' },
-          { gap: 280 },
+          { gap: 476 },
           { role: 'Заместитель директора по производству', fio: 'Сухарев С.В.' },
-        ]),
+        ], 22),
       ];
+      const footer = [
+        wPara('Исполнитель: ' + fioSurnameFirst(state.executor || ''), { sz: 14, after: 0, before: 0 }),
+        wPara('Тел: ' + (state.executorPhone || ''), { sz: 14, after: 0, before: 0 }),
+      ].join('');
       return `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Word.Document"?>
 <w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xml:space="preserve">
 <w:body>
 ${parts.join('\n')}
 <w:sectPr>
+<w:ftr w:type="odd">${footer}</w:ftr>
 <w:pgSz w:w="11906" w:h="16838"/>
-<w:pgMar w:top="567" w:right="680" w:bottom="680" w:left="850" w:header="284" w:footer="284"/>
+<w:pgMar w:top="568" w:right="680" w:bottom="851" w:left="851" w:header="0" w:footer="454"/>
 </w:sectPr>
 </w:body>
 </w:wordDocument>`;
