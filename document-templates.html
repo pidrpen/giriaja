@@ -1144,11 +1144,24 @@
       return state.docMode === 'tooling';
     }
 
+    /**
+     * «АДЕ 3422-682.00.00 Шаблон для…» → «АДЕ 3422-682.00.00 «Шаблон для…»»:
+     * всё после номера (первое слово с цифрой) — в кавычках-ёлочках, как ставит Word.
+     */
+    function toolQuoteName(line) {
+      const str = String(line || '').trim();
+      const m = str.match(/^(\S*\d\S*)\s+(.+)$/) || str.match(/^(\S+(?:\s+\S+)*?\s+\S*\d\S*)\s+(.+)$/);
+      if (!m) return str;
+      let name = m[2].trim();
+      if (/^["'«„“].*["'»“”]$/.test(name)) name = name.slice(1, -1).trim();
+      return name ? m[1] + ' «' + name + '»' : m[1];
+    }
+
     function toolNameLines() {
       const list = String(state.raspProducts || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      if (list.length) return list;
+      if (list.length) return list.map(toolQuoteName);
       const one = String(state.product || '').trim();
-      return one ? [one] : [];
+      return one ? [toolQuoteName(one)] : [];
     }
 
     function toolNameLinesShown() {
@@ -2175,7 +2188,7 @@
       } else if (id === 'rasp') {
         title.textContent = isTooling() ? 'Распоряжение — оснастка' : 'Распоряжение — изделия';
         note.textContent = isTooling()
-          ? 'Наименование берётся как введено в общих данных или в списке изделий. Количество по умолчанию 1. Число листов в приложении — сумма листов комплекта.'
+          ? 'Наименование — из общих данных или списка изделий; всё после номера само берётся в «ёлочки». Количество по умолчанию 1. Число листов в приложении — сумма листов комплекта.'
           : 'Текст распоряжения можно переписать. Список изделий — из 1С, по одному в строке.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
