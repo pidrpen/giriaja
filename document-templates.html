@@ -388,9 +388,9 @@
       /* колонтитул absolute bottom 6mm — узкий зазор, чтобы лист заполнялся плотнее */
       padding-bottom: 14mm;
     }
-    /* последний лист с подписью: подпись в потоке, снизу только зазор до колонтитула */
+    /* последний лист с подписью: колонтитул снизу не должен наезжать на «Начальник …» */
     .page.has-footer.has-sigs {
-      padding-bottom: 16mm;
+      padding-bottom: 28mm;
     }
     /* не растягивать body — иначе строки таблицы «раздуваются» на всю высоту листа */
     .page-body {
@@ -400,8 +400,8 @@
     /* Excel: подписи сразу под таблицей, с небольшим отступом */
     .page-signatures {
       flex: 0 0 auto;
-      margin-top: 6mm;
-      margin-bottom: 4mm;
+      margin-top: 8mm;
+      margin-bottom: 6mm;
       padding-top: 0;
       page-break-inside: avoid;
       break-inside: avoid;
@@ -2180,8 +2180,9 @@
      * Без этого, если таблица ровно заполняет лист, «Начальник ТБПП/БТН» сливается с footer.
      */
     function sigReserveRowsFor(id) {
-      if (id === 'mat') return 3;
-      if (id === 'f3') return 3;
+      if (id === 'mat') return 8;
+      if (id === 'f3') return 8;
+      if (id === 'stat') return 8;
       return 0;
     }
 
