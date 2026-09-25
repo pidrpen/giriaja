@@ -1131,17 +1131,8 @@
       return state.docMode === 'tooling';
     }
 
-    function toolNameShown() {
-      return String(state.toolTitle || '').trim() || 'Наименование';
-    }
-
     function toolCaption() {
-      const code = String(state.product || '').trim();
-      const name = String(state.toolTitle || '').trim();
-      if (code && name) return code + ' «' + name + '»';
-      if (name) return '«' + name + '»';
-      if (code) return code;
-      return '«Наименование»';
+      return productLabel('(ввести номер изделия)');
     }
 
     function toolQtyShown() {
@@ -2143,16 +2134,12 @@
       } else if (id === 'rasp') {
         title.textContent = isTooling() ? 'Распоряжение — оснастка' : 'Распоряжение — изделия';
         note.textContent = isTooling()
-          ? 'Наименование и количество подставятся в текст. Число листов в приложении — сумма листов комплекта. Пояснения из образца в бланк не печатаются.'
+          ? 'Количество подставится в текст. Изделие в приложении — из общих данных. Число листов — сумма листов комплекта.'
           : 'Текст распоряжения можно переписать. Список изделий — из 1С, по одному в строке.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
         if (delBtn) delBtn.classList.add('hidden');
         const toolFields = isTooling() ? `
-          <div class="field">
-            <label>Наименование оснастки</label>
-            <input id="toolTitle" value="${esc(state.toolTitle || '')}" placeholder="Шаблон для приварки…" />
-          </div>
           <div class="field">
             <label>Количество, шт</label>
             <input id="toolQty" value="${esc(state.toolQty || '1')}" />
@@ -2179,8 +2166,6 @@
           state.raspProducts = ta.value;
           renderPreview();
         };
-        const titleInp = $('toolTitle');
-        if (titleInp) titleInp.oninput = () => { state.toolTitle = titleInp.value; renderPreview(); };
         const qtyInp = $('toolQty');
         if (qtyInp) qtyInp.oninput = () => { state.toolQty = qtyInp.value; renderPreview(); };
         const chiefInp = $('toolChief');
@@ -2824,7 +2809,6 @@
                 <p class="rasp-subject"><span class="line1">${esc(applyTokens(docText('raspSubject1')))}</span><span class="line2">${esc(applyTokens(docText('raspSubject2')))}</span></p>
               </div>
               <p class="justify">${esc(applyTokens(docText('raspBody'))).replace(/\n/g, '<br>')}</p>
-              <p class="tool-name">«${esc(toolNameShown())}»</p>
               <p class="tool-qty">в количестве ${esc(toolQtyShown())} шт.</p>
               <div class="word-sig-gap"></div>
               <p class="word-sig"><span class="role">Главный технолог</span><span class="fio">${esc(toolChiefShown())}</span></p>
@@ -3547,7 +3531,6 @@
         pushL(applyTokens(docText('raspSubject1')), 'title', 18);
         pushL(applyTokens(docText('raspSubject2')), 'title', 18);
         wrapLines(applyTokens(docText('raspBody')), 90).forEach((ln) => pushL(ln, 'letterwrap', 16));
-        pushL('«' + toolNameShown() + '»', 'title', 18);
         pushL('в количестве ' + toolQtyShown() + ' шт.', 'letter', 16);
         rows.push({ cells: ['Главный технолог', toolChiefShown()], style: 'sig', height: 16 });
         pushL('Приложение: комплект отчётных документов на изделие ' + toolCaption() + ' на ' + sheets + ' л. в 1 экз.', 'letterwrap', 32);
@@ -3874,8 +3857,7 @@ ${sheets.join('\n')}
         wPara(applyTokens(docText('raspSubject1')), { bold: true, sz: 24, before: 160, after: 0 }),
         wPara(applyTokens(docText('raspSubject2')), { bold: true, sz: 24, before: 0, after: 160 }),
         wPara(String(applyTokens(docText('raspBody'))).split(/\r?\n/), { align: 'both', sz: 24, indent: 709, before: 80, after: 80 }),
-        wPara('«' + toolNameShown() + '»', { align: 'center', bold: true, sz: 24, before: 120, after: 40 }),
-        wPara('в количестве ' + toolQtyShown() + ' шт.', { sz: 24, indent: 709, before: 40, after: 80 }),
+        wPara('в количестве ' + toolQtyShown() + ' шт.', { sz: 24, indent: 709, before: 80, after: 80 }),
         wSigTable([{ gap: 200 }, { role: 'Главный технолог', fio: toolChiefShown() }]),
         wRuns([
           { t: 'Приложение: ', bold: true },
