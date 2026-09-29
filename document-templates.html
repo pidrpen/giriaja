@@ -427,6 +427,20 @@
       color: #000;
       position: relative;
     }
+    .page-word {
+      position: absolute;
+      top: 3mm;
+      right: 3mm;
+      z-index: 4;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #1a7f37;
+      background: #e8f6ee;
+      color: #146c2e;
+      cursor: pointer;
+    }
     .page.has-footer {
       /* колонтитул absolute bottom 6mm — узкий зазор, чтобы лист заполнялся плотнее */
       padding-bottom: 14mm;
@@ -809,7 +823,7 @@
         margin: 0;
       }
       body { background: #fff; }
-      .sidebar, .workspace-top, .no-print { display: none !important; }
+      .sidebar, .workspace-top, .no-print, .page-word { display: none !important; }
       .app { display: block; }
       .workspace { padding: 0; overflow: visible; }
       .sheet-stage {
@@ -961,7 +975,7 @@
           <button type="button" id="btnPrintOne">Печать текущей</button>
           <button type="button" class="ok" id="btnExportOne">⬇ Excel: текущий</button>
           <button type="button" class="ok" id="btnExportAll">⬇ Excel: комплект</button>
-          <button type="button" class="ok" id="btnExportWord">⬇ Word: распоряжение</button>
+          <button type="button" class="ok" id="btnExportWord">⬇ Word: текущий</button>
           <button type="button" id="btnSample">Образец данных</button>
           <button type="button" class="danger" id="btnReset">Сброс</button>
         </div>
@@ -994,7 +1008,7 @@
         <div class="btn-row">
           <button type="button" class="ok" id="btnExportOneTop">Excel текущий</button>
           <button type="button" class="ok" id="btnExportAllTop">Excel комплект</button>
-          <button type="button" class="ok" id="btnExportWordTop">Word: распоряжение</button>
+          <button type="button" class="ok" id="btnExportWordTop">Word: текущий</button>
           <button type="button" id="btnPrintOneTop">Печать текущей</button>
           <button type="button" class="primary" id="btnPrintTop">Печать комплекта</button>
         </div>
@@ -3118,6 +3132,15 @@
       $('previewTitle').textContent = 'Превью: ' + (docMeta ? docMeta.name : id);
       const stage = $('sheetStage');
       stage.innerHTML = buildDocPagesHtml(id, mode === 'print' ? 'print' : 'screen');
+      stage.querySelectorAll('.page').forEach((page, idx, all) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'page-word no-print';
+        btn.textContent = 'Word';
+        btn.title = 'Скачать этот лист в Word';
+        btn.onclick = () => exportPreviewPageWord(page, idx, all.length);
+        page.appendChild(btn);
+      });
       // оценка N для flow-auto с колонтитулом
       requestAnimationFrame(() => {
         stage.querySelectorAll('.page.flow-auto.has-footer').forEach((page) => {
@@ -4008,10 +4031,59 @@ ${parts.join('\n')}
     function downloadWordAct() {
       const xml = buildActWordXml();
       const blob = new Blob(['\uFEFF', xml], { type: 'application/msword;charset=utf-8' });
-      const name = ('Акт' + (state.product ? '_' + state.product : '')).replace(/[\\/:*?"<>|]+/g, '_');
+      const name = ((DOCS.find((d) => d.id === 'rasp') || {}).name || 'Распоряжение') + (state.product ? '_' + state.product : '');
+      triggerDownload(blob, name.replace(/[\\/:*?"<>|]+/g, '_') + '.doc');
+    }
+
+    function pageNodeWordHtml(pageEl) {
+      const clone = pageEl.cloneNode(true);
+      clone.querySelectorAll('.page-word').forEach((b) => b.remove());
+      return clone.outerHTML.replace(/src="images\/universalmash-logo\.png"/g, 'src="data:image/png;base64,' + ACT_LOGO_B64 + '"');
+    }
+
+    function downloadHtmlWord(filename, pagesHtml) {
+      const css = (document.querySelector('style') && document.querySelector('style').textContent) || '';
+      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]--><style>${css}
+@page { size: A4; margin: 8mm; }
+.page { height: auto !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; margin: 0 auto !important; page-break-after: always; }
+.page-word, .no-print { display: none !important; }
+</style></head><body>${pagesHtml}</body></html>`;
+      triggerDownload(new Blob(['\uFEFF', html], { type: 'application/msword;charset=utf-8' }), filename.endsWith('.doc') ? filename : filename + '.doc');
+    }
+
+    function currentDocFileBase() {
+      const meta = DOCS.find((d) => d.id === state.current);
+      return ((meta && meta.name) || state.current) + (state.product ? '_' + state.product : '');
+    }
+
+    function exportPreviewPageWord(page, idx, total) {
+      if (state.current === 'rasp') {
+        downloadWordAct();
+        return;
+      }
+      const base = currentDocFileBase().replace(/[\\/:*?"<>|]+/g, '_');
+      const name = total > 1 ? base + '_стр' + (idx + 1) : base;
+      downloadHtmlWord(name, pageNodeWordHtml(page));
+    }
+
+    function downloadWordCurrent() {
+      if (state.current === 'rasp') {
+        downloadWordAct();
+        return;
+      }
+      const pages = Array.from(document.querySelectorAll('#sheetStage .page'));
+      if (!pages.length) {
+        alert('Нет листа для выгрузки');
+        return;
+      }
+      const base = currentDocFileBase().replace(/[\\/:*?"<>|]+/g, '_');
+      downloadHtmlWord(base, pages.map(pageNodeWordHtml).join('\n'));
+    }
+
+    function triggerDownload(blob, filename) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = name + '.doc';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -4187,9 +4259,9 @@ ${parts.join('\n')}
       const btnExAllTop = $('btnExportAllTop');
       if (btnExAllTop) btnExAllTop.onclick = exportAllDocs;
       const btnWord = $('btnExportWord');
-      if (btnWord) btnWord.onclick = downloadWordAct;
+      if (btnWord) btnWord.onclick = downloadWordCurrent;
       const btnWordTop = $('btnExportWordTop');
-      if (btnWordTop) btnWordTop.onclick = downloadWordAct;
+      if (btnWordTop) btnWordTop.onclick = downloadWordCurrent;
       const btnSample = $('btnSample');
       if (btnSample) btnSample.onclick = () => {
         if (!confirm('Заполнить все формы образцовыми данными? Текущий ввод будет заменён.')) return;
