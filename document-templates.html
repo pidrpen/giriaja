@@ -926,8 +926,8 @@
         </div>
         <div class="row2">
           <div class="field">
-            <label>Подпись в комплекте</label>
-            <select id="giRole" title="Кто подписывает комплект (замещают друг друга)">
+            <label>Подписывает (акт и комплект)</label>
+            <select id="giRole" title="Главный инженер и главный технолог замещают друг друга">
               <option>Главный инженер</option>
               <option>Главный технолог</option>
             </select>
@@ -1082,8 +1082,6 @@
       giRole: 'Главный инженер',
       /** ФИО главного технолога; пусто — подставит normalizeGiRole (в т.ч. из старого toolChief) */
       fioGt: null,
-      /** кто подписывает акт: отдельно для машин и для оснастки (ГИ и ГТ замещают друг друга) */
-      raspSigner: null,
       orderDate: '№342/02 от 16.01.2026',
       executor: '',
       executorPhone: '',
@@ -1151,9 +1149,7 @@
         if (String(state.toolChief || '').trim()) state.fioGt = state.toolChief;
         else state.fioGt = 'Останин Н.А.';
       }
-      if (!state.raspSigner || typeof state.raspSigner !== 'object') state.raspSigner = {};
-      if (!CHIEF_ROLES.includes(state.raspSigner.machine)) state.raspSigner.machine = state.giRole || 'Главный инженер';
-      if (!CHIEF_ROLES.includes(state.raspSigner.tooling)) state.raspSigner.tooling = 'Главный технолог';
+      delete state.raspSigner;
     }
 
     /** ФИО по должности: главный инженер / главный технолог (фамилия, затем инициалы) */
@@ -1162,10 +1158,9 @@
       return fioSurnameFirst(state.fioGi || '') || 'Мельников И.В.';
     }
 
-    /** Кто подписывает акт в текущем режиме */
+    /** Кто подписывает акт — тот же выбор, что везде (ГИ или ГТ) */
     function raspSignerRole() {
-      const r = state.raspSigner && state.raspSigner[isTooling() ? 'tooling' : 'machine'];
-      return CHIEF_ROLES.includes(r) ? r : (isTooling() ? 'Главный технолог' : 'Главный инженер');
+      return giRoleTitle();
     }
 
     function syncGiRoleLabel() {}
@@ -2277,20 +2272,7 @@
             { key: 'raspBody', label: 'Текст акта', rows: 6 },
           ])}
           ${toolFields}
-          <div class="field">
-            <label>Подписывает акт</label>
-            <select id="raspSigner" title="Главный инженер и главный технолог замещают друг друга">
-              ${CHIEF_ROLES.map((r) => `<option value="${esc(r)}"${r === raspSignerRole() ? ' selected' : ''}>${esc(r)} — ${esc(chiefFio(r))}</option>`).join('')}
-            </select>
-            <div class="note">ФИО — из общих данных.</div>
-          </div>
         `;
-        const signerSel = $('raspSigner');
-        if (signerSel) signerSel.onchange = () => {
-          normalizeGiRole();
-          state.raspSigner[isTooling() ? 'tooling' : 'machine'] = signerSel.value;
-          renderPreview();
-        };
         const ta = $('raspProducts');
         if (ta) ta.oninput = () => {
           state.raspProducts = ta.value;
@@ -3815,7 +3797,6 @@ ${sheets.join('\n')}
       state.fioGi = 'Мельников И.В.';
       state.fioGt = 'Останин Н.А.';
       state.giRole = 'Главный инженер';
-      state.raspSigner = { machine: 'Главный инженер', tooling: 'Главный технолог' };
       state.orderDate = '№342/02 от 16.01.2026';
       state.hasStatUnload = true;
       state.texts = {};
@@ -4205,8 +4186,7 @@ ${parts.join('\n')}
         ['Нач. БПП/ТБПП', state.fioBpp],
         ['Главный инженер', state.fioGi],
         ['Главный технолог', state.fioGt],
-        ['Подпись в комплекте', giRoleTitle()],
-        ['Подпись в акте', raspSignerRole()],
+        ['Подписывает', giRoleTitle()],
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
         ['Распоряжение', state.orderDate],
@@ -4230,7 +4210,6 @@ ${parts.join('\n')}
         el.oninput = () => {
           state[key] = el.value;
           if (key === 'giRole') syncGiRoleLabel();
-          if ((key === 'fioGi' || key === 'fioGt') && state.current === 'rasp') renderEditor();
           if (key === 'product' && state.current === 'rasp' && !state.raspProducts) {
             // keep live
           }
