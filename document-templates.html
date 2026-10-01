@@ -938,7 +938,7 @@
             <input id="executorPhone" value="" placeholder="12-34" />
           </div>
         </div>
-        <div class="field">
+        <div class="field" id="hasStatUnloadField">
           <label style="display:flex;align-items:center;gap:8px;font-weight:600">
             <input type="checkbox" id="hasStatUnload" checked />
             Есть статистика выгрузки
@@ -1158,6 +1158,28 @@
       return state.docMode === 'tooling';
     }
 
+    /** В оснастке нет статистики и сравнения */
+    const TOOLING_HIDDEN_DOCS = ['stat', 'cmp'];
+
+    function docVisible(id) {
+      return !(isTooling() && TOOLING_HIDDEN_DOCS.includes(id));
+    }
+
+    function visibleDocs() {
+      return DOCS.filter((d) => docVisible(d.id));
+    }
+
+    function statOn() {
+      return !isTooling() && state.hasStatUnload !== false;
+    }
+
+    /** «Форма 1. Сводная ведомость…» — номер формы в начале шапки (оснастка) */
+    function formTitlePrefix(id) {
+      if (!isTooling()) return '';
+      const n = { f1: 1, f2: 2, f3: 3 }[id];
+      return n ? 'Форма ' + n + '. ' : '';
+    }
+
     /**
      * «АДЕ 3422-682.00.00 Шаблон для…» → «АДЕ 3422-682.00.00 «Шаблон для…»»:
      * всё после номера (первое слово с цифрой) — в кавычках-ёлочках, как ставит Word.
@@ -1214,8 +1236,7 @@
 
     function kitPackSheets() {
       const p = recalcKitPages();
-      const statOn = state.hasStatUnload !== false;
-      return (statOn ? Math.max(1, Math.round(Number(p.stat) || 1)) : 0)
+      return (statOn() ? Math.max(1, Math.round(Number(p.stat) || 1)) : 0)
         + Math.max(1, Math.round(Number(p.f1) || 1))
         + Math.max(1, Math.round(Number(p.f2) || 1))
         + Math.max(1, Math.round(Number(p.f3) || 1))
@@ -1227,6 +1248,8 @@
       document.querySelectorAll('#modeBar [data-mode]').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.mode === state.docMode);
       });
+      const statField = document.getElementById('hasStatUnloadField');
+      if (statField) statField.classList.toggle('hidden', isTooling());
     }
 
     function normalizeDocMode() {
@@ -1965,7 +1988,8 @@
     function buildTabs() {
       const root = $('tabs');
       root.innerHTML = '';
-      DOCS.forEach((d) => {
+      if (!docVisible(state.current)) state.current = 'rasp';
+      visibleDocs().forEach((d) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'tab' + (state.current === d.id ? ' active' : '');
@@ -2128,7 +2152,7 @@
         if (delBtn) delBtn.classList.add('hidden');
         recalcKitPages();
         const p = state.kitPages;
-        const statOn = state.hasStatUnload !== false;
+        const statShown = statOn();
         const line = (key, label) => {
           const n = Math.max(1, Math.round(Number(p[key]) || 1));
           return `<div class="field">
@@ -2137,14 +2161,14 @@
             <div class="note kit-pages-hint" data-kit-hint="${key}">${esc(naListah(n) + ' формата А4')}</div>
           </div>`;
         };
-        const totalSheets = (statOn ? Math.max(1, Math.round(Number(p.stat) || 1)) : 0)
+        const totalSheets = (statShown ? Math.max(1, Math.round(Number(p.stat) || 1)) : 0)
           + Math.max(1, Math.round(Number(p.f1) || 1))
           + Math.max(1, Math.round(Number(p.f2) || 1))
           + Math.max(1, Math.round(Number(p.f3) || 1))
           + Math.max(1, Math.round(Number(p.mat) || 1));
         body.innerHTML = `
           <p class="note" style="margin-top:0">Правка сразу попадает в текст комплекта и в Excel. Автоподсчёт не затирает введённые числа, пока не нажмёте «Пересчитать».</p>
-          ${statOn ? line('stat', 'Статистика, листов') : ''}
+          ${statShown ? line('stat', 'Статистика, листов') : ''}
           ${line('f1', 'Форма 1, листов')}
           ${line('f2', 'Форма 2, листов')}
           ${line('f3', 'Форма 3, листов')}
@@ -2173,7 +2197,7 @@
           state.kitPagesCustom = true;
           const hint = document.querySelector(`[data-kit-hint="${key}"]`);
           if (hint) hint.textContent = naListah(n) + ' формата А4';
-          const keys = ['f1', 'f2', 'f3', 'mat'].concat(state.hasStatUnload === false ? [] : ['stat']);
+          const keys = ['f1', 'f2', 'f3', 'mat'].concat(statOn() ? ['stat'] : []);
           const total = keys.reduce((s, k) => s + Math.max(1, Math.round(Number(state.kitPages[k]) || 1)), 0);
           const tot = $('kitPagesTotal');
           if (tot) tot.value = listovForm(total);
@@ -2714,7 +2738,7 @@
     function kitCoverItems(pp, pages) {
       const n = (k) => naListah((pages && pages[k]) || 1);
       const items = [];
-      if (state.hasStatUnload !== false) {
+      if (statOn()) {
         items.push(`Отчет «Статистика выгрузки и сравнение контрольных сумм спецификаций» ${n('stat')} формата А4`);
       }
       items.push(
@@ -2733,7 +2757,7 @@
         return {
           paginate: true,
           footerBase: `Сводная ведомость нормативной трудоемкости операций на изделие ${esc(p)}`,
-          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости операций на изделие<br>${esc(p)}</h1>`,
+          title: `<h1 class="doc-title">${formTitlePrefix('f1')}Сводная ведомость нормативной трудоемкости операций на изделие<br>${esc(p)}</h1>`,
           tableClass: 'doc',
           colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
           thead: `<tr><th>Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
@@ -2747,7 +2771,7 @@
         return {
           paginate: true,
           footerBase: `Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(p)}`,
-          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(p)}</h1>`,
+          title: `<h1 class="doc-title">${formTitlePrefix('f2')}Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${esc(p)}</h1>`,
           tableClass: 'doc',
           colgroup: '<col style="width:70%"><col style="width:15%"><col style="width:15%">',
           thead: `<tr><th>Подразделение/Операции</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
@@ -2765,7 +2789,7 @@
         return {
           paginate: true,
           footerBase: `Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${esc(p)}`,
-          title: `<h1 class="doc-title">Сводная ведомость нормативной трудоемкости работ по<br>подразделениям и номенклатуре на изделие ${esc(p)}</h1>`,
+          title: `<h1 class="doc-title">${formTitlePrefix('f3')}Сводная ведомость нормативной трудоемкости работ по<br>подразделениям и номенклатуре на изделие ${esc(p)}</h1>`,
           tableClass: 'doc compact',
           colgroup: '<col style="width:58%"><col style="width:14%"><col style="width:14%"><col style="width:14%">',
           thead: `<tr><th>Изделие/Подразделение/Операция</th><th>Количество:<br>шт — для изделий/подразделений<br>н.мин — для операций</th><th>Трудоемкость, н.мин.</th><th>Трудоемкость, н.ч.</th></tr>`,
@@ -2973,19 +2997,22 @@
         p.on = !!p.on;
         return true;
       });
-      state.pack = pack;
+      // скрытые в режиме формы — в конец, чтобы ↑↓ работали по видимым
+      state.pack = pack.filter((p) => docVisible(p.id)).concat(pack.filter((p) => !docVisible(p.id)));
     }
 
     function getSelectedPackIds() {
       normalizePack();
-      return state.pack.filter((p) => p.on).map((p) => p.id);
+      return state.pack.filter((p) => p.on && docVisible(p.id)).map((p) => p.id);
     }
 
     function renderPackList() {
       normalizePack();
       const root = $('packList');
       if (!root) return;
+      const lastVisible = state.pack.filter((p) => docVisible(p.id)).length - 1;
       root.innerHTML = state.pack.map((p, i) => {
+        if (!docVisible(p.id)) return '';
         const meta = DOCS.find((d) => d.id === p.id) || { name: p.id, short: p.id };
         const ord = state.pack.filter((x, j) => j <= i && x.on).length;
         const num = p.on ? ord : '—';
@@ -2997,7 +3024,7 @@
               <span>${esc(meta.name)} <span style="color:var(--muted)">(${esc(meta.short)})</span></span>
             </label>
             <button type="button" class="icon" data-pack-up="${i}" title="Выше" ${i === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="icon" data-pack-down="${i}" title="Ниже" ${i === state.pack.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="icon" data-pack-down="${i}" title="Ниже" ${i >= lastVisible ? 'disabled' : ''}>↓</button>
             <button type="button" class="icon" data-pack-open="${p.id}" title="Открыть для редактирования">✎</button>
           </div>`;
       }).join('');
@@ -3022,7 +3049,7 @@
       root.querySelectorAll('[data-pack-down]').forEach((el) => {
         el.onclick = () => {
           const i = +el.dataset.packDown;
-          if (i >= state.pack.length - 1) return;
+          if (i >= state.pack.length - 1 || !docVisible(state.pack[i + 1].id)) return;
           const t = state.pack[i + 1];
           state.pack[i + 1] = state.pack[i];
           state.pack[i] = t;
@@ -3177,7 +3204,7 @@
       // Порядок всегда стартует с эталона: Расп → Компл → Мат → Ф3 → Ф2 → Ф1 → …
       // Галочки берём из сайдбара (что было отмечено).
       const onMap = Object.fromEntries(state.pack.map((p) => [p.id, !!p.on]));
-      printDraft = defaultPackState().map((p) => ({
+      printDraft = defaultPackState().filter((p) => docVisible(p.id)).map((p) => ({
         id: p.id,
         on: onMap[p.id] !== undefined ? onMap[p.id] : true,
       }));
@@ -3460,7 +3487,7 @@
       return {
         sheetName: 'Форма1', colCount: 3, colWidths: [280, 70, 70],
         rows: [
-          { cells: [`Сводная ведомость нормативной трудоемкости операций на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
+          { cells: [`${formTitlePrefix('f1')}Сводная ведомость нормативной трудоемкости операций на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
           { cells: ['Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 22 },
           { cells: ['Итого', sumMin, sumHour], style: 'total', height: 16 },
           ...rows.map((r) => ({ cells: [r.op, r.min, r.hour], style: 'data', height: 14 })),
@@ -3472,7 +3499,7 @@
       return {
         sheetName: 'Форма2', colCount: 3, colWidths: [280, 70, 70],
         rows: [
-          { cells: [`Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
+          { cells: [`${formTitlePrefix('f2')}Сводная ведомость нормативной трудоемкости операций по подразделениям на изделие ${product}`], style: 'title', mergeAcross: 2, height: 28 },
           { cells: ['Подразделение/Операции', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 22 },
           { cells: ['Итого', sumMin, sumHour], style: 'total', height: 16 },
           ...rows.map((r) => ({ cells: [hierExcelText(r.unit, f2HierarchyLevel(r.unit)), r.min, r.hour], style: 'data', height: 14 })),
@@ -3485,7 +3512,7 @@
       return {
         sheetName: 'Форма3', colCount: 4, colWidths: [280, 90, 90, 90],
         rows: [
-          { cells: [`Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${product}`], style: 'title', mergeAcross: 3, height: 32 },
+          { cells: [`${formTitlePrefix('f3')}Сводная ведомость нормативной трудоемкости работ по подразделениям и номенклатуре на изделие ${product}`], style: 'title', mergeAcross: 3, height: 32 },
           { cells: ['Изделие/Подразделение/Операция', 'Количество: шт — для изделий/подразделений, н.мин — для операций', 'Трудоемкость, н.мин.', 'Трудоемкость, н.ч.'], style: 'hdr', height: 28 },
           { cells: ['Итого', '', sumMin, sumHour], style: 'total', height: 16 },
           ...data.map((r) => ({ cells: [hierExcelText(r.name, f3HierarchyLevel(r.name)), r.qty, r.min, r.hour], style: 'data', height: 14 })),
@@ -4142,7 +4169,7 @@ ${parts.join('\n')}
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
         ['Акт', state.orderDate],
-        ['Статистика выгрузки', state.hasStatUnload === false ? 'нет' : 'да'],
+        ['Статистика выгрузки', statOn() ? 'да' : 'нет'],
         ['Порядок печати/Excel', ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id).join(' → ')],
       ]));
       ids.forEach((id) => {
@@ -4241,7 +4268,7 @@ ${parts.join('\n')}
         renderPrintPackList();
       };
       $('btnPrintModalDefault').onclick = () => {
-        printDraft = defaultPackState();
+        printDraft = defaultPackState().filter((p) => docVisible(p.id));
         renderPrintPackList();
       };
       // клик по фону — закрыть
@@ -4587,6 +4614,8 @@ ${parts.join('\n')}
       btn.onclick = () => {
         state.docMode = btn.dataset.mode === 'tooling' ? 'tooling' : 'machine';
         syncModeBar();
+        buildTabs();
+        renderPackList();
         renderEditor();
         renderPreview();
         saveState();
