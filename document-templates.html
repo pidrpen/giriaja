@@ -916,12 +916,21 @@
         </div>
         <div class="row2">
           <div class="field">
-            <label id="fioGiLabel">Главный инженер (ФИО)</label>
-            <select id="giRole" title="Должность в подписи">
+            <label>Главный инженер (ФИО)</label>
+            <input id="fioGi" value="Мельников И.В." />
+          </div>
+          <div class="field">
+            <label>Главный технолог (ФИО)</label>
+            <input id="fioGt" value="Останин Н.А." />
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Подпись в комплекте</label>
+            <select id="giRole" title="Кто подписывает комплект (замещают друг друга)">
               <option>Главный инженер</option>
               <option>Главный технолог</option>
             </select>
-            <input id="fioGi" value="Мельников И.В." style="margin-top:6px" />
           </div>
           <div class="field">
             <label>Дата распоряжения (текст)</label>
@@ -959,7 +968,7 @@
 
       <div class="panel-section">
         <h2>Комплект: печать и Excel</h2>
-        <p class="note" style="margin-top:0">Состав комплекта (Excel и база для печати). Перед печатью откроется окно выбора. Порядок по умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+        <p class="note" style="margin-top:0">Состав комплекта (Excel и база для печати). Перед печатью откроется окно выбора. Порядок по умолчанию: Акт → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
         <div class="pack-list" id="packList"></div>
         <div class="btn-row">
           <button type="button" id="btnPackAll">Все</button>
@@ -1022,7 +1031,7 @@
     <div class="modal">
       <header>
         <h3 id="printModalTitle">Печать комплекта</h3>
-        <p>Отметьте формы и задайте порядок (↑↓). По умолчанию: Распоряжение → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
+        <p>Отметьте формы и задайте порядок (↑↓). По умолчанию: Акт → Комплект → Материалы → Ф3 → Ф2 → Ф1 → остальное.</p>
       </header>
       <div class="modal-body">
         <div class="pack-list" id="printPackList"></div>
@@ -1047,13 +1056,13 @@
       { id: 'mat', name: 'Материалы', short: 'Мат.', excelName: 'Материалы' },
       { id: 'stat', name: 'Статистика', short: 'Стат.', excelName: 'Статистика' },
       { id: 'kit', name: 'Комплект', short: 'Компл.', excelName: 'Комплект' },
-      { id: 'rasp', name: 'Распоряжение', short: 'Распор.', excelName: 'Распоряжение' },
+      { id: 'rasp', name: 'Акт', short: 'Акт', excelName: 'Акт' },
       { id: 'cmp', name: 'Сравнение', short: 'Сравн.', excelName: 'Сравнение' },
     ];
 
     /**
      * Порядок печати по умолчанию:
-     * Распоряжение → Комплект → Материалы → Форма 3 → Форма 2 → Форма 1 → остальное
+     * Акт → Комплект → Материалы → Форма 3 → Форма 2 → Форма 1 → остальное
      */
     const DEFAULT_PACK = ['rasp', 'kit', 'mat', 'f3', 'f2', 'f1', 'stat', 'cmp'];
 
@@ -1071,6 +1080,10 @@
       fioBpp: 'Сажнев Д.Н.',
       fioGi: 'Мельников И.В.',
       giRole: 'Главный инженер',
+      /** ФИО главного технолога; пусто — подставит normalizeGiRole (в т.ч. из старого toolChief) */
+      fioGt: null,
+      /** кто подписывает акт: отдельно для машин и для оснастки (ГИ и ГТ замещают друг друга) */
+      raspSigner: null,
       orderDate: '№342/02 от 16.01.2026',
       executor: '',
       executorPhone: '',
@@ -1078,7 +1091,6 @@
       docMode: 'machine',
       toolTitle: '',
       toolQty: '1',
-      toolChief: 'Останин Н.А.',
       /** false — в комплекте нет строк про статистику выгрузки */
       hasStatUnload: true,
       /** переопределения абзацев акта, комплекта и статистики; нет ключа — типовой текст */
@@ -1110,7 +1122,7 @@
         .replace(/"/g, '&quot;');
     }
 
-    const COMMON_FIELDS = ['product', 'fioBtn', 'fioBpp', 'fioGi', 'giRole', 'orderDate', 'executor', 'executorPhone'];
+    const COMMON_FIELDS = ['product', 'fioBtn', 'fioBpp', 'fioGi', 'fioGt', 'giRole', 'orderDate', 'executor', 'executorPhone'];
 
     /**
      * Подписи: фамилия, затем инициалы.
@@ -1130,16 +1142,33 @@
       return state.giRole === 'Главный технолог' ? 'Главный технолог' : 'Главный инженер';
     }
 
+    const CHIEF_ROLES = ['Главный инженер', 'Главный технолог'];
+
     function normalizeGiRole() {
-      if (state.giRole !== 'Главный инженер' && state.giRole !== 'Главный технолог') {
-        state.giRole = 'Главный инженер';
+      if (!CHIEF_ROLES.includes(state.giRole)) state.giRole = 'Главный инженер';
+      if (state.fioGt == null || !String(state.fioGt).trim()) {
+        // старые сохранения: ФИО технолога было в акте оснастки или в общем поле при выборе «Главный технолог»
+        if (String(state.toolChief || '').trim()) state.fioGt = state.toolChief;
+        else state.fioGt = 'Останин Н.А.';
       }
+      if (!state.raspSigner || typeof state.raspSigner !== 'object') state.raspSigner = {};
+      if (!CHIEF_ROLES.includes(state.raspSigner.machine)) state.raspSigner.machine = state.giRole || 'Главный инженер';
+      if (!CHIEF_ROLES.includes(state.raspSigner.tooling)) state.raspSigner.tooling = 'Главный технолог';
     }
 
-    function syncGiRoleLabel() {
-      const lab = $('fioGiLabel');
-      if (lab) lab.textContent = giRoleTitle() + ' (ФИО)';
+    /** ФИО по должности: главный инженер / главный технолог (фамилия, затем инициалы) */
+    function chiefFio(role) {
+      if (role === 'Главный технолог') return fioSurnameFirst(state.fioGt || '') || 'Останин Н.А.';
+      return fioSurnameFirst(state.fioGi || '') || 'Мельников И.В.';
     }
+
+    /** Кто подписывает акт в текущем режиме */
+    function raspSignerRole() {
+      const r = state.raspSigner && state.raspSigner[isTooling() ? 'tooling' : 'machine'];
+      return CHIEF_ROLES.includes(r) ? r : (isTooling() ? 'Главный технолог' : 'Главный инженер');
+    }
+
+    function syncGiRoleLabel() {}
 
     const TEXT_DEFAULTS = {
       raspSubject1: 'О запуске в работу спецификаций',
@@ -1231,7 +1260,7 @@
     }
 
     function toolChiefShown() {
-      return fioSurnameFirst(state.toolChief || '') || 'Останин Н.А.';
+      return chiefFio(raspSignerRole());
     }
 
     function kitPackSheets() {
@@ -1256,7 +1285,6 @@
       if (!state.textsTool || typeof state.textsTool !== 'object') state.textsTool = {};
       if (state.toolTitle == null) state.toolTitle = '';
       if (state.toolQty == null || String(state.toolQty).trim() === '') state.toolQty = '1';
-      if (!String(state.toolChief || '').trim()) state.toolChief = 'Останин Н.А.';
       syncModeBar();
     }
 
@@ -1338,7 +1366,7 @@
     }
 
     function giFio() {
-      return fioSurnameFirst(state.fioGi) || 'Мельников И.В.';
+      return chiefFio(raspSignerRole());
     }
 
     /** Схемы столбцов — порядок как при копировании из 1С/Excel */
@@ -2224,10 +2252,10 @@
           renderPreview('screen');
         };
       } else if (id === 'rasp') {
-        title.textContent = isTooling() ? 'Распоряжение — оснастка' : 'Распоряжение — изделия';
+        title.textContent = isTooling() ? 'Акт — оснастка' : 'Акт — изделия';
         note.textContent = isTooling()
           ? 'Наименование — из общих данных или списка изделий; всё после номера само берётся в «ёлочки». Количество по умолчанию 1. Число листов в приложении — сумма листов комплекта.'
-          : 'Текст распоряжения можно переписать. Список изделий — из 1С, по одному в строке.';
+          : 'Текст акта можно переписать. Список изделий — из 1С, по одному в строке.';
         addBtn.classList.add('hidden');
         clearBtn.classList.add('hidden');
         if (delBtn) delBtn.classList.add('hidden');
@@ -2236,9 +2264,6 @@
             <label>Количество, шт</label>
             <input id="toolQty" value="${esc(state.toolQty || '1')}" />
           </div>
-          <div class="field">
-            <label>Главный технолог (ФИО)</label>
-            <input id="toolChief" value="${esc(state.toolChief || 'Останин Н.А.')}" />
           </div>` : `
           <div class="paste-box">
             <label>Список изделий (из 1С)</label>
@@ -2249,10 +2274,23 @@
           ${docTextBox([
             { key: 'raspSubject1', label: 'Тема, строка 1', rows: 1 },
             { key: 'raspSubject2', label: 'Тема, строка 2', rows: 1 },
-            { key: 'raspBody', label: 'Текст распоряжения', rows: 6 },
+            { key: 'raspBody', label: 'Текст акта', rows: 6 },
           ])}
           ${toolFields}
+          <div class="field">
+            <label>Подписывает акт</label>
+            <select id="raspSigner" title="Главный инженер и главный технолог замещают друг друга">
+              ${CHIEF_ROLES.map((r) => `<option value="${esc(r)}"${r === raspSignerRole() ? ' selected' : ''}>${esc(r)} — ${esc(chiefFio(r))}</option>`).join('')}
+            </select>
+            <div class="note">ФИО — из общих данных.</div>
+          </div>
         `;
+        const signerSel = $('raspSigner');
+        if (signerSel) signerSel.onchange = () => {
+          normalizeGiRole();
+          state.raspSigner[isTooling() ? 'tooling' : 'machine'] = signerSel.value;
+          renderPreview();
+        };
         const ta = $('raspProducts');
         if (ta) ta.oninput = () => {
           state.raspProducts = ta.value;
@@ -2260,8 +2298,6 @@
         };
         const qtyInp = $('toolQty');
         if (qtyInp) qtyInp.oninput = () => { state.toolQty = qtyInp.value; renderPreview(); };
-        const chiefInp = $('toolChief');
-        if (chiefInp) chiefInp.oninput = () => { state.toolChief = chiefInp.value; renderPreview(); };
         if (ta) ta.addEventListener('paste', (e) => {
           const text = (e.clipboardData || window.clipboardData).getData('text');
           if (!text || (!text.includes('\t') && !text.includes(';') && text.split('\n').length < 2)) return;
@@ -2876,7 +2912,7 @@
                 ${kitItemsLines(pp, pages).map((t) => `<p>${esc(t)}</p>`).join('')}
               </div>
               <div class="word-sig-spacer"></div>
-              <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(fioSurnameFirst(state.fioGi))}</span></p>
+              <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(chiefFio(giRoleTitle()))}</span></p>
             </div>`,
           sigs: '',
         };
@@ -2902,7 +2938,7 @@
               <p class="justify">${esc(applyTokens(docText('raspBody'))).replace(/\n/g, '<br>')}</p>
               ${toolNameLinesShown().map((n) => `<p class="tool-name">${esc(n)}</p>`).join('')}
               <p class="tool-qty">в количестве ${esc(toolQtyShown())} шт.</p>
-              <p class="word-sig"><span class="role">Главный технолог</span><span class="fio">${esc(toolChiefShown())}</span></p>
+              <p class="word-sig"><span class="role">${esc(raspSignerRole())}</span><span class="fio">${esc(toolChiefShown())}</span></p>
               <p class="tool-appendix"><b>Приложение:</b> комплект отчётных документов на изделие <em>${esc(toolCaption())}</em> на ${esc(sheetsCountText(sheets))} л. в 1 экз.</p>
               <p class="tool-agree">Согласовано:</p>
               <p class="word-sig"><span class="role">Операционный директор</span><span class="fio">Романов В.В.</span></p>
@@ -2954,7 +2990,7 @@
               <p class="word-sig"><span class="role">Заместитель директора по экономике и финансам</span><span class="fio">Сыркина А.Г.</span></p>
               <div class="word-sig-gap"></div>
               <div class="word-sig-gap"></div>
-              <p class="word-sig"><span class="role">${esc(giRoleTitle())}</span><span class="fio">${esc(giFio())}</span></p>
+              <p class="word-sig"><span class="role">${esc(raspSignerRole())}</span><span class="fio">${esc(giFio())}</span></p>
               <div class="rasp-executor">
                 <p>Исполнитель: ${esc(fioSurnameFirst(state.executor || ''))}</p>
                 <p>Тел: ${esc(state.executorPhone || '')}</p>
@@ -3621,7 +3657,7 @@
       rows.push({ cells: ['', ''], height: 8 });
       kitItemsLines(pp, pages || {}).forEach((item) => wrapLines(item, 96).forEach((ln) => pushL(ln)));
       rows.push({ cells: ['', ''], height: 16 });
-      rows.push({ cells: [giRoleTitle(), fioSurnameFirst(fioGi) || ''], style: 'sig', height: 16 });
+      rows.push({ cells: [giRoleTitle(), chiefFio(giRoleTitle())], style: 'sig', height: 16 });
       return { sheetName: 'Комплект', colCount: 2, colWidths: [280, 90], rows };
     }
 
@@ -3642,7 +3678,7 @@
         toolNameLinesShown().forEach((n) => pushL(n, 'title', 18));
         pushL('в количестве ' + toolQtyShown() + ' шт.', 'title', 16);
         rows.push({ cells: ['', ''], height: 12 });
-        rows.push({ cells: ['Главный технолог', toolChiefShown()], style: 'sig', height: 16 });
+        rows.push({ cells: [raspSignerRole(), toolChiefShown()], style: 'sig', height: 16 });
         rows.push({ cells: ['', ''], height: 14 });
         wrapLines('Приложение: комплект отчётных документов на изделие ' + toolCaption() + ' на ' + sheetsCountText(sheets) + ' л. в 1 экз.', 90).forEach((ln) => pushL(ln, 'letterwrap', 16));
         rows.push({ cells: ['', ''], height: 48 });
@@ -3683,7 +3719,7 @@
         ['Заместитель директора по ВК и МТС', 'Мазур Е.В.'],
         ['Заместитель директора по производству', 'Сухарев С.В.'],
         ['Заместитель директора по экономике и финансам', 'Сыркина А.Г.'],
-        [giRoleTitle(), fioSurnameFirst(fioGi) || 'Мельников И.В.'],
+        [raspSignerRole(), giFio()],
       ].forEach(([role, fio], i, arr) => {
         rows.push({ cells: [role, fio], style: 'sig', height: 16 });
         if (i < arr.length - 1) rows.push({ cells: ['', ''], height: 10 });
@@ -3777,7 +3813,9 @@ ${sheets.join('\n')}
       state.fioBtn = 'Алексеев А.А.';
       state.fioBpp = 'Сажнев Д.Н.';
       state.fioGi = 'Мельников И.В.';
+      state.fioGt = 'Останин Н.А.';
       state.giRole = 'Главный инженер';
+      state.raspSigner = { machine: 'Главный инженер', tooling: 'Главный технолог' };
       state.orderDate = '№342/02 от 16.01.2026';
       state.hasStatUnload = true;
       state.texts = {};
@@ -3972,7 +4010,7 @@ ${sheets.join('\n')}
         wPara(String(applyTokens(docText('raspBody'))).split(/\r?\n/), { align: 'both', sz: 22, indent: 709, before: 1920, after: 80 }),
         ...toolNameLinesShown().map((n) => wPara(n, { align: 'center', bold: true, sz: 22, before: 0, after: 40 })),
         wPara('в количестве ' + toolQtyShown() + ' шт.', { align: 'center', sz: 22, before: 0, after: 360 }),
-        wSigTable([{ role: 'Главный технолог', fio: toolChiefShown() }], 22),
+        wSigTable([{ role: raspSignerRole(), fio: toolChiefShown() }], 22),
         wRuns([
           { t: 'Приложение:', bold: true, sz: 22 },
           { t: ' комплект отчётных документов на изделие ', sz: 22 },
@@ -4027,7 +4065,7 @@ ${parts.join('\n')}
         { gap: 828 },
         { role: 'Заместитель директора по экономике и финансам', fio: 'Сыркина А.Г.' },
         { gap: 552 },
-        { role: giRoleTitle(), fio: giFio() },
+        { role: raspSignerRole(), fio: giFio() },
       ];
       const parts = [
         head,
@@ -4058,7 +4096,7 @@ ${parts.join('\n')}
     function downloadWordAct() {
       const xml = buildActWordXml();
       const blob = new Blob(['\uFEFF', xml], { type: 'application/msword;charset=utf-8' });
-      const name = ((DOCS.find((d) => d.id === 'rasp') || {}).name || 'Распоряжение') + (state.product ? '_' + state.product : '');
+      const name = ((DOCS.find((d) => d.id === 'rasp') || {}).name || 'Акт') + (state.product ? '_' + state.product : '');
       triggerDownload(blob, name.replace(/[\\/:*?"<>|]+/g, '_') + '.doc');
     }
 
@@ -4165,10 +4203,13 @@ ${parts.join('\n')}
         ['Изделие', state.product],
         ['Нач. БТН', state.fioBtn],
         ['Нач. БПП/ТБПП', state.fioBpp],
-        [giRoleTitle(), state.fioGi],
+        ['Главный инженер', state.fioGi],
+        ['Главный технолог', state.fioGt],
+        ['Подпись в комплекте', giRoleTitle()],
+        ['Подпись в акте', raspSignerRole()],
         ['Исполнитель', state.executor],
         ['Тел. исполнителя', state.executorPhone],
-        ['Акт', state.orderDate],
+        ['Распоряжение', state.orderDate],
         ['Статистика выгрузки', statOn() ? 'да' : 'нет'],
         ['Порядок печати/Excel', ids.map((id) => (DOCS.find((d) => d.id === id) || {}).name || id).join(' → ')],
       ]));
@@ -4189,6 +4230,7 @@ ${parts.join('\n')}
         el.oninput = () => {
           state[key] = el.value;
           if (key === 'giRole') syncGiRoleLabel();
+          if ((key === 'fioGi' || key === 'fioGt') && state.current === 'rasp') renderEditor();
           if (key === 'product' && state.current === 'rasp' && !state.raspProducts) {
             // keep live
           }
